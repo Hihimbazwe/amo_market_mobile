@@ -1,0 +1,160 @@
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { Menu, AlertCircle, Clock, CheckCircle2, ShieldAlert, MessageSquare, ChevronRight, Gavel } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlatList } from 'react-native';
+import CustomText from '../../components/CustomText';
+import { Colors } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
+import { SellerDrawerContext } from '../../context/SellerDrawerContext';
+import { useAuth } from '../../context/AuthContext';
+import { sellerService } from '../../api/sellerService';
+
+// Mock disputes removed
+
+const SellerDisputesScreen = () => {
+  const { toggleDrawer } = React.useContext(SellerDrawerContext);
+  const { user } = useAuth();
+  const { colors, isDarkMode } = useTheme();
+  const [disputes, setDisputes] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const fetchDisputes = async () => {
+    if (!user?.id) return;
+    try {
+      const data = await sellerService.getDisputes(user.id);
+      setDisputes(data);
+    } catch (error) {
+      console.error('Error fetching disputes:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchDisputes();
+  }, [user]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDisputes();
+  };
+
+  const renderDisputeItem = ({ item }) => {
+    const title = item.order?.items[0]?.product?.title || 'Order Item';
+    const lastMsg = item.description || item.reason;
+    const dateStr = new Date(item.createdAt).toLocaleDateString();
+
+    return (
+      <TouchableOpacity style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.idContainer}>
+            <ShieldAlert color={colors.primary} size={14} />
+            <CustomText style={[styles.idText, { color: colors.primary }]}>#{item.id.slice(-6).toUpperCase()}</CustomText>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: item.status === 'OPEN' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)' }]}>
+            <CustomText style={[styles.statusText, { color: item.status === 'OPEN' ? '#EF4444' : '#10B981' }]}>{item.status}</CustomText>
+          </View>
+        </View>
+        
+        <CustomText style={[styles.titleText, { color: colors.foreground }]}>{title}</CustomText>
+        <CustomText style={styles.orderId}>Order #{item.orderId.slice(-8).toUpperCase()}</CustomText>
+        
+        <View style={[styles.messageBox, { backgroundColor: colors.glass }]}>
+          <MessageSquare color={colors.muted} size={12} />
+          <CustomText style={[styles.messageText, { color: colors.muted }]} numberOfLines={1}>{lastMsg}</CustomText>
+        </View>
+        
+        <View style={styles.cardFooter}>
+          <CustomText style={styles.dateText}>{dateStr}</CustomText>
+          <View style={styles.detailsBtn}>
+            <CustomText style={styles.detailsText}>VIEW DISPUTE</CustomText>
+            <ChevronRight color="#F97316" size={14} />
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
+          <Menu color={colors.foreground} size={24} />
+        </TouchableOpacity>
+        <CustomText variant="h2">Disputes</CustomText>
+      </View>
+      
+      {loading && disputes.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color="#F97316" />
+        </View>
+      ) : (
+        <FlatList
+          data={disputes}
+          renderItem={renderDisputeItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F97316" />
+          }
+          ListHeaderComponent={
+            <View style={[styles.infoBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Gavel color={colors.primary} size={24} />
+              <CustomText style={[styles.infoTitle, { color: colors.foreground }]}>Resolution Center</CustomText>
+              <CustomText style={styles.infoDesc}>Communicate with buyers and AMO agents to resolve order issues.</CustomText>
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <ShieldAlert color="rgba(255,255,255,0.1)" size={64} />
+              <CustomText style={styles.emptyText}>No active disputes. Good job!</CustomText>
+            </View>
+          }
+        />
+      )}
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  header: {
+    flexDirection: 'row', alignItems: 'center', padding: 20,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  menuButton: { marginRight: 16, padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  listContent: { padding: 16, paddingBottom: 100 },
+  infoBox: { 
+    alignItems: 'center', padding: 24, backgroundColor: 'rgba(255,255,255,0.02)', 
+    borderRadius: 24, marginBottom: 24, borderHorizontalWidth: 0, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' 
+  },
+  infoTitle: { color: Colors.white, fontSize: 18, fontWeight: 'bold', marginTop: 12 },
+  infoDesc: { color: Colors.muted, fontSize: 12, textAlign: 'center', marginTop: 8, lineHeight: 18 },
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 16, 
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 16
+  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  idContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  idText: { color: '#F97316', fontSize: 12, fontWeight: 'bold' },
+  statusBadge: { backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  statusText: { color: '#EF4444', fontSize: 9, fontWeight: 'bold' },
+  titleText: { color: Colors.white, fontSize: 16, fontWeight: 'bold' },
+  orderId: { color: Colors.muted, fontSize: 11, marginTop: 4 },
+  messageBox: { 
+    flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, 
+    backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 12, marginTop: 16 
+  },
+  messageText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, flex: 1 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
+  dateText: { color: Colors.muted, fontSize: 11 },
+  detailsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  detailsText: { color: '#F97316', fontSize: 11, fontWeight: '900' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', height: 200 },
+  emptyText: { color: Colors.muted, marginTop: 16, fontSize: 14, fontWeight: '600' }
+});
+
+export default SellerDisputesScreen;
