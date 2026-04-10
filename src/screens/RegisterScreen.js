@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
 import CustomInput from '../components/CustomInput';
-import { Colors } from '../theme/colors';
 import { ShoppingBag, Store, UserCheck } from 'lucide-react-native';
 import { authService } from '../api/authService';
 
@@ -63,7 +62,7 @@ const RegisterScreen = ({ navigation }) => {
       >
         <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={Colors.white} size={24} />
+          <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
         <CustomText variant="h2">Register</CustomText>
       </View>
@@ -114,7 +113,7 @@ const RegisterScreen = ({ navigation }) => {
                     role === item.id && styles.activeRoleItem
                   ]}
                 >
-                  <item.icon size={24} color={role === item.id ? Colors.primary : Colors.muted} />
+                  <item.icon size={24} color={role === item.id ? '#e67e22' : '#94a3b8'} />
                   <CustomText style={[
                     styles.roleItemText,
                     role === item.id && styles.activeRoleItemText
@@ -177,7 +176,7 @@ const RegisterScreen = ({ navigation }) => {
             style={styles.link}
           >
             <CustomText style={styles.linkText}>
-              Already have an account? <CustomText style={{ color: Colors.primary }}>Login</CustomText>
+              Already have an account? <CustomText style={{ color: '#e67e22' }}>Login</CustomText>
             </CustomText>
           </TouchableOpacity>
         </View>
@@ -190,7 +189,7 @@ const RegisterScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
   },
   header: {
     flexDirection: 'row',
@@ -218,7 +217,7 @@ const styles = StyleSheet.create({
   roleLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: Colors.muted,
+    color: '#94a3b8',
     textAlign: 'center',
     letterSpacing: 2,
     marginBottom: 16,
@@ -238,17 +237,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
   activeRoleItem: {
-    borderColor: Colors.primary,
+    borderColor: '#e67e22',
     backgroundColor: 'rgba(249, 115, 22, 0.1)',
   },
   roleItemText: {
     marginTop: 8,
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.muted,
+    color: '#94a3b8',
   },
   activeRoleItemText: {
-    color: Colors.primary,
+    color: '#e67e22',
   },
   form: {
     width: '100%',
@@ -266,13 +265,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   agentInfoTitle: {
-    color: Colors.primary,
+    color: '#e67e22',
     fontSize: 14,
     fontWeight: '800',
     marginBottom: 4,
   },
   agentInfoText: {
-    color: Colors.muted,
+    color: '#94a3b8',
     fontSize: 12,
     lineHeight: 18,
   },
@@ -280,7 +279,7 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 48,
-    color: Colors.muted,
+    color: '#94a3b8',
   },
   placeholderForm: {
     width: '100%',
@@ -294,7 +293,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   placeholderText: {
-    color: Colors.muted,
+    color: '#94a3b8',
     fontStyle: 'italic',
   },
   button: {
@@ -304,7 +303,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   linkText: {
-    color: Colors.muted,
+    color: '#94a3b8',
     fontSize: 14,
   },
 });

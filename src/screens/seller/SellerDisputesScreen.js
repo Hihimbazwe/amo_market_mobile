@@ -4,11 +4,11 @@ import { Menu, AlertCircle, Clock, CheckCircle2, ShieldAlert, MessageSquare, Che
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlatList } from 'react-native';
 import CustomText from '../../components/CustomText';
-import { Colors } from '../../theme/colors';
 import { useTheme } from '../../context/ThemeContext';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
+import NotificationIcon from '../../components/NotificationIcon';
 
 // Mock disputes removed
 
@@ -70,8 +70,8 @@ const SellerDisputesScreen = () => {
         <View style={styles.cardFooter}>
           <CustomText style={styles.dateText}>{dateStr}</CustomText>
           <View style={styles.detailsBtn}>
-            <CustomText style={styles.detailsText}>VIEW DISPUTE</CustomText>
-            <ChevronRight color="#F97316" size={14} />
+            <CustomText style={[styles.detailsText, { color: colors.primary }]}>VIEW DISPUTE</CustomText>
+            <ChevronRight color={colors.primary} size={14} />
           </View>
         </View>
       </TouchableOpacity>
@@ -84,12 +84,13 @@ const SellerDisputesScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Disputes</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>Disputes</CustomText>
+        <NotificationIcon />
       </View>
       
       {loading && disputes.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color="#F97316" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -98,7 +99,7 @@ const SellerDisputesScreen = () => {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F97316" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
           }
           ListHeaderComponent={
             <View style={[styles.infoBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -109,7 +110,7 @@ const SellerDisputesScreen = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <ShieldAlert color="rgba(255,255,255,0.1)" size={64} />
+              <ShieldAlert color={colors.isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} size={64} />
               <CustomText style={styles.emptyText}>No active disputes. Good job!</CustomText>
             </View>
           }
@@ -120,41 +121,41 @@ const SellerDisputesScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', padding: 20,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1,
   },
-  menuButton: { marginRight: 16, padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
   listContent: { padding: 16, paddingBottom: 100 },
   infoBox: { 
-    alignItems: 'center', padding: 24, backgroundColor: 'rgba(255,255,255,0.02)', 
-    borderRadius: 24, marginBottom: 24, borderHorizontalWidth: 0, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' 
+    alignItems: 'center', padding: 24, 
+    borderRadius: 24, marginBottom: 24, borderHorizontalWidth: 0, borderWidth: 1
   },
-  infoTitle: { color: Colors.white, fontSize: 18, fontWeight: 'bold', marginTop: 12 },
-  infoDesc: { color: Colors.muted, fontSize: 12, textAlign: 'center', marginTop: 8, lineHeight: 18 },
+  infoTitle: { fontSize: 18, fontWeight: 'bold', marginTop: 12 },
+  infoDesc: { fontSize: 12, textAlign: 'center', marginTop: 8, lineHeight: 18 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 16, 
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 16
+    borderRadius: 20, padding: 16, 
+    borderWidth: 1, marginBottom: 16
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   idContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  idText: { color: '#F97316', fontSize: 12, fontWeight: 'bold' },
-  statusBadge: { backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  statusText: { color: '#EF4444', fontSize: 9, fontWeight: 'bold' },
-  titleText: { color: Colors.white, fontSize: 16, fontWeight: 'bold' },
-  orderId: { color: Colors.muted, fontSize: 11, marginTop: 4 },
+  idText: { fontSize: 12, fontWeight: 'bold' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  statusText: { fontSize: 9, fontWeight: 'bold' },
+  titleText: { fontSize: 16, fontWeight: 'bold' },
+  orderId: { fontSize: 11, marginTop: 4 },
   messageBox: { 
     flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, 
-    backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 12, marginTop: 16 
+    borderRadius: 12, marginTop: 16 
   },
-  messageText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, flex: 1 },
+  messageText: { fontSize: 12, flex: 1 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
-  dateText: { color: Colors.muted, fontSize: 11 },
+  dateText: { fontSize: 11 },
   detailsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  detailsText: { color: '#F97316', fontSize: 11, fontWeight: '900' },
+  detailsText: { fontSize: 11, fontWeight: '900' },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', height: 200 },
-  emptyText: { color: Colors.muted, marginTop: 16, fontSize: 14, fontWeight: '600' }
+  emptyText: { marginTop: 16, fontSize: 14, fontWeight: '600' }
 });
 
 export default SellerDisputesScreen;

@@ -11,6 +11,7 @@ import {
   Alert,
   FlatList
 } from 'react-native';
+import {Text} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   ArrowLeft, 
@@ -33,8 +34,9 @@ import CustomButton from '../components/CustomButton';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 import ProductCard from '../components/ProductCard';
-import { Colors } from '../theme/colors';
+import NotificationIcon from '../components/NotificationIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -44,8 +46,10 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const { addToCart, loading: cartLoading } = useCart();
+  const { isInWishlist, toggleWishlist, loading: wishlistLoading } = useWishlist();
   const [addingToCart, setAddingToCart] = useState(false);
   
+  const isFavorite = routeProduct?.id ? isInWishlist(routeProduct.id) : false;
   const media = routeProduct?.media || [];
   const hasImages = media.length > 0;
   
@@ -152,14 +156,23 @@ const ProductDetailScreen = ({ route, navigation }) => {
           <SafeAreaView style={styles.headerOverlay}>
             <View style={styles.headerActions}>
               <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
-                <ArrowLeft color={Colors.white} size={24} />
+                <ArrowLeft color="#ffffff" size={24} />
               </TouchableOpacity>
               <View style={styles.headerRight}>
                 <TouchableOpacity style={styles.iconButton} onPress={onShare}>
-                  <Share2 color={Colors.white} size={24} />
+                  <Share2 color="#ffffff" size={24} />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.iconButton, { marginLeft: 12 }]}>
-                  <Heart color={Colors.white} size={24} />
+                <NotificationIcon style={{ marginLeft: 12, backgroundColor: 'rgba(0,0,0,0.3)', width: 44, height: 44, borderRadius: 22 }} color="#ffffff" />
+                 <TouchableOpacity 
+                  style={[styles.iconButton, { marginLeft: 12 }]}
+                  onPress={() => product.id && toggleWishlist(product.id)}
+                  disabled={wishlistLoading}
+                >
+                  <Heart 
+                    color={isFavorite ? '#e67e22' : '#ffffff'} 
+                    size={24} 
+                    fill={isFavorite ? '#e67e22' : 'transparent'} 
+                  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -209,7 +222,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
             <View style={styles.sellerDetails}>
               <CustomText style={styles.sellerName}>{product.seller.name}</CustomText>
               <View style={styles.locationRow}>
-                <MapPin size={12} color={Colors.muted} />
+                <MapPin size={12} color={'#94a3b8'} />
                 <CustomText variant="caption" style={styles.locationText}>{product.location}</CustomText>
               </View>
             </View>
@@ -226,7 +239,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
               { icon: ShieldCheck, label: 'Verified', desc: 'Certified' }
             ].map((badge, idx) => (
               <View key={idx} style={styles.badgeItem}>
-                <badge.icon size={20} color={Colors.primary} />
+                <badge.icon size={20} color={'#e67e22'} />
                 <CustomText style={styles.badgeLabel}>{badge.label}</CustomText>
                 <CustomText style={styles.badgeDesc}>{badge.desc}</CustomText>
               </View>
@@ -252,9 +265,9 @@ const ProductDetailScreen = ({ route, navigation }) => {
               disabled={addingToCart}
             >
               {addingToCart ? (
-                <Loader2 color={Colors.primary} size={24} className="animate-spin" />
+                <Loader2 color={'#e67e22'} size={24} className="animate-spin" />
               ) : (
-                <ShoppingCart color={Colors.primary} size={24} />
+                <ShoppingCart color={'#e67e22'} size={24} />
               )}
               <CustomText style={styles.cartBtnText}>
                 {addingToCart ? "Adding..." : "Add to Cart"}
@@ -318,7 +331,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
   },
   imageContainer: {
     height: 380,
@@ -353,7 +366,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     marginTop: -32,
@@ -402,7 +415,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(249, 115, 22, 0.1)',
   },
   price: {
-    color: Colors.primary,
+    color: '#e67e22',
   },
   unitPrice: {
     marginTop: 4,
@@ -432,7 +445,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   initials: {
-    color: Colors.primary,
+    color: '#e67e22',
     fontWeight: '800',
   },
   sellerDetails: {
@@ -458,7 +471,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   viewMapText: {
-    color: Colors.primary,
+    color: '#e67e22',
     fontSize: 10,
     fontWeight: '800',
   },
@@ -483,7 +496,7 @@ const styles = StyleSheet.create({
   },
   paginationDotActive: {
     width: 20,
-    backgroundColor: Colors.white,
+    backgroundColor: '#ffffff',
   },
   avatarImage: {
     width: '100%',
@@ -512,7 +525,7 @@ const styles = StyleSheet.create({
   },
   badgeDesc: {
     fontSize: 9,
-    color: Colors.muted,
+    color: '#94a3b8',
   },
   actionRow: {
     flexDirection: 'row',
@@ -549,7 +562,7 @@ const styles = StyleSheet.create({
   cartBtnText: {
     marginLeft: 8,
     fontWeight: '700',
-    color: Colors.primary,
+    color: '#e67e22',
   },
   tabsContainer: {
     marginTop: 32,
@@ -570,27 +583,27 @@ const styles = StyleSheet.create({
   },
   activeTabItem: {
     borderBottomWidth: 2,
-    borderBottomColor: Colors.primary,
+    borderBottomColor: '#e67e22',
     marginBottom: -14,
   },
   tabHeaderActive: {
     borderBottomWidth: 2,
-    borderBottomColor: Colors.primary,
+    borderBottomColor: '#e67e22',
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.muted,
+    color: '#94a3b8',
   },
   activeTabText: {
-    color: Colors.primary,
+    color: '#e67e22',
   },
   tabBody: {
     paddingTop: 20,
   },
   tabContent: {
     lineHeight: 22,
-    color: Colors.muted,
+    color: '#94a3b8',
   },
   specRow: {
     flexDirection: 'row',
@@ -601,7 +614,7 @@ const styles = StyleSheet.create({
     width: 100,
   },
   specValue: {
-    color: Colors.muted,
+    color: '#94a3b8',
   },
   relatedSection: {
     marginTop: 40,
@@ -635,7 +648,7 @@ const styles = StyleSheet.create({
   relatedPrice: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primary,
+    color: '#e67e22',
     marginTop: 4,
   },
   bottomBar: {

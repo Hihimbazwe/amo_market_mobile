@@ -5,13 +5,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../../components/CustomText';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
-import { Colors } from '../../theme/colors';
+
+import { useTheme } from '../../context/ThemeContext';
 import { BuyerDrawerContext as DrawerContext } from '../../context/BuyerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
 
 const BuyerProfileScreen = () => {
   const { toggleDrawer } = React.useContext(DrawerContext);
+  const { colors } = useTheme();
   const { user, login } = useAuth(); // login here acts as updating the user context
 
   const [name, setName] = useState(user?.name || '');
@@ -41,20 +43,20 @@ const BuyerProfileScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={toggleDrawer} style={styles.menuButton}>
-          <Menu color={Colors.white} size={24} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { borderBottomColor: colors.glassBorder }]}>
+        <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
+          <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
         <CustomText variant="h2">Profile</CustomText>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.avatarSection}>
-          <View style={styles.avatarPlaceholder}>
-            <User color={Colors.white} size={48} />
+          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20', borderColor: colors.primary + '50' }]}>
+            <User color={colors.primary} size={48} />
           </View>
           <CustomText variant="h2" style={{ marginTop: 16 }}>{user?.name || 'AMO User'}</CustomText>
-          <CustomText style={{ color: Colors.muted }}>{user?.email || 'user@example.com'}</CustomText>
+          <CustomText style={{ color: colors.muted }}>{user?.email || 'user@example.com'}</CustomText>
         </View>
 
         <View style={styles.formSection}>
@@ -91,20 +93,17 @@ const BuyerProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   menuButton: {
     marginRight: 16,
     padding: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   content: {
     padding: 24,
@@ -117,11 +116,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'rgba(249, 115, 22, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(249, 115, 22, 0.5)',
   },
   formSection: {
     gap: 16,

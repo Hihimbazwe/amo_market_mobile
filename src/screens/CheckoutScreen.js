@@ -37,8 +37,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { locationService } from '../api/locationService';
 import { checkoutService } from '../api/checkoutService';
-import { Colors } from '../theme/colors';
-
+import {Text, } from 'react-native';
 const { width } = Dimensions.get('window');
 
 const CheckoutScreen = ({ navigation }) => {

@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { Colors } from '../theme/colors';
 import CustomText from './CustomText';
 import CustomButton from './CustomButton';
 import { LogIn } from 'lucide-react-native';
@@ -27,7 +26,7 @@ const AuthOverlay = () => {
             style={styles.signInButton}
             onPress={() => navigation.navigate('Login')}
           >
-            <LogIn size={18} color={Colors.white} />
+            <LogIn size={18} color="#ffffff" />
             <CustomText style={styles.signInText}>Sign In</CustomText>
           </TouchableOpacity>
         </View>
@@ -68,17 +67,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: Colors.white,
+    color: '#ffffff',
     fontSize: 12,
     fontWeight: '800',
   },
   subtitle: {
-    color: Colors.muted,
+    color: '#94a3b8',
     fontSize: 10,
     marginTop: 2,
   },
   signInButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#e67e22',
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
@@ -87,7 +86,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   signInText: {
-    color: Colors.white,
+    color: '#ffffff',
     fontSize: 11,
     fontWeight: '700',
   },

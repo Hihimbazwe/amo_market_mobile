@@ -1,7 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, View } from 'react-native';
 import CustomText from './CustomText';
-import { Colors } from '../theme/colors';
 
 const CategoryItem = ({ label, icon: Icon, color, onPress }) => {
   return (
@@ -11,7 +10,7 @@ const CategoryItem = ({ label, icon: Icon, color, onPress }) => {
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: color ? `${color}15` : 'rgba(255,255,255,0.05)' }]}>
-        <Icon size={24} color={color || Colors.primary} />
+        <Icon size={24} color={color || '#e67e22'} />
       </View>
       <CustomText variant="caption" style={styles.label}>
         {label}

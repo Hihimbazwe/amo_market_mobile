@@ -3,16 +3,15 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } fro
 import { Menu, TrendingUp, Users, ShoppingBag, BarChart2, ArrowUpRight } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../../components/CustomText';
-import { Colors } from '../../theme/colors';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
+import NotificationIcon from '../../components/NotificationIcon';
 
 
 // Removed hardcoded data constants as they are now fetched from the backend
-
 const PERIODS = ['7D', '30D', '3M', '1Y'];
 
 export default function SellerAnalyticsScreen() {
@@ -61,13 +60,14 @@ export default function SellerAnalyticsScreen() {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Store Analytics</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>Store Analytics</CustomText>
+        <NotificationIcon />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {loading && !analytics ? (
           <View style={{ padding: 40, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#F97316" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <>
@@ -143,7 +143,7 @@ export default function SellerAnalyticsScreen() {
           <View style={styles.listCard}>
             {topProducts.length === 0 ? (
               <View style={{ padding: 20, alignItems: 'center' }}>
-                <CustomText style={{ color: Colors.muted }}>No products sold yet.</CustomText>
+                <CustomText style={{ color: colors.muted }}>No products sold yet.</CustomText>
               </View>
             ) : (
               topProducts.map((p, i) => {
@@ -195,47 +195,47 @@ export default function SellerAnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', padding: 20,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1,
   },
-  menuButton: { marginRight: 16, padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
   content: { padding: 16, paddingBottom: 60 },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
   metricCard: {
-    width: '47%', backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', position: 'relative',
+    width: '47%',
+    borderRadius: 16, padding: 16, borderWidth: 1, position: 'relative',
   },
   metricIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  metricValue: { color: Colors.white, fontSize: 20, fontWeight: '900' },
-  metricLabel: { color: Colors.muted, fontSize: 9, fontWeight: 'bold', letterSpacing: 0.8, marginTop: 2 },
+  metricValue: { fontSize: 20, fontWeight: '900' },
+  metricLabel: { fontSize: 9, fontWeight: 'bold', letterSpacing: 0.8, marginTop: 2 },
   metricDelta: {
     position: 'absolute', top: 14, right: 14, flexDirection: 'row', alignItems: 'center', gap: 2,
     backgroundColor: 'rgba(16,185,129,0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
   },
   metricDeltaText: { color: '#10B981', fontSize: 10, fontWeight: 'bold' },
   chartCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 20,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 24,
+    borderRadius: 20, padding: 20,
+    borderWidth: 1, marginBottom: 24,
   },
   chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  chartTitle: { color: Colors.white, fontSize: 16, fontWeight: 'bold' },
+  chartTitle: { fontSize: 16, fontWeight: 'bold' },
   periodPicker: { flexDirection: 'row', gap: 6 },
-  periodChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.03)' },
+  periodChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   periodChipActive: { backgroundColor: '#F97316' },
-  periodText: { color: Colors.muted, fontSize: 11, fontWeight: 'bold' },
-  periodTextActive: { color: Colors.white },
+  periodText: { fontSize: 11, fontWeight: 'bold' },
+  periodTextActive: { },
   barChart: { flexDirection: 'row', alignItems: 'flex-end', height: 120, gap: 6 },
   barGroup: { flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' },
   barContainer: { width: '100%', height: '85%', justifyContent: 'flex-end' },
   bar: { width: '100%', borderRadius: 6, minHeight: 4 },
-  barLabel: { color: Colors.muted, fontSize: 8, marginTop: 6, textAlign: 'center' },
+  barLabel: { fontSize: 8, marginTop: 6, textAlign: 'center' },
   section: { marginBottom: 24 },
-  sectionTitle: { color: Colors.white, fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
   listCard: {
-    backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 20, padding: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20, padding: 8,
+    borderWidth: 1,
   },
   productRow: { flexDirection: 'row', alignItems: 'center', padding: 14 },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
@@ -243,15 +243,15 @@ const styles = StyleSheet.create({
     width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(249,115,22,0.12)',
     alignItems: 'center', justifyContent: 'center',
   },
-  rankText: { color: '#F97316', fontSize: 12, fontWeight: '900' },
-  productName: { color: Colors.white, fontSize: 14, fontWeight: 'bold' },
-  productRevenue: { color: Colors.muted, fontSize: 11, marginTop: 2, marginBottom: 6 },
+  rankText: { fontSize: 12, fontWeight: '900' },
+  productName: { fontSize: 14, fontWeight: 'bold' },
+  productRevenue: { fontSize: 11, marginTop: 2, marginBottom: 6 },
   progressBg: { height: 4, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)' },
   progressFill: { height: 4, borderRadius: 4, backgroundColor: '#F97316' },
-  productPct: { color: Colors.muted, fontSize: 12, fontWeight: 'bold', marginLeft: 12 },
+  productPct: { fontSize: 12, fontWeight: 'bold', marginLeft: 12 },
   categoryRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
   catDot: { width: 10, height: 10, borderRadius: 5 },
-  catName: { color: Colors.white, fontSize: 13, fontWeight: '600', width: 90 },
+  catName: { fontSize: 13, fontWeight: '600', width: 90 },
   catBarBg: { flex: 1, height: 6, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)' },
   catBarFill: { height: 6, borderRadius: 4 },
   catPct: { fontSize: 12, fontWeight: 'bold', width: 36, textAlign: 'right' },

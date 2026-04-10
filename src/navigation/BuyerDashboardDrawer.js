@@ -2,8 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Modal, Animated, Dimensions, TouchableWithoutFeedback, Image, Alert } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { BuyerDrawerContext } from '../context/BuyerDrawerContext';
 import CustomText from '../components/CustomText';
-import { Colors } from '../theme/colors';
+import { Sun, Moon } from 'lucide-react-native';
+
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { 
   Home, 
@@ -26,17 +29,17 @@ import BuyerWalletScreen from '../screens/buyer/BuyerWalletScreen';
 import BuyerDisputesScreen from '../screens/buyer/BuyerDisputesScreen';
 import BuyerReplacementsScreen from '../screens/buyer/BuyerReplacementsScreen';
 import BuyerSettingsScreen from '../screens/buyer/BuyerSettingsScreen';
+import BuyerOrderTrackingScreen from '../screens/buyer/BuyerOrderTrackingScreen';
 
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
-// A custom Context to allow any screen inside the stack to toggle the drawer
-import { BuyerDrawerContext } from '../context/BuyerDrawerContext';
 
 const CustomDrawer = ({ visible, onClose, navigation }) => {
   const slideAnim = useRef(new Animated.Value(-width * 0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const { isDarkMode, colors, toggleTheme } = useTheme();
 
   useEffect(() => {
     if (visible) {
@@ -72,14 +75,14 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
           <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]} />
         </TouchableWithoutFeedback>
         
-        <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
-          <View style={styles.drawerHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+        <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }], backgroundColor: colors.background, borderRightColor: colors.glassBorder }]}>
+          <View style={[styles.drawerHeader, { borderBottomColor: colors.glassBorder }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
               <Image 
                 source={require('../../assets/logo.png')} 
-                style={{ width: 40, height: 40, resizeMode: 'contain', marginRight: 12 }} 
+                style={{ width: 34, height: 34, resizeMode: 'contain', marginRight: 10 }} 
               />
-              <Svg height="30" width="110">
+              <Svg height="28" width="110">
                 <Defs>
                   <LinearGradient id="grad2" x1="0" y1="0" x2="1" y2="0">
                     <Stop offset="0" stopColor="#A855F7" stopOpacity="1" />
@@ -88,16 +91,24 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
                 </Defs>
                 <SvgText
                   fill="url(#grad2)"
-                  fontSize="18"
+                  fontSize="17"
                   fontWeight="900"
                   x="0"
-                  y="22"
+                  y="20"
                   textAnchor="start"
                 >AMO Market</SvgText>
               </Svg>
             </View>
+
+            {/* User Info - Email Only */}
+            <View style={{ marginTop: 4 }}>
+              <CustomText style={{ color: colors.foreground, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+                {user?.email || 'Buyer'}
+              </CustomText>
+            </View>
+
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X color={Colors.muted} size={24} />
+              <X color={colors.muted} size={22} />
             </TouchableOpacity>
           </View>
 
@@ -114,8 +125,8 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
                     navigation.navigate('Me', { screen: route.name });
                   }}
                 >
-                  <IconComponent color={Colors.muted} size={20} />
-                  <CustomText style={styles.drawerItemText}>{route.name}</CustomText>
+                  <IconComponent color={colors.muted} size={20} />
+                  <CustomText style={[styles.drawerItemText, { color: colors.foreground }]}>{route.name}</CustomText>
                 </TouchableOpacity>
               );
             })}
@@ -136,10 +147,10 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
                 }
               ]);
             }} 
-            style={styles.logoutButton}
+            style={[styles.logoutButton, { borderColor: '#ff4444' }]}
           >
-            <LogOut color={Colors.white} size={20} />
-            <CustomText style={{ color: Colors.white, marginLeft: 12, fontWeight: 'bold' }}>Sign Out</CustomText>
+            <LogOut color="#ff4444" size={20} />
+            <CustomText style={{ color: '#ff4444', marginLeft: 12, fontWeight: 'bold' }}>Sign Out</CustomText>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -162,6 +173,7 @@ export default function BuyerDashboard({ navigation }) {
           <Stack.Screen name="Disputes" component={BuyerDisputesScreen} />
           <Stack.Screen name="Replacements" component={BuyerReplacementsScreen} />
           <Stack.Screen name="Settings" component={BuyerSettingsScreen} />
+          <Stack.Screen name="OrderTracking" component={BuyerOrderTrackingScreen} />
         </Stack.Navigator>
         
         <CustomDrawer 
@@ -181,12 +193,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   drawer: {
     width: width * 0.75,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
     height: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 5, height: 0 },
@@ -228,7 +244,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   drawerItemText: {
-    color: Colors.muted,
+    color: '#94a3b8',
     marginLeft: 12,
     fontSize: 16,
     fontWeight: '600',
@@ -236,8 +252,23 @@ const styles = StyleSheet.create({
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    backgroundColor: 'transparent',
+  },
+  toggleTrack: {
+    width: 32,
+    height: 18,
+    borderRadius: 9,
+    padding: 2,
+  },
+  toggleThumb: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: 'white',
   },
 });

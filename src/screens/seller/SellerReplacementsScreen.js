@@ -1,14 +1,14 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Alert, Image } from 'react-native';
 import { Menu, RefreshCcw, CheckCircle2, XCircle, Clock, ChevronRight, CheckCircle, Package } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlatList } from 'react-native';
 import CustomText from '../../components/CustomText';
-import { Colors } from '../../theme/colors';
 import { useTheme } from '../../context/ThemeContext';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
-import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
+import NotificationIcon from '../../components/NotificationIcon';
+import { useAuth } from '../../context/AuthContext';
 
 const SellerReplacementsScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
@@ -58,7 +58,7 @@ const SellerReplacementsScreen = () => {
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
           <View>
-            <CustomText style={styles.idText}>#{item.id.slice(-6).toUpperCase()}</CustomText>
+            <CustomText style={[styles.idText, { color: colors.muted }]}>#{item.id.slice(-6).toUpperCase()}</CustomText>
             <CustomText style={[styles.titleText, { color: colors.foreground }]}>{title}</CustomText>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: item.status === 'PENDING' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)' }]}>
@@ -77,10 +77,26 @@ const SellerReplacementsScreen = () => {
             <CustomText style={styles.label}>Reason:</CustomText>
             <CustomText style={[styles.value, { color: colors.foreground }]}>{item.reason}</CustomText>
           </View>
+          {item.description ? (
+            <View style={[styles.infoRow, { flexDirection: 'column', gap: 4 }]}>
+              <CustomText style={styles.label}>Description:</CustomText>
+              <CustomText style={[styles.value, { color: colors.foreground, fontWeight: 'normal' }]}>{item.description}</CustomText>
+            </View>
+          ) : null}
           <View style={styles.infoRow}>
             <CustomText style={styles.label}>Date:</CustomText>
             <CustomText style={[styles.value, { color: colors.foreground }]}>{dateStr}</CustomText>
           </View>
+          {item.evidence && item.evidence.length > 0 ? (
+            <View style={[styles.infoRow, { flexDirection: 'column', gap: 8, marginTop: 4 }]}>
+              <CustomText style={styles.label}>Evidence:</CustomText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {item.evidence.map((img, idx) => (
+                  <Image key={idx} source={{ uri: img }} style={styles.evidenceThumbnail} />
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
         </View>
 
         {item.status === 'PENDING' && (
@@ -89,7 +105,7 @@ const SellerReplacementsScreen = () => {
               style={[styles.actionBtn, styles.approveBtn]}
               onPress={() => handleUpdateStatus(item.id, 'APPROVED')}
             >
-              <CheckCircle color={Colors.white} size={14} />
+              <CheckCircle color="white" size={14} />
               <CustomText style={styles.actionBtnText}>Approve</CustomText>
             </TouchableOpacity>
             <TouchableOpacity 
@@ -111,12 +127,13 @@ const SellerReplacementsScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Replacements</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>Replacements</CustomText>
+        <NotificationIcon />
       </View>
       
       {loading && replacements.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#F97316" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -125,7 +142,7 @@ const SellerReplacementsScreen = () => {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F97316" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
           }
           ListHeaderComponent={
             <View style={[styles.headerBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -135,7 +152,7 @@ const SellerReplacementsScreen = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Package color="rgba(255,255,255,0.1)" size={64} />
+              <Package color={colors.isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} size={64} />
               <CustomText style={styles.emptyText}>No replacement requests yet.</CustomText>
             </View>
           }
@@ -146,36 +163,37 @@ const SellerReplacementsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', padding: 20,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1,
   },
-  menuButton: { marginRight: 16, padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
   listContent: { padding: 16, paddingBottom: 100 },
   headerBox: { 
     flexDirection: 'row', alignItems: 'center', gap: 16, 
     padding: 20, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 20, marginBottom: 24
   },
-  headerDesc: { flex: 1, color: Colors.muted, fontSize: 13, lineHeight: 18 },
+  headerDesc: { flex: 1, fontSize: 13, lineHeight: 18 },
   card: {
     backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 16, 
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 16
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  idText: { color: Colors.muted, fontSize: 11, fontWeight: 'bold' },
-  titleText: { color: Colors.white, fontSize: 15, fontWeight: 'bold', marginTop: 2 },
+  idText: { fontSize: 11, fontWeight: 'bold' },
+  titleText: { fontSize: 15, fontWeight: 'bold', marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 10, fontWeight: 'bold' },
   cardBody: { gap: 8, marginBottom: 16, padding: 12, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 12 },
   infoRow: { flexDirection: 'row', gap: 8 },
-  label: { color: Colors.muted, fontSize: 12 },
-  value: { color: Colors.white, fontSize: 12, fontWeight: 'bold' },
+  label: { fontSize: 12 },
+  value: { fontSize: 12, fontWeight: 'bold' },
   actions: { flexDirection: 'row', gap: 12 },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: 10 },
   approveBtn: { backgroundColor: '#10B981' },
   rejectBtn: { borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.2)' },
-  actionBtnText: { color: Colors.white, fontWeight: 'bold', fontSize: 13 }
+  actionBtnText: { fontWeight: 'bold', fontSize: 13 },
+  evidenceThumbnail: { width: 60, height: 60, borderRadius: 8, marginRight: 8, backgroundColor: 'rgba(255,255,255,0.05)' }
 });
 
 export default SellerReplacementsScreen;

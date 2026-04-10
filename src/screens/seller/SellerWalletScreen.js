@@ -3,7 +3,6 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndic
 import { Menu, Wallet, ArrowDownToLine, ArrowUpRight, TrendingUp, Clock, History, CreditCard } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../../components/CustomText';
-import { Colors } from '../../theme/colors';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
@@ -80,11 +79,11 @@ const SellerWalletScreen = ({ navigation }) => {
         contentContainerStyle={styles.content} 
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F97316" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
         {loading && !wallet ? (
-          <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 50 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
         ) : (
           <>
             {/* Balance Card */}
@@ -95,7 +94,7 @@ const SellerWalletScreen = ({ navigation }) => {
               </View>
               <View style={styles.balanceActions}>
                 <TouchableOpacity style={styles.withdrawBtn} onPress={() => navigation.navigate('SellerWithdraw')}>
-                  <ArrowDownToLine color={Colors.white} size={20} />
+                  <ArrowDownToLine color="white" size={20} />
                   <CustomText style={styles.withdrawBtnText}>Withdraw</CustomText>
                 </TouchableOpacity>
               </View>
@@ -115,8 +114,8 @@ const SellerWalletScreen = ({ navigation }) => {
 
         {/* Section Header */}
         <View style={styles.sectionHeader}>
-          <History color="#F97316" size={20} />
-          <CustomText style={styles.sectionTitle}>Transaction History</CustomText>
+          <History color={colors.primary} size={20} />
+          <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Transaction History</CustomText>
         </View>
 
         {/* Transactions list implemented as children of ScrollView for simplicity in this mockup, 
@@ -125,7 +124,7 @@ const SellerWalletScreen = ({ navigation }) => {
           {wallet?.transactions?.length > 0 ? (
             wallet.transactions.map((item) => renderTransactionItem({ item }))
           ) : (
-            <CustomText style={{ color: Colors.muted, textAlign: 'center', padding: 20 }}>No transactions yet.</CustomText>
+            <CustomText style={{ color: colors.muted, textAlign: 'center', padding: 20 }}>No transactions yet.</CustomText>
           )}
         </View>
           </>
@@ -151,52 +150,52 @@ const SellerWalletScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', padding: 20,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1,
   },
-  menuButton: { marginRight: 16, padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
   content: { padding: 16 },
   balanceCard: {
     backgroundColor: '#0284c7', borderRadius: 24, padding: 24, marginBottom: 16,
     shadowColor: '#0284c7', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8
   },
   balanceLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
-  balanceAmount: { color: Colors.white, fontSize: 32, fontWeight: '900', marginTop: 8 },
+  balanceAmount: { color: 'white', fontSize: 32, fontWeight: '900', marginTop: 8 },
   balanceActions: { marginTop: 24 },
   withdrawBtn: {
     backgroundColor: 'rgba(255,255,255,0.2)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingVertical: 14, borderRadius: 16, gap: 10
   },
-  withdrawBtnText: { color: Colors.white, fontWeight: 'bold', fontSize: 16 },
+  withdrawBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   statsRow: { flexDirection: 'row', gap: 12, marginBottom: 32 },
   miniStatCard: {
     flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 16,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)'
   },
-  miniStatLabel: { color: Colors.muted, fontSize: 10, fontWeight: 'bold' },
-  miniStatValue: { color: Colors.white, fontSize: 16, fontWeight: 'bold', marginTop: 4 },
+  miniStatLabel: { fontSize: 10, fontWeight: 'bold' },
+  miniStatValue: { fontSize: 16, fontWeight: 'bold', marginTop: 4 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, paddingHorizontal: 4 },
-  sectionTitle: { color: Colors.white, fontSize: 18, fontWeight: 'bold' },
-  txList: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 20, padding: 8, marginBottom: 24 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold' },
+  txList: { borderRadius: 20, padding: 8, marginBottom: 24 },
   txRow: {
     flexDirection: 'row', alignItems: 'center', padding: 12, 
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)'
   },
   txIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  txType: { color: Colors.white, fontSize: 14, fontWeight: 'bold' },
-  txDate: { color: Colors.muted, fontSize: 11, marginTop: 2 },
+  txType: { fontSize: 14, fontWeight: 'bold' },
+  txDate: { fontSize: 11, marginTop: 2 },
   txAmount: { fontSize: 14, fontWeight: '900' },
-  txStatus: { color: Colors.muted, fontSize: 10, marginTop: 2 },
+  txStatus: { fontSize: 10, marginTop: 2 },
   methodsCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 16,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)'
   },
   methodIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(59, 130, 246, 0.2)', alignItems: 'center', justifyContent: 'center' },
-  methodTitle: { color: Colors.white, fontSize: 15, fontWeight: 'bold' },
-  methodDesc: { color: Colors.muted, fontSize: 11, marginTop: 2 },
+  methodTitle: { fontSize: 15, fontWeight: 'bold' },
+  methodDesc: { fontSize: 11, marginTop: 2 },
 });
 
 export default SellerWalletScreen;

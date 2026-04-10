@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
 import CustomInput from '../components/CustomInput';
-import { Colors } from '../theme/colors';
 import { authService } from '../api/authService';
 import { useAuth } from '../context/AuthContext';
 
@@ -30,13 +29,16 @@ const LoginScreen = ({ navigation }) => {
         {
           text: 'OK',
           onPress: () => {
-            // Walk up to the Tab navigator (parent of HomeStack / MarketplaceStack)
-            const tabNav = navigation.getParent();
-            if (tabNav) {
-              tabNav.navigate('Me');
-            } else {
-              navigation.navigate('Me');
+            const state = navigation.getState();
+            if (state && state.routes && state.routes.length > 0) {
+              const firstRouteName = state.routes[0].name;
+              navigation.reset({
+                index: 0,
+                routes: [{ name: firstRouteName }],
+              });
             }
+            
+            navigation.navigate(result.role === 'SELLER' ? 'Me' : 'Home');
           },
         },
       ]);
@@ -64,7 +66,7 @@ const LoginScreen = ({ navigation }) => {
       >
         <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={Colors.white} size={24} />
+          <ArrowLeft color="#e2e8f0" size={24} />
         </TouchableOpacity>
         <CustomText variant="h2">Login</CustomText>
       </View>
@@ -131,7 +133,7 @@ const LoginScreen = ({ navigation }) => {
             style={styles.link}
           >
             <CustomText style={styles.linkText}>
-              Don't have an account? <CustomText style={{ color: Colors.primary }}>Register</CustomText>
+              Don't have an account? <CustomText style={{ color: '#e67e22' }}>Register</CustomText>
             </CustomText>
           </TouchableOpacity>
         </View>
@@ -144,7 +146,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
   },
   header: {
     flexDirection: 'row',
@@ -175,7 +177,7 @@ const styles = StyleSheet.create({
     marginTop: -8,
   },
   forgotPassText: {
-    color: Colors.primary,
+    color: '#e67e22',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -183,7 +185,7 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 48,
-    color: Colors.muted,
+    color: '#94a3b8',
   },
   placeholderForm: {
     width: '100%',
@@ -197,7 +199,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   placeholderText: {
-    color: Colors.muted,
+    color: '#94a3b8',
     fontStyle: 'italic',
   },
   button: {
@@ -207,7 +209,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   linkText: {
-    color: Colors.muted,
+    color: '#94a3b8',
     fontSize: 14,
   },
 });

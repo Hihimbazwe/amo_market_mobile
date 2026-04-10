@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   SafeAreaView,
   Alert,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
+import {Text} from 'react-native';
 import { ArrowLeft, CheckCircle } from 'lucide-react-native';
 import CustomText from '../components/CustomText';
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
-import { Colors } from '../theme/colors';
 import { authService } from '../api/authService';
 import { useAuth } from '../context/AuthContext';
 
@@ -33,10 +33,10 @@ const VerifyOTPScreen = ({ navigation, route }) => {
     try {
       // In a real app, we call the verify endpoint
       // const result = await authService.verifyOTP(email, otp);
-      
+
       // For now, mirroring backend logic with fetch
       const result = await authService.verifyOTP(email, otp);
-      
+
       Alert.alert('Success', 'Email verified successfully!');
       // After verification, we could auto-login or go to login screen
       // The user said "navigate to an otp verification screen instead of going to the login screen"
@@ -51,31 +51,31 @@ const VerifyOTPScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color={Colors.white} size={24} />
+            <ArrowLeft color="#ffffff" size={24} />
           </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.iconContainer}>
-            <CheckCircle color={Colors.primary} size={64} />
+            <CheckCircle color="#e67e22" size={64} />
           </View>
 
           <View style={styles.textContainer}>
             <CustomText variant="h1" style={styles.title}>Verify Email</CustomText>
             <CustomText style={styles.subtitle}>
               We sent a 6-digit code to {'\n'}
-              <CustomText style={{ color: Colors.primary, fontWeight: '700' }}>{email}</CustomText>
+              <CustomText style={{ color: '#e67e22', fontWeight: '700' }}>{email}</CustomText>
             </CustomText>
           </View>
 
           <View style={styles.form}>
-            <CustomInput 
+            <CustomInput
               label="Verification Code"
               placeholder="123456"
               value={otp}
@@ -84,7 +84,7 @@ const VerifyOTPScreen = ({ navigation, route }) => {
               maxLength={6}
             />
 
-            <CustomButton 
+            <CustomButton
               title="Verify Code"
               loading={loading}
               onPress={handleVerify}
@@ -93,7 +93,7 @@ const VerifyOTPScreen = ({ navigation, route }) => {
 
             <TouchableOpacity style={styles.resendLink}>
               <CustomText style={styles.resendText}>
-                Didn't receive code? <CustomText style={{ color: Colors.primary }}>Resend</CustomText>
+                Didn't receive code? <CustomText style={{ color: '#e67e22' }}>Resend</CustomText>
               </CustomText>
             </TouchableOpacity>
           </View>
@@ -106,7 +106,7 @@ const VerifyOTPScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
   },
   header: {
     paddingHorizontal: 20,
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     textAlign: 'center',
-    color: Colors.muted,
+    color: '#94a3b8',
     lineHeight: 22,
   },
   form: {
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resendText: {
-    color: Colors.muted,
+    color: '#94a3b8',
     fontSize: 14,
   },
 });

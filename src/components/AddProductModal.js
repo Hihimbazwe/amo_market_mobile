@@ -4,7 +4,6 @@ import { X, Upload, Image as ImageIcon, Flame, ChevronDown, Video } from 'lucide
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import CustomText from './CustomText';
-import { Colors } from '../theme/colors';
 import { useTheme } from '../context/ThemeContext';
 
 const CATEGORIES = ["Electronics", "Fashion", "Home & Living", "Sports", "Beauty", "Books", "Vehicles", "Other"];
@@ -167,7 +166,7 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
                 <View key={index} style={styles.imageBox}>
                   {media.type === 'video' ? (
                     <View style={[styles.image, { backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }]}>
-                      <Video color={Colors.muted} size={32} />
+                      <Video color="#94a3b8" size={32} />
                     </View>
                   ) : (
                     <Image source={{ uri: media.uri }} style={styles.image} />
@@ -178,7 +177,7 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
                     </View>
                   )}
                   <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeImage(index)} disabled={isSubmitting}>
-                    <X color={Colors.white} size={14} />
+                    <X color="#ffffff" size={14} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -186,11 +185,11 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
               {images.length < 5 && (
                 <>
                   <TouchableOpacity style={styles.addImageBtn} onPress={pickImage} disabled={isSubmitting}>
-                    <ImageIcon color={Colors.muted} size={24} />
+                    <ImageIcon color="#94a3b8" size={24} />
                     <CustomText style={styles.addText}>Add Photo</CustomText>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.addImageBtn} onPress={pickVideo} disabled={isSubmitting}>
-                    <Video color={Colors.muted} size={24} />
+                    <Video color="#94a3b8" size={24} />
                     <CustomText style={styles.addText}>Add Video</CustomText>
                   </TouchableOpacity>
                 </>
@@ -361,7 +360,7 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
                 <CustomText style={styles.draftText}>Save Draft</CustomText>
               </TouchableOpacity>
               <TouchableOpacity style={styles.publishBtn} onPress={() => handleSubmit(true)}>
-                <Upload color={Colors.white} size={18} style={{ marginRight: 8 }} />
+                <Upload color="#ffffff" size={18} style={{ marginRight: 8 }} />
                 <CustomText style={styles.publishText}>Publish Product</CustomText>
               </TouchableOpacity>
             </>
@@ -373,7 +372,7 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: '#030712' },
   header: { 
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
     padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' 
@@ -382,12 +381,12 @@ const styles = StyleSheet.create({
   body: { flex: 1 },
   contentContainer: { padding: 20, paddingBottom: 40 },
   section: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: Colors.white, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 },
+  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#ffffff', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 },
   inputGroup: { marginBottom: 16 },
-  label: { fontSize: 12, color: Colors.muted, marginBottom: 8, fontWeight: 'bold' },
+  label: { fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: 'bold' },
   input: { 
     backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', 
-    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: Colors.white, fontSize: 14 
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: '#ffffff', fontSize: 14 
   },
   textArea: { height: 100 },
   row: { flexDirection: 'row' },
@@ -397,24 +396,24 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginRight: 8, backgroundColor: 'rgba(255,255,255,0.05)' 
   },
   chipActive: { backgroundColor: 'rgba(249, 115, 22, 0.1)', borderColor: 'rgba(249, 115, 22, 0.4)' },
-  chipText: { color: Colors.muted, fontSize: 13 },
+  chipText: { color: '#94a3b8', fontSize: 13 },
   chipTextActive: { color: '#F97316', fontWeight: 'bold' },
   imageScroll: { flexDirection: 'row', gap: 12 },
   imageBox: { width: 100, height: 100, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   image: { width: '100%', height: '100%' },
   removeImageBtn: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 4 },
   coverBadge: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(249, 115, 22, 0.9)', paddingVertical: 4, alignItems: 'center' },
-  coverText: { color: Colors.white, fontSize: 9, fontWeight: 'bold' },
+  coverText: { color: '#ffffff', fontSize: 9, fontWeight: 'bold' },
   addImageBtn: { width: 100, height: 100, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.02)' },
-  addText: { color: Colors.muted, fontSize: 11, marginTop: 4 },
-  footer: { flexDirection: 'row', padding: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', backgroundColor: Colors.background, gap: 12 },
+  addText: { color: '#94a3b8', fontSize: 11, marginTop: 4 },
+  footer: { flexDirection: 'row', padding: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', backgroundColor: '#030712', gap: 12 },
   draftBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  draftText: { color: Colors.muted, fontWeight: 'bold' },
+  draftText: { color: '#94a3b8', fontWeight: 'bold' },
   publishBtn: { flex: 2, paddingVertical: 14, borderRadius: 12, backgroundColor: '#F97316', alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  publishText: { color: Colors.white, fontWeight: 'bold', fontSize: 15 },
+  publishText: { color: '#ffffff', fontWeight: 'bold', fontSize: 15 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   loadingText: { color: '#F97316', marginTop: 8, fontWeight: 'bold' },
-  charCount: { fontSize: 11, color: Colors.muted }
+  charCount: { fontSize: 11, color: '#94a3b8' }
 });
 
 export default AddProductModal;

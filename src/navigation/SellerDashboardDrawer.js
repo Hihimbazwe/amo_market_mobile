@@ -3,25 +3,20 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated, Dimens
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { SellerDrawerContext } from '../context/SellerDrawerContext';
 import CustomText from '../components/CustomText';
-import { Colors } from '../theme/colors';
-import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { 
-  Home, 
-  Package, 
-  ShoppingBag, 
-  Wallet, 
-  BarChart2, 
-  Settings, 
-  ShieldCheck, 
+import Svg, { Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import {
+  Home,
+  Package,
+  ShoppingBag,
+  Wallet,
+  Settings,
+  ShieldCheck,
   LogOut,
   X,
-  User,
-  ArrowDownToLine,
   CreditCard,
-  ShieldAlert,
-  RefreshCcw,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react-native';
 
 import SellerOverviewScreen from '../screens/seller/SellerOverviewScreen';
@@ -40,44 +35,71 @@ import SellerKYCScreen from '../screens/seller/SellerKYCScreen';
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
-import { SellerDrawerContext } from '../context/SellerDrawerContext';
+// Core nav groups — secondary items (Withdraw, Replacements, Analytics, Profile) live inside their related screens
+const NAV_GROUPS = [
+  {
+    label: 'STORE',
+    items: [
+      { name: 'Dashboard', icon: Home, screen: 'SellerOverview' },
+      { name: 'My Products', icon: Package, screen: 'SellerProducts' },
+      { name: 'Orders', icon: ShoppingBag, screen: 'SellerOrders' },
+      { name: 'Disputes', icon: AlertCircle, screen: 'SellerDisputes' },
+    ],
+  },
+  {
+    label: 'FINANCE',
+    items: [
+      { name: 'Wallet', icon: Wallet, screen: 'SellerWallet' },
+      { name: 'Membership', icon: CreditCard, screen: 'SellerMembership' },
+    ],
+  },
+  {
+    label: 'ACCOUNT',
+    items: [
+      { name: 'KYC Verification', icon: ShieldCheck, screen: 'SellerKYC' },
+      { name: 'Settings', icon: Settings, screen: 'SellerSettings' },
+    ],
+  },
+];
 
 const CustomDrawer = ({ visible, onClose, navigation }) => {
-  const { colors, isDarkMode } = useTheme();
+  const { colors } = useTheme();
+  const { logout, user } = useAuth();
   const slideAnim = useRef(new Animated.Value(-width * 0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const { logout } = useAuth();
 
   useEffect(() => {
     if (visible) {
       Animated.parallel([
         Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-        Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: true })
+        Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
       ]).start();
     } else {
       Animated.parallel([
         Animated.timing(slideAnim, { toValue: -width * 0.75, duration: 200, useNativeDriver: true }),
-        Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true })
+        Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
   }, [visible]);
 
   if (!visible && opacityAnim._value === 0) return null;
 
-  const routes = [
-    { name: 'Dashboard', icon: Home, screen: 'SellerOverview' },
-    { name: 'My Products', icon: Package, screen: 'SellerProducts' },
-    { name: 'Orders', icon: ShoppingBag, screen: 'SellerOrders' },
-    { name: 'Replacements', icon: RefreshCcw, screen: 'SellerReplacements' },
-    { name: 'Disputes', icon: AlertCircle, screen: 'SellerDisputes' },
-    { name: 'Wallet', icon: Wallet, screen: 'SellerWallet' },
-    { name: 'Withdraw', icon: ArrowDownToLine, screen: 'SellerWithdraw' },
-    { name: 'Analytics', icon: BarChart2, screen: 'SellerAnalytics' },
-    { name: 'Membership', icon: CreditCard, screen: 'SellerMembership' },
-    { name: 'KYC', icon: ShieldCheck, screen: 'SellerKYC' },
-    { name: 'Profile', icon: User, screen: 'SellerProfile' },
-    { name: 'Settings', icon: Settings, screen: 'SellerSettings' },
-  ];
+  const handleNavigate = (screen) => {
+    onClose();
+    navigation.navigate('Me', { screen });
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: () => { onClose(); logout(); navigation.navigate('Home'); },
+      },
+    ]);
+  };
+
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
@@ -85,77 +107,85 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
         <TouchableWithoutFeedback onPress={onClose}>
           <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]} />
         </TouchableWithoutFeedback>
-        
-        <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }], backgroundColor: colors.background, borderRightColor: colors.border }]}>
+
+        <Animated.View
+          style={[
+            styles.drawer,
+            { transform: [{ translateX: slideAnim }], backgroundColor: colors.background, borderRightColor: colors.border },
+          ]}
+        >
+          {/* ── Header ── */}
           <View style={[styles.drawerHeader, { borderBottomColor: colors.border }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-              <Image 
-                source={require('../../assets/logo.png')} 
-                style={{ width: 40, height: 40, resizeMode: 'contain', marginRight: 12 }} 
-              />
-              <Svg height="30" width="110">
-                <Defs>
-                  <LinearGradient id="grad2" x1="0" y1="0" x2="1" y2="0">
-                    <Stop offset="0" stopColor="#A855F7" stopOpacity="1" />
-                    <Stop offset="1" stopColor="#3B82F6" stopOpacity="1" />
-                  </LinearGradient>
-                </Defs>
-                <SvgText
-                  fill="url(#grad2)"
-                  fontSize="18"
-                  fontWeight="900"
-                  x="0"
-                  y="22"
-                  textAnchor="start"
-                >Seller Hub</SvgText>
-              </Svg>
+            <View style={styles.headerTop}>
+              <View style={styles.brandRow}>
+                <Image source={require('../../assets/logo.png')} style={styles.brandLogo} />
+                <Svg height="28" width="110">
+                  <Defs>
+                    <SvgGradient id="grad" x1="0" y1="0" x2="1" y2="0">
+                      <Stop offset="0" stopColor="#A855F7" stopOpacity="1" />
+                      <Stop offset="1" stopColor="#3B82F6" stopOpacity="1" />
+                    </SvgGradient>
+                  </Defs>
+                  <SvgText fill="url(#grad)" fontSize="17" fontWeight="900" x="0" y="20" textAnchor="start">
+                    AMO Market
+                  </SvgText >
+                </Svg>
+              </View>
+              <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.glass }]}>
+                <X color={colors.muted} size={20} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.glass }]}>
-              <X color={colors.muted} size={24} />
+
+            {/* User info — only email, no avatar */}
+            <View style={styles.userInfo}>
+              <View>
+                <CustomText style={[styles.userEmail, { color: colors.foreground, fontSize: 14, fontWeight: '700' }]} numberOfLines={1}>
+                  {user?.email || 'Seller'}
+                </CustomText>
+              </View>
+            </View>
+          </View>
+
+          {/* ── Nav ── */}
+          <ScrollView
+            style={styles.navContent}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 24 }}
+          >
+            {NAV_GROUPS.map((group, gIdx) => (
+              <View key={group.label} style={[styles.group, gIdx > 0 && { marginTop: 8 }]}>
+                <CustomText style={[styles.groupLabel, { color: colors.muted }]}>{group.label}</CustomText>
+                {group.items.map((item) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <TouchableOpacity
+                      key={item.name}
+                      style={styles.navItem}
+                      onPress={() => handleNavigate(item.screen)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.navIconBox, { backgroundColor: `${colors.primary}12` }]}>
+                        <ItemIcon color={colors.muted} size={17} />
+                      </View>
+                      <CustomText style={[styles.navItemText, { color: colors.foreground }]}>{item.name}</CustomText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* ── Footer ── */}
+          <View style={[styles.drawerFooter, { borderTopColor: colors.border }]}>
+            <TouchableOpacity
+              style={[styles.logoutBtn, { backgroundColor: 'rgba(239,68,68,0.08)' }]}
+              onPress={handleLogout}
+              activeOpacity={0.8}
+            >
+              <LogOut color="#EF4444" size={18} />
+              <CustomText style={styles.logoutText}>Sign Out</CustomText>
             </TouchableOpacity>
           </View>
-
-          <View style={styles.drawerItems}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {routes.map((route) => {
-                const IconComponent = route.icon;
-                return (
-                  <TouchableOpacity
-                    key={route.name}
-                    style={[styles.drawerItem, { backgroundColor: 'transparent' }]}
-                    onPress={() => {
-                      onClose();
-                      navigation.navigate('Me', { screen: route.screen });
-                    }}
-                  >
-                    <IconComponent color={colors.muted} size={20} />
-                    <CustomText style={[styles.drawerItemText, { color: colors.muted }]}>{route.name}</CustomText>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          <TouchableOpacity 
-            onPress={() => {
-              Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Sign Out', 
-                  style: 'destructive', 
-                  onPress: () => {
-                    onClose();
-                    logout();
-                    navigation.navigate('Home');
-                  } 
-                }
-              ]);
-            }} 
-            style={[styles.logoutButton, { borderTopColor: colors.border }]}
-          >
-            <LogOut color="#EF4444" size={20} />
-            <CustomText style={{ color: "#EF4444", marginLeft: 12, fontWeight: 'bold' }}>Sign Out</CustomText>
-          </TouchableOpacity>
         </Animated.View>
       </View>
     </Modal>
@@ -166,7 +196,7 @@ export default function SellerDashboardDrawer({ navigation }) {
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   return (
-    <SellerDrawerContext.Provider value={{ toggleDrawer: () => setDrawerVisible(!drawerVisible) }}>
+    <SellerDrawerContext.Provider value={{ toggleDrawer: () => setDrawerVisible(v => !v) }}>
       <View style={{ flex: 1 }}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="SellerOverview" component={SellerOverviewScreen} />
@@ -182,11 +212,11 @@ export default function SellerDashboardDrawer({ navigation }) {
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
         </Stack.Navigator>
-        
-        <CustomDrawer 
-          visible={drawerVisible} 
-          onClose={() => setDrawerVisible(false)} 
-          navigation={navigation.navigate ? navigation : { navigate: () => {} }}
+
+        <CustomDrawer
+          visible={drawerVisible}
+          onClose={() => setDrawerVisible(false)}
+          navigation={navigation?.navigate ? navigation : { navigate: () => {} }}
         />
       </View>
     </SellerDrawerContext.Provider>
@@ -194,60 +224,66 @@ export default function SellerDashboardDrawer({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    flexDirection: 'row',
-  },
+  modalOverlay: { flex: 1, flexDirection: 'row' },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    left: 0, top: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   drawer: {
     width: width * 0.75,
-    backgroundColor: Colors.background,
     height: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 5, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
     elevation: 20,
     borderRightWidth: 1,
-    borderRightColor: 'rgba(255,255,255,0.05)',
   },
+
+  // Header
   drawerHeader: {
-    padding: 24,
-    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 18,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    gap: 16,
   },
-  closeBtn: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    padding: 8,
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandLogo: { width: 34, height: 34, resizeMode: 'contain' },
+  closeBtn: { padding: 8, borderRadius: 10 },
+
+  // User info (no card/border)
+  userInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
   },
-  drawerItems: {
-    padding: 16,
-    flex: 1,
+  avatarText: { fontSize: 14, fontWeight: '900' },
+  userName: { fontSize: 14, fontWeight: '700' },
+  userEmail: { fontSize: 11, marginTop: 1 },
+
+  // Nav
+  navContent: { flex: 1, paddingHorizontal: 14, paddingTop: 16 },
+  group: { marginBottom: 4 },
+  groupLabel: {
+    fontSize: 10, fontWeight: '800', letterSpacing: 1.4,
+    marginBottom: 6, marginLeft: 4,
   },
-  drawerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+  navItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 10, paddingHorizontal: 8,
+    borderRadius: 12, marginBottom: 2,
   },
-  drawerItemText: {
-    color: Colors.muted,
-    marginLeft: 12,
-    fontSize: 16,
-    fontWeight: '600',
+  navIconBox: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  navItemText: { fontSize: 14, fontWeight: '600' },
+
+  // Footer
+  drawerFooter: { paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: 1 },
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14,
   },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-  },
+  logoutText: { color: '#EF4444', fontWeight: '700', fontSize: 15 },
 });

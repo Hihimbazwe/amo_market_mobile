@@ -3,7 +3,7 @@ import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Menu } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../../components/CustomText';
-import { Colors } from '../../theme/colors';
+
 import { BuyerDrawerContext as DrawerContext } from '../../context/BuyerDrawerContext';
 
 const BuyerPlaceholderScreen = ({ navigation, title }) => {
@@ -13,7 +13,7 @@ const BuyerPlaceholderScreen = ({ navigation, title }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={toggleDrawer} style={styles.menuButton}>
-          <Menu color={Colors.white} size={24} />
+          <Menu color={'#ffffff'} size={24} />
         </TouchableOpacity>
         <CustomText variant="h2">{title}</CustomText>
       </View>
@@ -28,7 +28,7 @@ const BuyerPlaceholderScreen = ({ navigation, title }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
   },
   header: {
     flexDirection: 'row',

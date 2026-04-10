@@ -15,8 +15,8 @@ import CustomText from '../components/CustomText';
 import ProductCard from '../components/ProductCard';
 import CustomButton from '../components/CustomButton';
 import AuthOverlay from '../components/AuthOverlay';
-import { Colors } from '../theme/colors';
-
+import NotificationIcon from '../components/NotificationIcon';
+import {Text } from 'react-native';
 import { productService } from '../api/productService';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -39,7 +39,7 @@ const FilterModal = ({ visible, onClose, filters, setFilters }) => {
           <View style={styles.modalHeader}>
             <CustomText variant="h2">Filters</CustomText>
             <TouchableOpacity onPress={onClose}>
-              <X color={Colors.foreground} size={24} />
+              <X color="#e2e8f0" size={24} />
             </TouchableOpacity>
           </View>
 
@@ -48,7 +48,7 @@ const FilterModal = ({ visible, onClose, filters, setFilters }) => {
               <CustomText variant="subtitle" style={styles.filterLabel}>PROVINCE</CustomText>
               <View style={styles.pickerContainer}>
                 <CustomText>{filters.province}</CustomText>
-                <ChevronDown color={Colors.muted} size={20} />
+                <ChevronDown color={'#94a3b8'} size={20} />
               </View>
               {/* Note: Simplified UI for choosing */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
@@ -100,7 +100,7 @@ const FilterModal = ({ visible, onClose, filters, setFilters }) => {
                 style={styles.priceInput}
                 keyboardType="numeric"
                 placeholder="Maximum Price"
-                placeholderTextColor={Colors.muted}
+                placeholderTextColor={'#94a3b8'}
                 value={filters.maxPrice.toString()}
                 onChangeText={(text) => setFilters({ ...filters, maxPrice: text.replace(/[^0-9]/g, '') })}
               />
@@ -121,7 +121,7 @@ const FilterModal = ({ visible, onClose, filters, setFilters }) => {
 };
 
 const MarketplaceScreen = ({ navigation, route }) => {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(route.params?.search || '');
   const [filtersOpen, setFiltersOpen] = useState(false);
   
   // Initialize with values from navigation params if they exist
@@ -132,12 +132,15 @@ const MarketplaceScreen = ({ navigation, route }) => {
     maxPrice: 5000000
   });
 
-  // Sync filters if route params change (e.g., navigating from Home with a different category)
+  // Sync filters if route params change (e.g., navigating from Home with a different category or search)
   useEffect(() => {
     if (route.params?.category) {
       setFilters(prev => ({ ...prev, category: route.params.category }));
     }
-  }, [route.params?.category]);
+    if (route.params?.search) {
+      setSearch(route.params.search);
+    }
+  }, [route.params?.category, route.params?.search]);
 
   const [allProducts, setAllProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -186,25 +189,26 @@ const MarketplaceScreen = ({ navigation, route }) => {
       {/* Search Header */}
       <View style={styles.header}>
         <View style={styles.searchBar}>
-          <Search color={Colors.muted} size={20} style={styles.searchIcon} />
+          <Search color={'#94a3b8'} size={20} style={styles.searchIcon} />
           <TextInput 
             style={styles.input}
             placeholder="Search marketplace..."
-            placeholderTextColor={Colors.muted}
+            placeholderTextColor={'#94a3b8'}
             value={search}
             onChangeText={setSearch}
           />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <X color={Colors.muted} size={20} />
+              <X color={'#94a3b8'} size={20} />
             </TouchableOpacity>
           )}
         </View>
+        <NotificationIcon />
         <TouchableOpacity 
           style={styles.filterButton}
           onPress={() => setFiltersOpen(true)}
         >
-          <Filter color={Colors.white} size={20} />
+          <Filter color={'#ffffff'} size={20} />
         </TouchableOpacity>
       </View>
 
@@ -245,7 +249,7 @@ const MarketplaceScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
   },
   header: {
     flexDirection: 'row',
@@ -257,23 +261,23 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.inputBg,
+    backgroundColor: 'rgba(255,255,255,0.02)',
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 48,
     borderWidth: 1,
-    borderColor: Colors.inputBorder,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   searchIcon: {
     marginRight: 8,
   },
   input: {
     flex: 1,
-    color: Colors.white,
+    color: '#ffffff',
     fontSize: 14,
   },
   filterButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#e67e22',
     width: 48,
     height: 48,
     borderRadius: 12,
@@ -297,7 +301,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.card,
+    backgroundColor: '#0b101b',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     height: '80%',
@@ -324,11 +328,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.inputBg,
+    backgroundColor: 'rgba(255,255,255,0.02)',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.inputBorder,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     marginBottom: 12,
   },
   chipScroll: {
@@ -345,20 +349,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.15)',
   },
   activeChip: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: '#e67e22',
+    borderColor: '#e67e22',
   },
   activeChipText: {
-    color: Colors.white,
+    color: '#ffffff',
     fontWeight: '700',
   },
   priceInput: {
-    backgroundColor: Colors.inputBg,
+    backgroundColor: 'rgba(255,255,255,0.02)',
     padding: 16,
     borderRadius: 12,
-    color: Colors.white,
+    color: '#ffffff',
     borderWidth: 1,
-    borderColor: Colors.inputBorder,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalFooter: {
     paddingTop: 16,

@@ -8,13 +8,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../../components/CustomText';
 import CustomButton from '../../components/CustomButton';
-import { Colors } from '../../theme/colors';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
 import { ActivityIndicator, RefreshControl } from 'react-native';
-
+import {Text} from 'react-native';
 // Mock data removed
 
 const METHODS = [
@@ -99,12 +98,12 @@ export default function SellerWithdrawScreen() {
         contentContainerStyle={styles.content} 
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F97316" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
         {loading && !wallet ? (
           <View style={{ padding: 40, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#F97316" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <>
@@ -181,8 +180,8 @@ export default function SellerWithdrawScreen() {
         {/* Withdrawal History */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Clock color="#F97316" size={18} />
-            <CustomText style={styles.sectionTitle}>Recent Withdrawals</CustomText>
+            <Clock color={colors.primary} size={18} />
+            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Withdrawals</CustomText>
           </View>
           <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {(!wallet?.withdrawals || wallet.withdrawals.length === 0) ? (
@@ -217,30 +216,30 @@ export default function SellerWithdrawScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', padding: 20,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1,
   },
-  menuButton: { marginRight: 16, padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
   content: { padding: 16, paddingBottom: 60 },
   balanceCard: {
     backgroundColor: '#0284c7', borderRadius: 24, padding: 24, marginBottom: 24,
     shadowColor: '#0284c7', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
   },
   balanceLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 'bold', letterSpacing: 1 },
-  balanceAmount: { color: Colors.white, fontSize: 34, fontWeight: '900', marginTop: 6 },
+  balanceAmount: { color: 'white', fontSize: 34, fontWeight: '900', marginTop: 6 },
   balanceMeta: { flexDirection: 'row', gap: 8, marginTop: 12 },
   balanceMetaText: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
   inputSection: { marginBottom: 24 },
-  sectionLabel: { color: Colors.muted, fontSize: 11, fontWeight: 'bold', letterSpacing: 1.5, marginBottom: 12 },
+  sectionLabel: { fontSize: 11, fontWeight: 'bold', letterSpacing: 1.5, marginBottom: 12 },
   amountInputRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, paddingHorizontal: 20,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  currencyPrefix: { color: Colors.muted, fontSize: 20, fontWeight: 'bold', marginRight: 8 },
-  amountInput: { flex: 1, color: Colors.white, fontSize: 28, fontWeight: '900', height: 64 },
+  currencyPrefix: { fontSize: 20, fontWeight: 'bold', marginRight: 8 },
+  amountInput: { flex: 1, fontSize: 28, fontWeight: '900', height: 64 },
   quickAmounts: { flexDirection: 'row', gap: 10, marginTop: 12 },
   quickChip: {
     flex: 1, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 10, paddingVertical: 8,
@@ -249,7 +248,7 @@ const styles = StyleSheet.create({
   quickChipText: { color: '#F97316', fontSize: 12, fontWeight: 'bold' },
   section: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  sectionTitle: { color: Colors.white, fontSize: 16, fontWeight: 'bold' },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold' },
   methodCard: {
     flexDirection: 'row', alignItems: 'center', padding: 16,
     backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, marginBottom: 10,
@@ -257,18 +256,18 @@ const styles = StyleSheet.create({
   },
   methodCardSelected: { borderColor: '#F97316', backgroundColor: 'rgba(249,115,22,0.05)' },
   methodIconBox: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  methodLabel: { color: Colors.white, fontWeight: 'bold', fontSize: 15 },
-  methodSub: { color: Colors.muted, fontSize: 12, marginTop: 2 },
+  methodLabel: { fontWeight: 'bold', fontSize: 15 },
+  methodSub: { fontSize: 12, marginTop: 2 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: '#F97316' },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#F97316' },
   submitBtn: { marginBottom: 32 },
   historyCard: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 20, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   historyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  historyDivider: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  historyDivider: { borderBottomWidth: 1 },
   historyLeft: {},
-  historyId: { color: Colors.white, fontWeight: 'bold', fontSize: 13 },
-  historyMeta: { color: Colors.muted, fontSize: 11, marginTop: 2 },
+  historyId: { fontWeight: 'bold', fontSize: 13 },
+  historyMeta: { fontSize: 11, marginTop: 2 },
   historyAmount: { color: '#EF4444', fontWeight: '900', fontSize: 14 },
   statusBadge: { marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   statusText: { fontSize: 9, fontWeight: 'bold' },

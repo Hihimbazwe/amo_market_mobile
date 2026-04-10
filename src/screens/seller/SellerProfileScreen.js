@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../../components/CustomText';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
-import { Colors } from '../../theme/colors';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
@@ -84,18 +83,18 @@ const SellerProfileScreen = () => {
       <ScrollView 
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F97316" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
         {loading && !profile ? (
-          <ActivityIndicator size="large" color="#F97316" style={{ marginTop: 50 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
         ) : (
           <>
             <View style={styles.avatarSection}>
               <TouchableOpacity style={[styles.avatarPlaceholder, { backgroundColor: `${colors.primary}20`, borderColor: `${colors.primary}30` }]}>
                 <Store color={colors.primary} size={48} />
-                <View style={[styles.cameraBtn, { borderColor: colors.background }]}>
-                  <Camera color={colors.white} size={16} />
+                <View style={[styles.cameraBtn, { borderColor: colors.background, backgroundColor: colors.primary }]}>
+                  <Camera color="white" size={16} />
                 </View>
               </TouchableOpacity>
               <CustomText variant="h2" style={{ marginTop: 16 }}>{name || 'Seller Name'}</CustomText>
@@ -146,12 +145,12 @@ const SellerProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', padding: 20,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1,
   },
-  menuButton: { marginRight: 16, padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
   content: { padding: 24 },
   avatarSection: { alignItems: 'center', marginBottom: 32 },
   avatarPlaceholder: {
@@ -160,9 +159,9 @@ const styles = StyleSheet.create({
     position: 'relative'
   },
   cameraBtn: {
-    position: 'absolute', bottom: 0, right: 0, backgroundColor: '#F97316',
+    position: 'absolute', bottom: 0, right: 0,
     width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: Colors.background
+    borderWidth: 3,
   },
   roleBadge: { backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginTop: 12 },
   roleText: { color: '#10B981', fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },

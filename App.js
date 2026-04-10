@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -15,14 +15,16 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import VerifyOTPScreen from './src/screens/VerifyOTPScreen';
-import { Colors } from './src/theme/colors';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { CartProvider, useCart } from './src/context/CartContext';
+import { WishlistProvider } from './src/context/WishlistContext';
+import { NotificationProvider, useNotifications } from './src/context/NotificationContext';
 import CustomText from './src/components/CustomText';
 import BuyerDashboardDrawer from './src/navigation/BuyerDashboardDrawer';
 import SellerDashboardDrawer from './src/navigation/SellerDashboardDrawer';
-import { Loader2 } from 'lucide-react-native';
+import { Loader2, Bell } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -35,6 +37,7 @@ const HomeStack = () => (
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} />
   </Stack.Navigator>
 );
 
@@ -46,6 +49,7 @@ const MarketplaceStack = () => (
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
+    <Stack.Screen name="Notifications" component={NotificationsScreen} />
   </Stack.Navigator>
 );
 
@@ -67,22 +71,75 @@ const LoadingScreen = () => {
 };
 
 const RootNavigator = () => {
-  const { loading, user } = useAuth();
+  const { loading, user, logout } = useAuth();
   const { cartCount } = useCart();
+  const { unreadCount } = useNotifications();
+  
+  const inactivityTimer = React.useRef(null);
+  const backgroundTime = React.useRef(null);
+
+  const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+
+  const resetTimer = React.useCallback(() => {
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    if (!user) return; // Only track logged-in users
+
+    inactivityTimer.current = setTimeout(() => {
+      logout();
+    }, INACTIVITY_LIMIT);
+  }, [user, logout]);
+
+  React.useEffect(() => {
+    resetTimer();
+    return () => {
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    };
+  }, [resetTimer]);
+
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        if (backgroundTime.current && user) {
+          const elapsed = Date.now() - backgroundTime.current;
+          if (elapsed >= INACTIVITY_LIMIT) {
+            logout();
+          }
+        }
+        resetTimer();
+      } else if (nextAppState.match(/inactive|background/)) {
+        backgroundTime.current = Date.now();
+        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [user, resetTimer, logout]);
 
   if (loading) {
     return <LoadingScreen />;
   }
 
   return (
-    <NavigationContainer>
+    <View 
+      style={{ flex: 1 }}
+      onStartShouldSetResponderCapture={() => {
+        resetTimer();
+        return false; 
+      }}
+      onPanResponderCapture={() => {
+        resetTimer();
+        return false;
+      }}
+    >
+      <NavigationContainer>
       <Tab.Navigator
         initialRouteName={user?.role === 'SELLER' ? 'Me' : 'Home'}
         screenOptions={({ route }) => ({
           headerShown: false,
           tabBarStyle: styles.tabBar,
-          tabBarActiveTintColor: Colors.primary,
-          tabBarInactiveTintColor: Colors.muted,
+          tabBarActiveTintColor: '#e67e22',
+          tabBarInactiveTintColor: '#94a3b8',
           tabBarIcon: ({ color, size }) => {
             let IconComponent;
             if (route.name === 'Home') IconComponent = Home;
@@ -96,6 +153,11 @@ const RootNavigator = () => {
                 {route.name === 'Cart' && cartCount > 0 && (
                   <View style={styles.badge}>
                     <CustomText style={styles.badgeText}>{cartCount}</CustomText>
+                  </View>
+                )}
+                {route.name === 'Me' && unreadCount > 0 && (
+                  <View style={[styles.badge, { backgroundColor: '#ef4444' }]}>
+                    <CustomText style={styles.badgeText}>{unreadCount}</CustomText>
                   </View>
                 )}
               </View>
@@ -112,6 +174,7 @@ const RootNavigator = () => {
         />
       </Tab.Navigator>
     </NavigationContainer>
+    </View>
   );
 };
 
@@ -120,11 +183,15 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <ThemeProvider>
-          <CartProvider>
-            <SafeAreaProvider>
-              <RootNavigator />
-            </SafeAreaProvider>
-          </CartProvider>
+          <NotificationProvider>
+            <CartProvider>
+              <WishlistProvider>
+                <SafeAreaProvider>
+                  <RootNavigator />
+                </SafeAreaProvider>
+              </WishlistProvider>
+            </CartProvider>
+          </NotificationProvider>
         </ThemeProvider>
       </AuthProvider>
     </GestureHandlerRootView>
@@ -133,7 +200,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
     paddingBottom: 5,
@@ -142,7 +209,7 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#030712',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -150,7 +217,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -8,
     top: -4,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#e67e22',
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -158,10 +225,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 4,
     borderWidth: 1.5,
-    borderColor: Colors.background,
+    borderColor: '#030712',
   },
   badgeText: {
-    color: Colors.white,
+    color: '#ffffff',
     fontSize: 9,
     fontWeight: '900',
     textAlign: 'center',

@@ -3,11 +3,11 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, FlatL
 import { Menu, Search, Package, Plus, Pencil, Trash2, Eye, EyeOff, Tag, Flame, RefreshCw } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../../components/CustomText';
-import { Colors } from '../../theme/colors';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { productService } from '../../api/productService';
 import { useTheme } from '../../context/ThemeContext';
+import NotificationIcon from '../../components/NotificationIcon';
 import AddProductModal from '../../components/AddProductModal';
 const SellerProductsScreen = () => {
   const { toggleDrawer } = useContext(SellerDrawerContext);
@@ -149,7 +149,7 @@ const SellerProductsScreen = () => {
             )}
             {item.isHotDeal && (
               <View style={styles.hotBadge}>
-                <Flame color={colors.white} size={10} fill={colors.white} />
+                <Flame color="white" size={10} fill="white" />
               </View>
             )}
           </View>
@@ -217,13 +217,14 @@ const SellerProductsScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">My Products</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>My Products</CustomText>
+        <NotificationIcon style={{ marginRight: 12 }} />
         <TouchableOpacity 
           style={[styles.addButton, { backgroundColor: colors.primary }]}
           onPress={() => setModalVisible(true)}
         >
-          <Plus color={colors.white} size={20} />
-          <CustomText style={[styles.addButtonText, { color: colors.white }]}>Add</CustomText>
+          <Plus color="white" size={20} />
+          <CustomText style={[styles.addButtonText, { color: 'white' }]}>Add</CustomText>
         </TouchableOpacity>
       </View>
 
@@ -242,7 +243,7 @@ const SellerProductsScreen = () => {
 
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#F97316" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -253,7 +254,7 @@ const SellerProductsScreen = () => {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Package color="rgba(255,255,255,0.1)" size={64} />
+              <Package color={colors.isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} size={64} />
               <CustomText style={styles.emptyText}>No products found.</CustomText>
             </View>
           }
@@ -272,13 +273,13 @@ const SellerProductsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', padding: 20,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1,
   },
-  menuButton: { marginRight: 16, padding: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
-  addButton: { marginLeft: 'auto', padding: 8, borderRadius: 12, backgroundColor: '#F97316' },
+  menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
+  addButton: { marginLeft: 'auto', padding: 8, borderRadius: 12 },
   searchSection: { padding: 16 },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',
@@ -286,7 +287,7 @@ const styles = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 16,
   },
   searchIcon: { marginRight: 12 },
-  searchInput: { flex: 1, color: Colors.white, height: 44, fontSize: 14 },
+  searchInput: { flex: 1, height: 44, fontSize: 14 },
   listContent: { padding: 16, paddingBottom: 100 },
   productCard: {
     borderRadius: 16, borderWidth: 1, marginBottom: 16, overflow: 'hidden'

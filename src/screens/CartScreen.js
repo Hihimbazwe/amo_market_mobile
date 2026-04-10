@@ -16,7 +16,7 @@ import CustomButton from '../components/CustomButton';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
 import { Colors as StaticColors } from '../theme/colors';
-
+import {Text} from 'react-native';
 const CartScreen = ({ navigation }) => {
   const { cartItems, cartTotal, loading, updateQuantity, removeFromCart, clearCart } = useCart();
   const { colors, isDark } = useTheme();
