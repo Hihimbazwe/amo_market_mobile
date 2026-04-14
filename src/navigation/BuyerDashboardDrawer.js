@@ -11,7 +11,7 @@ import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-s
 import { 
   Home, 
   ShoppingBag, 
-  User, 
+  User as UserIcon, 
   Heart, 
   Wallet, 
   Settings, 
@@ -100,11 +100,30 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
               </Svg>
             </View>
 
-            {/* User Info - Email Only */}
-            <View style={{ marginTop: 4 }}>
-              <CustomText style={{ color: colors.foreground, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
-                {user?.email || 'Buyer'}
-              </CustomText>
+            {/* User Info - Avatar and Name */}
+            <View style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ 
+                width: 36, 
+                height: 36, 
+                borderRadius: 18, 
+                backgroundColor: 'rgba(255,255,255,0.05)', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                marginRight: 10,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)'
+              }}>
+                {user?.image ? (
+                  <Image source={{ uri: user.image }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+                ) : (
+                  <UserIcon color={colors.primary} size={20} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <CustomText style={{ color: colors.foreground, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
+                  {user?.name || 'Buyer'}
+                </CustomText>
+              </View>
             </View>
 
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>

@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { Menu, Search, Zap, ShoppingBag, Wallet, ShieldAlert, Bell, Clock } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { BuyerDrawerContext as DrawerContext } from '../../context/BuyerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { orderService } from '../../api/orderService';
 import { disputeService } from '../../api/disputeService';
-import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react-native';
+
 
 const mockOrders = [
   { id: 'ORD-1029', title: 'Wireless Headphones', amount: 'Rwf 45,000', status: 'DELIVERED' },
@@ -20,6 +21,7 @@ const BuyerOverviewScreen = () => {
   const { toggleDrawer } = React.useContext(DrawerContext);
   const { user } = useAuth();
   const { colors } = useTheme();
+  const navigation = useNavigation();
   const firstName = user?.name?.split(' ')[0] || 'there';
   
   const [orders, setOrders] = useState([]);
@@ -72,9 +74,12 @@ const BuyerOverviewScreen = () => {
             <CustomText variant="h2">Buyer Dashboard</CustomText>
             <CustomText style={{ color: colors.muted, marginTop: 4 }}>Welcome back, {firstName}!</CustomText>
           </View>
-          <TouchableOpacity style={[styles.shopBtn, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity
+            style={[styles.shopBtn, { backgroundColor: colors.primary }]}
+            onPress={() => navigation.navigate('Market')}
+          >
             <Zap color={colors.white} size={16} />
-            <CustomText style={styles.shopBtnText}>Shop</CustomText>
+            <CustomText style={styles.shopBtnText}>Shop Now</CustomText>
           </TouchableOpacity>
         </View>
 

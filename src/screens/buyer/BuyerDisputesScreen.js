@@ -2,6 +2,15 @@ import React, { useEffect, useState, useContext } from 'react';
 import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { Menu, AlertCircle, Loader2 } from 'lucide-react-native';
+
+const REASON_LABELS = {
+  'not-as-described': 'Not as described',
+  'damaged': 'Arrived damaged',
+  'missing': 'Missing parts/items',
+  'never-arrived': 'Order never arrived',
+  'counterfeit': 'Counterfeit/fake item',
+  'wrong-item': 'Received wrong item',
+};
 import { BuyerDrawerContext as DrawerContext } from '../../context/BuyerDrawerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -71,16 +80,25 @@ const BuyerDisputesScreen = () => {
             <CustomText variant="subtitle" style={{ marginTop: 16 }}>No active disputes.</CustomText>
           </View>
         ) : (
-          disputes.map((dispute) => (
-            <View key={dispute.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.error + '40' }]}>
-              <View style={styles.cardTop}>
-                <CustomText style={[styles.idText, { color: colors.foreground }]}>#{dispute.id.slice(-8).toUpperCase()}</CustomText>
-                <CustomText style={[styles.statusText, { color: colors.error }]}>{dispute.status}</CustomText>
+          disputes.map((dispute) => {
+            const productName = dispute.order?.items?.[0]?.product?.title || 'Order Item';
+            const reasonLabel = REASON_LABELS[dispute.reason] || dispute.reason;
+            const date = new Date(dispute.createdAt).toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' });
+            return (
+              <View key={dispute.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.error + '40' }]}>
+                <View style={styles.cardTop}>
+                  <CustomText style={[styles.idText, { color: colors.foreground }]} numberOfLines={1}>{productName}</CustomText>
+                  <View style={[styles.statusBadge, { backgroundColor: colors.error + '15' }]}>
+                    <CustomText style={[styles.statusText, { color: colors.error }]}>{dispute.status}</CustomText>
+                  </View>
+                </View>
+                <CustomText style={[styles.reasonText, { color: colors.muted }]}>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>Reason: </CustomText>{reasonLabel}
+                </CustomText>
+                <CustomText style={[styles.dateText, { color: colors.muted }]}>{date}</CustomText>
               </View>
-              <CustomText style={[styles.reasonText, { color: colors.foreground }]}>Reason: {dispute.reason}</CustomText>
-              <CustomText style={[styles.dateText, { color: colors.muted }]}>Order: #{dispute.orderId?.slice(-8).toUpperCase()}  •  {new Date(dispute.createdAt).toLocaleDateString()}</CustomText>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
@@ -108,11 +126,12 @@ const styles = StyleSheet.create({
     borderRadius: 16, padding: 16,
     borderWidth: 1, marginBottom: 12,
   },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  idText: { fontWeight: 'bold' },
-  statusText: { fontWeight: 'bold' },
-  reasonText: { fontSize: 16, marginBottom: 8 },
-  dateText: { fontSize: 12 },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  idText: { fontWeight: 'bold', fontSize: 15, flex: 1, marginRight: 8 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusText: { fontWeight: 'bold', fontSize: 11 },
+  reasonText: { fontSize: 13, marginBottom: 6 },
+  dateText: { fontSize: 11 },
 });
 
 export default BuyerDisputesScreen;

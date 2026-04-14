@@ -102,9 +102,13 @@ const BuyerOrdersScreen = ({ navigation }) => {
             return (
               <TouchableOpacity key={order.id} style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
                 <View style={styles.orderTop}>
-                  <View>
-                    <CustomText style={[styles.orderId, { color: colors.foreground }]}>#{order.id.slice(-8).toUpperCase()}</CustomText>
-                    <CustomText style={[styles.orderDate, { color: colors.muted }]}>{new Date(order.createdAt).toLocaleDateString()}</CustomText>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <CustomText style={[styles.orderId, { color: colors.foreground }]} numberOfLines={1}>
+                      {order.items?.[0]?.product?.title || order.items?.[0]?.product?.name || 'Order'}
+                    </CustomText>
+                    <CustomText style={[styles.orderDate, { color: colors.muted }]}>
+                      {new Date(order.createdAt).toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </CustomText>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
                     <CustomText style={[styles.orderStatus, { color: getStatusColor(order.status) }]}>

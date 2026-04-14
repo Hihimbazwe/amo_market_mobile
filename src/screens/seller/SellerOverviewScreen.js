@@ -34,24 +34,24 @@ const SellerOverviewScreen = () => {
         if (!user?.id) return;
         setLoading(true);
         try {
-          const profile = await sellerService.getKycStatus(user.id);
-          
+          // Fire ALL requests in parallel — do not await KYC status alone first
+          const [profile, analytics, products, wallet, orders] = await Promise.all([
+            sellerService.getKycStatus(user.id),
+            sellerService.getAnalytics(user.id, '7D').catch(() => ({})),
+            productService.getMyProducts(user.id).catch(() => []),
+            sellerService.getWallet(user.id).catch(() => null),
+            sellerService.getOrders(user.id, 15).catch(() => [])
+          ]);
+
           if (!profile?.kycSubmitted || !profile?.membershipPlanId) {
             navigation.navigate('SellerKYC');
             return;
           }
 
-          const [analytics, products, wallet, orders] = await Promise.all([
-            sellerService.getAnalytics(user.id, '7D'),
-            productService.getMyProducts(user.id),
-            sellerService.getWallet(user.id),
-            sellerService.getOrders(user.id)
-          ]);
-
           setData({
             revenue: analytics.revenue || 0,
             activeProducts: products.filter(p => p.published).length,
-            pendingShipments: orders.filter(o => o.status === 'PENDING' || o.status === 'PROCESSING').length,
+            pendingShipments: analytics.pendingOrders || 0,
             walletBalance: wallet?.balance || 0,
             recentOrders: orders.slice(0, 5)
           });
@@ -168,8 +168,8 @@ const SellerOverviewScreen = () => {
                     <Package color={colors.muted} size={20} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
-                    <CustomText style={[styles.orderId, { color: colors.foreground }]}>#{order.id.slice(-6).toUpperCase()}</CustomText>
-                    <CustomText style={styles.orderTitle} numberOfLines={1}>{itemTitle}</CustomText>
+                    <CustomText style={[styles.orderId, { color: colors.foreground }]} numberOfLines={1}>{itemTitle}</CustomText>
+                    <CustomText style={styles.orderTitle}>{new Date(order.createdAt).toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' })}</CustomText>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <CustomText style={[styles.orderAmount, { color: colors.foreground }]}>{orderTotal}</CustomText>

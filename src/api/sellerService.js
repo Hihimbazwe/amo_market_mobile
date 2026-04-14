@@ -40,9 +40,10 @@ export const sellerService = {
     }
   },
 
-  getOrders: async (userId) => {
+  getOrders: async (userId, limit = undefined) => {
     try {
-      const response = await fetch(`${BASE_URL}/api/seller/orders`, {
+      const url = limit ? `${BASE_URL}/api/seller/orders?limit=${limit}` : `${BASE_URL}/api/seller/orders`;
+      const response = await fetch(url, {
         method: 'GET',
         headers: buildHeaders(userId),
       });
@@ -57,6 +58,58 @@ export const sellerService = {
       return data;
     } catch (error) {
       console.error('getOrders error:', error);
+      throw error;
+    }
+  },
+
+  getAgents: async (userId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/agents`, {
+        method: 'GET',
+        headers: buildHeaders(userId),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to fetch agents (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('getAgents error:', error);
+      throw error;
+    }
+  },
+
+  assignAgent: async (userId, orderId, agentId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/assign-agent`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ agentId })
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to assign agent (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('assignAgent error:', error);
+      throw error;
+    }
+  },
+
+  shipOrder: async (userId, orderId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/ship`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to ship order (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('shipOrder error:', error);
       throw error;
     }
   },

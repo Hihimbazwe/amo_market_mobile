@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
-import { Menu, Search, ShoppingBag, ChevronRight, User, RefreshCcw } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TouchableWithoutFeedback } from 'react-native';
+import { Menu, Search, ShoppingBag, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
 import NotificationIcon from '../../components/NotificationIcon';
-
-
-// Mock orders removed - now fetching from backend
-
-// Status mapping moved inside component for dynamic theme support
 
 const SellerOrdersScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
@@ -24,6 +19,18 @@ const SellerOrdersScreen = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [replacementsCount, setReplacementsCount] = useState(0);
+
+  // Assign agent modal state
+  const [showAgentModal, setShowAgentModal] = useState(false);
+  const [targetOrderId, setTargetOrderId] = useState(null);
+  const [agents, setAgents] = useState([]);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
+
+  // Action Menu Modal State
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [selectedOrderForActions, setSelectedOrderForActions] = useState(null);
 
   const statusColors = {
     PENDING: { bg: colors.glass, text: colors.muted },
@@ -35,11 +42,17 @@ const SellerOrdersScreen = () => {
     CANCELLED: { bg: 'rgba(239, 68, 68, 0.1)', text: '#EF4444' },
   };
 
-  const fetchOrders = async () => {
+  const fetchOrdersAndReplacements = async () => {
     if (!user?.id) return;
     try {
-      const data = await sellerService.getOrders(user.id);
+      const [data, reps] = await Promise.all([
+        sellerService.getOrders(user.id),
+        sellerService.getReplacements(user.id).catch(() => []) 
+      ]);
       setOrders(data);
+      if (Array.isArray(reps)) {
+        setReplacementsCount(reps.filter((r) => r.status === 'OPEN' || r.status === 'PENDING').length);
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -48,13 +61,61 @@ const SellerOrdersScreen = () => {
     }
   };
 
-  React.useEffect(() => {
-    fetchOrders();
-  }, [user]);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchOrdersAndReplacements();
+    }, [user?.id])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchOrders();
+    fetchOrdersAndReplacements();
+  };
+
+  const openAgentModal = async (order) => {
+    setTargetOrderId(order.id);
+    setSelectedAgentId(order.agentId || '');
+    setShowAgentModal(true);
+    setLoadingAgents(true);
+    try {
+      const data = await sellerService.getAgents(user.id);
+      setAgents(data);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to fetch agents');
+      setShowAgentModal(false);
+    } finally {
+      setLoadingAgents(false);
+    }
+  };
+
+  const submitAssignAgent = async () => {
+    try {
+      // we use selectedAgentId or null to assign/remove
+      await sellerService.assignAgent(user.id, targetOrderId, selectedAgentId || null);
+      Alert.alert('Success', selectedAgentId ? 'Agent assigned successfully' : 'Agent handling removed');
+      setShowAgentModal(false);
+      fetchOrdersAndReplacements();
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to assign agent');
+    }
+  };
+
+  const handleShipOrder = (orderId) => {
+    Alert.alert('Ship Order', 'Are you sure this order is packed and ready to ship?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Ship',
+        onPress: async () => {
+          try {
+            await sellerService.shipOrder(user.id, orderId);
+            Alert.alert('Success', 'Order marked as shipped');
+            fetchOrdersAndReplacements();
+          } catch (err) {
+            Alert.alert('Error', err.message || 'Failed to ship order');
+          }
+        }
+      }
+    ]);
   };
 
   const filteredOrders = filter === 'ALL' ? orders : orders.filter(o => o.status === filter);
@@ -66,10 +127,11 @@ const SellerOrdersScreen = () => {
     const dateStr = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     
     return (
-      <TouchableOpacity style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.orderHeader}>
-          <View>
-            <CustomText style={[styles.orderId, { color: colors.foreground }]}>#{item.id.slice(-8).toUpperCase()}</CustomText>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            {/* Real name of the orders not the id */}
+            <CustomText style={[styles.orderId, { color: colors.foreground }]} numberOfLines={1}>{orderTitle}</CustomText>
             <CustomText style={styles.orderDate}>{dateStr}</CustomText>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColors[item.status]?.bg || colors.glass }]}>
@@ -82,22 +144,34 @@ const SellerOrdersScreen = () => {
         <View style={[styles.orderBody, { borderBottomColor: colors.border }]}>
           <View style={styles.orderInfoRow}>
             <User color={colors.muted} size={14} />
-            <CustomText style={styles.orderInfoText}>{item.buyer?.name || 'Buyer'}</CustomText>
+            <CustomText style={styles.orderInfoText}>{item.recipientName || 'Unknown Buyer'}</CustomText>
           </View>
           <View style={styles.orderInfoRow}>
             <ShoppingBag color={colors.muted} size={14} />
-            <CustomText style={styles.orderInfoText}>{item.items.length} item{item.items.length > 1 ? 's' : ''}: {orderTitle}</CustomText>
+            <CustomText style={styles.orderInfoText}>{item.items.length} item{item.items.length > 1 ? 's' : ''}</CustomText>
           </View>
+          {item.agent && (
+             <View style={styles.orderInfoRow}>
+               <UserCheck color={colors.primary} size={14} />
+               <CustomText style={[styles.orderInfoText, { color: colors.primary }]}>Agent: {item.agent.user?.name || 'Assigned'}</CustomText>
+             </View>
+          )}
         </View>
         
         <View style={styles.orderFooter}>
           <CustomText style={[styles.orderAmount, { color: colors.foreground }]}>{formatPrice(item.payment?.amount || 0)}</CustomText>
-          <View style={styles.viewDetails}>
-            <CustomText style={styles.viewDetailsText}>DETAILS</CustomText>
-            <ChevronRight color={colors.primary} size={14} />
-          </View>
+
+          <TouchableOpacity 
+            style={styles.moreButton}
+            onPress={() => {
+              setSelectedOrderForActions(item);
+              setActionModalVisible(true);
+            }}
+          >
+            <MoreVertical color={colors.muted} size={20} />
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -110,16 +184,39 @@ const SellerOrdersScreen = () => {
         <CustomText variant="h2" style={{ flex: 1 }}>Orders</CustomText>
         <NotificationIcon />
       </View>
+
+      {/* Replacement Badge Banner */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 }}>
+        <TouchableOpacity
+          style={[styles.replacementsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => navigation.navigate('SellerReplacements')}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.replacementsIcon, { backgroundColor: 'rgba(249,115,22,0.12)' }]}>
+            <RefreshCcw color="#F97316" size={20} />
+            {replacementsCount > 0 && (
+              <View style={styles.badgeIndicator}>
+                <CustomText style={styles.badgeText}>{replacementsCount}</CustomText>
+              </View>
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <CustomText style={[styles.replacementsTitle, { color: colors.foreground }]}>Replacement Requests</CustomText>
+            <CustomText style={[styles.replacementsSub, { color: colors.muted }]}>Manage customer RMAs & replacements</CustomText>
+          </View>
+          <ChevronRight color={colors.muted} size={18} />
+        </TouchableOpacity>
+      </View>
       
-      <View style={styles.filterSection}>
+      <View style={[styles.filterSection, { borderBottomColor: colors.border }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-          {['ALL', 'PENDING', 'PAID', 'SHIPPED', 'DELIVERED'].map((f) => (
+          {['ALL', 'PENDING', 'PROCESSING', 'PAID', 'SHIPPED', 'DELIVERED'].map((f) => (
             <TouchableOpacity 
               key={f} 
               onPress={() => setFilter(f)}
-              style={[styles.filterTab, filter === f && styles.filterTabActive]}
+              style={[styles.filterTab, { backgroundColor: colors.glass }, filter === f && styles.filterTabActive]}
             >
-              <CustomText style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
+              <CustomText style={[styles.filterTabText, { color: colors.muted }, filter === f && styles.filterTabTextActive]}>
                 {f}
               </CustomText>
             </TouchableOpacity>
@@ -144,27 +241,174 @@ const SellerOrdersScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <ShoppingBag color={colors.isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} size={64} />
-              <CustomText style={styles.emptyText}>No orders found.</CustomText>
+              <CustomText style={[styles.emptyText, { color: colors.muted }]}>No {filter !== 'ALL' ? filter : ''} orders found.</CustomText>
             </View>
-          }
-          ListFooterComponent={
-            <TouchableOpacity
-              style={[styles.replacementsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => navigation.navigate('SellerReplacements')}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.replacementsIcon, { backgroundColor: 'rgba(249,115,22,0.12)' }]}>
-                <RefreshCcw color="#F97316" size={18} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <CustomText style={[styles.replacementsTitle, { color: colors.foreground }]}>Replacements</CustomText>
-                <CustomText style={[styles.replacementsSub, { color: colors.muted }]}>View and manage replacement requests</CustomText>
-              </View>
-              <ChevronRight color={colors.muted} size={18} />
-            </TouchableOpacity>
           }
         />
       )}
+
+      {/* Action Menu Modal */}
+      <Modal visible={actionModalVisible} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => setActionModalVisible(false)}>
+          <View style={styles.overlayCentered}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.actionMenuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {selectedOrderForActions && (
+                  <>
+                    {/* Ship Option */}
+                    {(selectedOrderForActions.status === 'PAID' || selectedOrderForActions.status === 'PROCESSING') && (
+                      <TouchableOpacity 
+                        style={[styles.actionMenuItem, { borderBottomColor: colors.border }]}
+                        onPress={() => {
+                          setActionModalVisible(false);
+                          handleShipOrder(selectedOrderForActions.id);
+                        }}
+                      >
+                        <Truck size={18} color="#10B981" />
+                        <CustomText style={styles.actionMenuText}>Ship Order</CustomText>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Assign/Change Agent Option */}
+                    {(selectedOrderForActions.status === 'PAID' || selectedOrderForActions.status === 'PROCESSING' || selectedOrderForActions.status === 'PENDING') && (
+                      <TouchableOpacity 
+                        style={[styles.actionMenuItem]}
+                        onPress={() => {
+                          setActionModalVisible(false);
+                          openAgentModal(selectedOrderForActions);
+                        }}
+                      >
+                        <UserCheck size={18} color={colors.primary} />
+                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.agent ? 'Change Agent' : 'Assign Agent'}</CustomText>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Agents Modal */}
+      <Modal visible={showAgentModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '70%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <CustomText variant="h2">Assign Delivery Agent</CustomText>
+                {targetOrderId && <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>Order #{targetOrderId.slice(-8).toUpperCase()}</CustomText>}
+              </View>
+              <TouchableOpacity onPress={() => setShowAgentModal(false)} style={styles.closeBtn}>
+                <X color={colors.muted} size={24} />
+              </TouchableOpacity>
+            </View>
+            
+            {loadingAgents ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator color={colors.primary} size="large" />
+              </View>
+            ) : agents.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <CustomText style={{ color: colors.muted }}>No active delivery agents found.</CustomText>
+              </View>
+            ) : (
+              <ScrollView style={{ flex: 1, paddingRight: 4 }}>
+                <TouchableOpacity
+                  style={[styles.agentRow, selectedAgentId === '' ? styles.agentRowSelected : styles.agentRowUnselected]}
+                  onPress={() => setSelectedAgentId('')}
+                >
+                  <View style={[styles.radioOuter, selectedAgentId === '' ? styles.radioOuterSelected : styles.radioOuterUnselected]} />
+                  <CustomText style={{ fontWeight: 'bold', fontSize: 13, color: colors.foreground }}>No agent (handle manually)</CustomText>
+                </TouchableOpacity>
+
+                {agents.filter(a => a.verified).length > 0 && <CustomText style={styles.sectionHeading}>VERIFIED AGENTS</CustomText>}
+                {agents.filter(a => a.verified).map((agent) => (
+                   <TouchableOpacity
+                     key={agent.id}
+                     style={[styles.agentRow, selectedAgentId === agent.id ? styles.agentRowSelected : styles.agentRowUnselected]}
+                     onPress={() => setSelectedAgentId(agent.id)}
+                   >
+                     <View style={[styles.radioOuter, selectedAgentId === agent.id ? styles.radioOuterSelected : styles.radioOuterUnselected]} />
+                     
+                     <View style={styles.agentAvatar}>
+                       <CustomText style={styles.agentAvatarText}>{(agent.user?.name || 'A').slice(0, 2).toUpperCase()}</CustomText>
+                     </View>
+
+                     <View style={{ flex: 1 }}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                         <CustomText style={{ fontWeight: 'bold', fontSize: 13, color: colors.foreground }} numberOfLines={1}>{agent.user?.name || 'Agent'}</CustomText>
+                         <View style={styles.verifiedBadge}>
+                           <CustomText style={styles.verifiedText}>VERIFIED</CustomText>
+                         </View>
+                       </View>
+                       
+                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+                         <CustomText style={{ fontSize: 10, color: colors.muted, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>{agent.city || 'Kigali'}</CustomText>
+                         {agent.phone && (
+                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                             <Phone size={10} color={colors.muted} />
+                             <CustomText style={{ fontSize: 10, color: colors.muted }}>{agent.phone}</CustomText>
+                           </View>
+                         )}
+                       </View>
+                     </View>
+
+                     <View style={{ alignItems: 'flex-end' }}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                         <Star size={12} color="#FACC15" fill="#FACC15" />
+                         <CustomText style={{ fontSize: 12, fontWeight: 'bold', color: colors.foreground }}>{(agent.rating || 5).toFixed(1)}</CustomText>
+                       </View>
+                     </View>
+                   </TouchableOpacity>
+                ))}
+
+                {agents.filter(a => !a.verified).length > 0 && <CustomText style={[styles.sectionHeading, { color: colors.muted }]}>OTHER AGENTS</CustomText>}
+                {agents.filter(a => !a.verified).map((agent) => (
+                   <TouchableOpacity
+                     key={agent.id}
+                     style={[styles.agentRow, selectedAgentId === agent.id ? styles.agentRowSelected : styles.agentRowUnselected]}
+                     onPress={() => setSelectedAgentId(agent.id)}
+                   >
+                     <View style={[styles.radioOuter, selectedAgentId === agent.id ? styles.radioOuterSelected : styles.radioOuterUnselected]} />
+                     
+                     <View style={styles.agentAvatar}>
+                       <CustomText style={styles.agentAvatarText}>{(agent.user?.name || 'A').slice(0, 2).toUpperCase()}</CustomText>
+                     </View>
+
+                     <View style={{ flex: 1 }}>
+                       <CustomText style={{ fontWeight: 'bold', fontSize: 13, color: colors.foreground }} numberOfLines={1}>{agent.user?.name || 'Agent'}</CustomText>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+                         <CustomText style={{ fontSize: 10, color: colors.muted, backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>{agent.city || 'Kigali'}</CustomText>
+                       </View>
+                     </View>
+
+                     <View style={{ alignItems: 'flex-end' }}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                         <Star size={12} color="#D1D5DB" />
+                         <CustomText style={{ fontSize: 12, fontWeight: 'bold', color: colors.foreground }}>{(agent.rating || 0).toFixed(1)}</CustomText>
+                       </View>
+                     </View>
+                   </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            {!loadingAgents && (
+              <View style={styles.modalFooter}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAgentModal(false)}>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>Cancel</CustomText>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.submitAssignBtn, { backgroundColor: colors.primary }]} onPress={submitAssignAgent}>
+                  <UserCheck size={16} color="white" />
+                  <CustomText style={{ fontWeight: 'bold', color: 'white' }}>{selectedAgentId ? 'Assign Agent' : 'Remove Agent'}</CustomText>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -184,30 +428,64 @@ const styles = StyleSheet.create({
   filterTabTextActive: { color: 'white' },
   listContent: { padding: 16, paddingBottom: 100 },
   orderCard: {
-    borderRadius: 16, padding: 16, borderHorizontalWidth: 0, borderWidth: 1,
+    borderRadius: 16, padding: 16, borderWidth: 1,
     marginBottom: 16
   },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   orderId: { fontSize: 16, fontWeight: 'bold' },
-  orderDate: { fontSize: 11, marginTop: 2 },
+  orderDate: { fontSize: 11, marginTop: 4 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 10, fontWeight: 'bold', letterSpacing: 0.5 },
   orderBody: { gap: 8, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1 },
   orderInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  orderInfoText: { fontSize: 13 },
+  orderInfoText: { fontSize: 13, color: '#94a3b8' },
   orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   orderAmount: { fontSize: 16, fontWeight: '900' },
+  actionButtons: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  smallBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 4 },
+  btnText: { fontSize: 11, fontWeight: 'bold' },
   viewDetails: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  viewDetailsText: { fontSize: 11, fontWeight: '900' },
+  viewDetailsText: { fontSize: 11, fontWeight: '900', color: '#94a3b8' },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', height: 300 },
   emptyText: { marginTop: 16, fontSize: 14, fontWeight: '600' },
   replacementsCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 16, padding: 16, marginTop: 8, marginHorizontal: 0, borderWidth: 1,
+    borderRadius: 16, padding: 16, borderWidth: 1,
   },
-  replacementsIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  replacementsTitle: { fontSize: 14, fontWeight: '700' },
-  replacementsSub: { fontSize: 11, marginTop: 2 },
+  replacementsIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  replacementsTitle: { fontSize: 15, fontWeight: '700' },
+  replacementsSub: { fontSize: 11, marginTop: 4 },
+  badgeIndicator: {
+    position: 'absolute', top: -5, right: -5,
+    backgroundColor: '#EF4444', height: 18, minWidth: 18, borderRadius: 9, 
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4,
+    borderWidth: 1.5, borderColor: '#030712'
+  },
+  badgeText: { color: 'white', fontSize: 9, fontWeight: '900' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { height: '60%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 24 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  closeBtn: { padding: 4 },
+  agentRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 8, gap: 12 },
+  agentRowSelected: { borderColor: 'rgba(249,115,22,0.5)', backgroundColor: 'rgba(249,115,22,0.05)' },
+  agentRowUnselected: { borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'transparent' },
+  radioOuter: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
+  radioOuterSelected: { borderColor: '#F97316', backgroundColor: '#F97316' },
+  radioOuterUnselected: { borderColor: 'rgba(255,255,255,0.2)' },
+  agentAvatar: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(249,115,22,0.15)', borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', alignItems: 'center', justifyContent: 'center' },
+  agentAvatarText: { color: '#F97316', fontWeight: '900', fontSize: 16 },
+  verifiedBadge: { backgroundColor: 'rgba(249,115,22,0.1)', borderColor: 'rgba(249,115,22,0.2)', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  verifiedText: { color: '#F97316', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  sectionHeading: { fontSize: 10, fontWeight: '900', color: '#F97316', letterSpacing: 1, marginVertical: 8, marginLeft: 4 },
+  modalFooter: { flexDirection: 'row', gap: 12, marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' },
+  cancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  submitAssignBtn: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, gap: 8 },
+  moreButton: { padding: 8, marginRight: -8 },
+  overlayCentered: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  actionMenuCard: { width: '80%', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  actionMenuHeader: { padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  actionMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1 },
+  actionMenuText: { fontSize: 14, fontWeight: '600' },
 });
 
 export default SellerOrdersScreen;

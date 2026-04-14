@@ -22,8 +22,18 @@
       },
       "edgeToEdgeEnabled": true
     },
+    "notification": {
+      "icon": "./assets/logo.png",
+      "color": "#e67e22"
+    },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "49b11845-df80-45c9-884b-44a4cbcd4258"
+      }
+    },
+    "owner": "ihyacinthe"
   }
 }

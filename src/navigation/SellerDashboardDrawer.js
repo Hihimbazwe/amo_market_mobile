@@ -17,6 +17,7 @@ import {
   X,
   CreditCard,
   AlertCircle,
+  User as UserIcon,
 } from 'lucide-react-native';
 
 import SellerOverviewScreen from '../screens/seller/SellerOverviewScreen';
@@ -138,9 +139,26 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
 
             {/* User info — only email, no avatar */}
             <View style={styles.userInfo}>
-              <View>
+              <View style={{ 
+                width: 36, 
+                height: 36, 
+                borderRadius: 18, 
+                backgroundColor: 'rgba(255,255,255,0.05)', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                marginRight: 10,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)'
+              }}>
+                {user?.image ? (
+                  <Image source={{ uri: user.image }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+                ) : (
+                  <UserIcon color={colors.primary} size={20} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
                 <CustomText style={[styles.userEmail, { color: colors.foreground, fontSize: 14, fontWeight: '700' }]} numberOfLines={1}>
-                  {user?.email || 'Seller'}
+                  {user?.name || 'Seller'}
                 </CustomText>
               </View>
             </View>
