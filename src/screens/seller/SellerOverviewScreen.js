@@ -9,7 +9,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
 import { sellerService } from '../../api/sellerService';
-import { productService } from '../../api/productService';
 
 
 const SellerOverviewScreen = () => {
@@ -30,30 +29,26 @@ const SellerOverviewScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      const checkStatusAndLoad = async () => {
+      const loadDashboard = async () => {
         if (!user?.id) return;
         setLoading(true);
         try {
-          // Fire ALL requests in parallel — do not await KYC status alone first
-          const [profile, analytics, products, wallet, orders] = await Promise.all([
-            sellerService.getKycStatus(user.id),
-            sellerService.getAnalytics(user.id, '7D').catch(() => ({})),
-            productService.getMyProducts(user.id).catch(() => []),
-            sellerService.getWallet(user.id).catch(() => null),
-            sellerService.getOrders(user.id, 15).catch(() => [])
-          ]);
+          const dashboard = await sellerService.getDashboard(user.id);
+          console.log('[DEBUG] Dashboard data received:', dashboard);
 
-          if (!profile?.kycSubmitted || !profile?.membershipPlanId) {
+          // KYC gate — redirect if not ready
+          if (!dashboard.kycReady) {
+            console.log('[DEBUG] KYC not ready, navigating to SellerKYC');
             navigation.navigate('SellerKYC');
             return;
           }
 
           setData({
-            revenue: analytics.revenue || 0,
-            activeProducts: products.filter(p => p.published).length,
-            pendingShipments: analytics.pendingOrders || 0,
-            walletBalance: wallet?.balance || 0,
-            recentOrders: orders.slice(0, 5)
+            revenue: dashboard.revenue || 0,
+            activeProducts: dashboard.activeProducts || 0,
+            pendingShipments: dashboard.pendingOrders || 0,
+            walletBalance: dashboard.walletBalance || 0,
+            recentOrders: dashboard.recentOrders || [],
           });
         } catch (err) {
           console.error('Failed to load dashboard:', err);
@@ -61,7 +56,7 @@ const SellerOverviewScreen = () => {
           setLoading(false);
         }
       };
-      checkStatusAndLoad();
+      loadDashboard();
     }, [user, navigation])
   );
 
@@ -148,7 +143,6 @@ const SellerOverviewScreen = () => {
           </View>
         </View>
 
-        {/* Recent Orders */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <CustomText style={styles.sectionTitle}>Recent Orders</CustomText>
@@ -157,13 +151,21 @@ const SellerOverviewScreen = () => {
             </TouchableOpacity>
           </View>
           {data.recentOrders.length === 0 ? (
-            <CustomText style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 10 }}>No recent orders.</CustomText>
+            <View style={[styles.emptyRecent, { backgroundColor: colors.glass }]}>
+              <ShoppingBag color={colors.muted} size={32} />
+              <CustomText style={{ color: colors.muted, marginTop: 12, fontSize: 13 }}>No recent orders to show.</CustomText>
+            </View>
           ) : (
             data.recentOrders.map((order) => {
               const itemTitle = order.items && order.items.length > 0 && order.items[0].product ? order.items[0].product.title : 'Order Items';
               const orderTotal = formatPrice(order.payment?.amount || 0);
               return (
-                <View key={order.id} style={[styles.orderRow, { borderBottomColor: colors.border }]}>
+                <TouchableOpacity 
+                  key={order.id} 
+                  style={[styles.orderRow, { borderBottomColor: colors.border }]}
+                  onPress={() => navigation.navigate('SellerOrders')}
+                  activeOpacity={0.7}
+                >
                   <View style={[styles.productIcon, { backgroundColor: colors.glass }]}>
                     <Package color={colors.muted} size={20} />
                   </View>
@@ -177,7 +179,7 @@ const SellerOverviewScreen = () => {
                       <CustomText style={[styles.statusText, { color: order.status === 'PAID' ? '#3B82F6' : '#F97316' }]}>{order.status}</CustomText>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -285,6 +287,15 @@ const styles = StyleSheet.create({
   upgradeIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   upgradeTitle: { fontSize: 16, fontWeight: 'bold' },
   upgradeDesc: { color: 'rgba(255,255,255,0.8)', fontSize: 11, marginTop: 2 },
+  emptyRecent: {
+    padding: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    borderStyle: 'dashed',
+  },
 });
 
 export default SellerOverviewScreen;

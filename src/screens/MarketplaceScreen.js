@@ -7,7 +7,8 @@ import {
   TouchableOpacity, 
   StatusBar,
   Modal,
-  ScrollView
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Filter, X, ChevronDown } from 'lucide-react-native';
@@ -154,6 +155,12 @@ const MarketplaceScreen = ({ navigation, route }) => {
       applyLocalFilters(data, search, filters.maxPrice);
     } catch (error) {
       console.error('Fetch error:', error);
+      const errorMsg = error.message || 'Unknown error occurred while fetching products.';
+      require('react-native').Alert.alert(
+        'Connection Error',
+        `Failed to reach the marketplace: ${errorMsg}\n\nPlease check if your backend is running and your API_BASE_URL in .env is correct.`,
+        [{ text: 'Retry', onPress: fetchProducts }, { text: 'OK' }]
+      );
     } finally {
       setLoading(false);
     }
@@ -220,26 +227,42 @@ const MarketplaceScreen = ({ navigation, route }) => {
       />
 
       {/* Product List */}
-      <FlatList 
-        data={filteredProducts}
-        refreshing={loading}
-        onRefresh={fetchProducts}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <ProductCard product={item} onPress={() => navigation.navigate('ProductDetail', { product: item })} />
-        )}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={() => (
-          <View style={styles.listHeader}>
-            <CustomText variant="subtitle">
-              {filters.category !== "All Categories" ? `${filters.category} in ` : ""}
-              {filters.province !== "All Provinces" ? `${filters.province}` : "Marketplace"}
-            </CustomText>
-          </View>
-        )}
-      />
+      {loading && filteredProducts.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#e67e22" />
+          <CustomText style={{ marginTop: 12, color: '#94a3b8' }}>Loading products...</CustomText>
+        </View>
+      ) : (
+        <FlatList 
+          data={filteredProducts}
+          refreshing={loading}
+          onRefresh={fetchProducts}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <ProductCard product={item} onPress={() => navigation.navigate('ProductDetail', { product: item })} />
+          )}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
+          contentContainerStyle={styles.listContent}
+          initialNumToRender={6}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
+          ListHeaderComponent={() => (
+            <View style={styles.listHeader}>
+              <CustomText variant="subtitle">
+                {filters.category !== "All Categories" ? `${filters.category} in ` : ""}
+                {filters.province !== "All Provinces" ? `${filters.province}` : "Marketplace"}
+              </CustomText>
+            </View>
+          )}
+          ListEmptyComponent={() => !loading && (
+            <View style={styles.loadingContainer}>
+              <CustomText style={{ color: '#94a3b8' }}>No products found matching your criteria.</CustomText>
+            </View>
+          )}
+        />
+      )}
 
       <AuthOverlay />
     </SafeAreaView>
@@ -367,6 +390,12 @@ const styles = StyleSheet.create({
   modalFooter: {
     paddingTop: 16,
     paddingBottom: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
   },
 });
 

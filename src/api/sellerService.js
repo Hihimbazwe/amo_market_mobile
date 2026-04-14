@@ -7,6 +7,19 @@ const commonHeaders = {
   'ngrok-skip-browser-warning': 'true',
 };
 
+// Wraps fetch with a timeout to avoid hanging indefinitely over slow tunnels
+const fetchWithTimeout = (url, options = {}, timeoutMs = 20000) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .then(res => { clearTimeout(timer); return res; })
+    .catch(err => {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('Request timed out. Check your connection.');
+      throw err;
+    });
+};
+
 // Helper inside service to attach user ID
 const buildHeaders = (userId) => ({
   ...commonHeaders,
@@ -14,6 +27,24 @@ const buildHeaders = (userId) => ({
 });
 
 export const sellerService = {
+  // Single consolidated call for the seller overview screen
+  getDashboard: async (userId) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/seller/dashboard`, {
+        method: 'GET',
+        headers: buildHeaders(userId),
+      }, 12000);
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid response: ${text.slice(0, 100)}`); }
+      if (!response.ok) throw new Error(data.error || `Failed to load dashboard (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('getDashboard error:', error);
+      throw error;
+    }
+  },
+
   getAnalytics: async (userId, period = '7D') => {
     try {
       let webPeriod = "7 Days";
@@ -21,7 +52,7 @@ export const sellerService = {
       if (period === "3M") webPeriod = "90 Days";
       if (period === "1Y") webPeriod = "1 Year";
 
-      const response = await fetch(`${BASE_URL}/api/seller/analytics?period=${encodeURIComponent(webPeriod)}`, {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/seller/analytics?period=${encodeURIComponent(webPeriod)}`, {
         method: 'GET',
         headers: buildHeaders(userId),
       });
@@ -43,7 +74,7 @@ export const sellerService = {
   getOrders: async (userId, limit = undefined) => {
     try {
       const url = limit ? `${BASE_URL}/api/seller/orders?limit=${limit}` : `${BASE_URL}/api/seller/orders`;
-      const response = await fetch(url, {
+      const response = await fetchWithTimeout(url, {
         method: 'GET',
         headers: buildHeaders(userId),
       });
@@ -223,7 +254,7 @@ export const sellerService = {
 
   getKycStatus: async (userId) => {
     try {
-      const response = await fetch(`${BASE_URL}/api/seller/kyc`, {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/seller/kyc`, {
         method: 'GET',
         headers: buildHeaders(userId),
       });

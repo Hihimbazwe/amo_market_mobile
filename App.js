@@ -6,7 +6,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Home, ShoppingBag, ShoppingCart, User } from 'lucide-react-native';
+import { Home, ShoppingBag, ShoppingCart, CircleUser as UserIcon, Loader2 } from 'lucide-react-native';
+
 import HomeScreen from './src/screens/HomeScreen';
 import MarketplaceScreen from './src/screens/MarketplaceScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
@@ -15,19 +16,24 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import VerifyOTPScreen from './src/screens/VerifyOTPScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
+
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import Constants from 'expo-constants';
 import { CartProvider, useCart } from './src/context/CartContext';
 import { WishlistProvider } from './src/context/WishlistContext';
 import { NotificationProvider, useNotifications } from './src/context/NotificationContext';
 import CustomText from './src/components/CustomText';
 import BuyerDashboardDrawer from './src/navigation/BuyerDashboardDrawer';
 import SellerDashboardDrawer from './src/navigation/SellerDashboardDrawer';
-import { Loader2, Bell } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+// --- STACKS ---
 
 const HomeStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -60,6 +66,18 @@ const CartStack = () => (
   </Stack.Navigator>
 );
 
+const AuthStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen name="Register" component={RegisterScreen} />
+    <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+  </Stack.Navigator>
+);
+
+// --- COMPONENTS ---
+
 const LoadingScreen = () => {
   const { colors } = useTheme();
   return (
@@ -70,6 +88,54 @@ const LoadingScreen = () => {
   );
 };
 
+const AppTabs = ({ user, cartCount, unreadCount }) => {
+  const { colors } = useTheme();
+  return (
+    <Tab.Navigator
+      initialRouteName={user?.role === 'SELLER' ? 'Me' : 'Home'}
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: [styles.tabBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }],
+        tabBarActiveTintColor: '#e67e22',
+        tabBarInactiveTintColor: '#94a3b8',
+        tabBarIcon: ({ color, size }) => {
+          let IconComponent;
+          if (route.name === 'Home') IconComponent = Home;
+          else if (route.name === 'Market') IconComponent = ShoppingBag;
+          else if (route.name === 'Cart') IconComponent = ShoppingCart;
+          else if (route.name === 'Me') IconComponent = UserIcon;
+          
+          return (
+            <View>
+              <IconComponent color={color} size={size} />
+              {route.name === 'Cart' && cartCount > 0 && (
+                <View style={styles.badge}>
+                  <CustomText style={styles.badgeText}>{cartCount}</CustomText>
+                </View>
+              )}
+              {route.name === 'Me' && unreadCount > 0 && (
+                <View style={[styles.badge, { backgroundColor: '#ef4444' }]}>
+                  <CustomText style={styles.badgeText}>{unreadCount}</CustomText>
+                </View>
+              )}
+            </View>
+          );
+        },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeStack} />
+      <Tab.Screen name="Market" component={MarketplaceStack} />
+      <Tab.Screen name="Cart" component={CartStack} />
+      <Tab.Screen 
+        name="Me" 
+        component={user?.role === 'SELLER' ? SellerDashboardDrawer : BuyerDashboardDrawer} 
+      />
+    </Tab.Navigator>
+  );
+};
+
+// --- CORE NAVIGATION & LOGIC ---
+
 const RootNavigator = () => {
   const { loading, user, logout } = useAuth();
   const { cartCount } = useCart();
@@ -78,7 +144,7 @@ const RootNavigator = () => {
   const inactivityTimer = React.useRef(null);
   const backgroundTime = React.useRef(null);
 
-  const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes
+  const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
 
   const resetTimer = React.useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
@@ -120,6 +186,27 @@ const RootNavigator = () => {
     return <LoadingScreen />;
   }
 
+  const manifest = Constants.expoConfig || Constants.manifest;
+  const hostUri = manifest?.hostUri;
+
+  const linking = {
+    prefixes: [
+      hostUri ? `exp://${hostUri}/--` : 'exp://1ui--vo-ihyacinthe-8081.exp.direct/--',
+      'exp://'
+    ],
+    config: {
+      initialRouteName: 'Auth',
+      screens: {
+        Auth: {
+          initialRouteName: 'Login',
+          screens: {
+            ResetPassword: 'reset-password',
+          },
+        },
+      },
+    },
+  };
+
   return (
     <View 
       style={{ flex: 1 }}
@@ -132,48 +219,17 @@ const RootNavigator = () => {
         return false;
       }}
     >
-      <NavigationContainer>
-      <Tab.Navigator
-        initialRouteName={user?.role === 'SELLER' ? 'Me' : 'Home'}
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarStyle: styles.tabBar,
-          tabBarActiveTintColor: '#e67e22',
-          tabBarInactiveTintColor: '#94a3b8',
-          tabBarIcon: ({ color, size }) => {
-            let IconComponent;
-            if (route.name === 'Home') IconComponent = Home;
-            else if (route.name === 'Market') IconComponent = ShoppingBag;
-            else if (route.name === 'Cart') IconComponent = ShoppingCart;
-            else if (route.name === 'Me') IconComponent = User;
-            
-            return (
-              <View>
-                <IconComponent color={color} size={size} />
-                {route.name === 'Cart' && cartCount > 0 && (
-                  <View style={styles.badge}>
-                    <CustomText style={styles.badgeText}>{cartCount}</CustomText>
-                  </View>
-                )}
-                {route.name === 'Me' && unreadCount > 0 && (
-                  <View style={[styles.badge, { backgroundColor: '#ef4444' }]}>
-                    <CustomText style={styles.badgeText}>{unreadCount}</CustomText>
-                  </View>
-                )}
-              </View>
-            );
-          },
-        })}
-      >
-        <Tab.Screen name="Home" component={HomeStack} />
-        <Tab.Screen name="Market" component={MarketplaceStack} />
-        <Tab.Screen name="Cart" component={CartStack} />
-        <Tab.Screen 
-          name="Me" 
-          component={user?.role === 'SELLER' ? SellerDashboardDrawer : BuyerDashboardDrawer} 
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+      <NavigationContainer linking={linking}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {!user ? (
+            <Stack.Screen name="Auth" component={AuthStack} />
+          ) : (
+            <Stack.Screen name="MainApp">
+              {() => <AppTabs user={user} cartCount={cartCount} unreadCount={unreadCount} />}
+            </Stack.Screen>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
     </View>
   );
 };

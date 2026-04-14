@@ -11,7 +11,7 @@ import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-s
 import { 
   Home, 
   ShoppingBag, 
-  User as UserIcon, 
+  CircleUser as UserIcon, 
   Heart, 
   Wallet, 
   Settings, 
@@ -60,7 +60,7 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   const routes = [
     { name: 'Dashboard', icon: Home },
     { name: 'Orders', icon: ShoppingBag },
-    { name: 'Profile', icon: User },
+    { name: 'Profile', icon: UserIcon },
     { name: 'Wishlist', icon: Heart },
     { name: 'Wallet', icon: Wallet },
     { name: 'Disputes', icon: AlertCircle },

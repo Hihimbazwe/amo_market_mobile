@@ -23,27 +23,31 @@ export const productService = {
         url += `district=${encodeURIComponent(district)}&`;
       }
 
-      console.log('Fetching products from:', url);
+      console.log('[DEBUG] Fetching products from:', url);
+      
       const response = await fetch(url, {
         method: 'GET',
         headers: commonHeaders,
       });
 
       const text = await response.text();
+      console.log('[DEBUG] Raw response status:', response.status);
+      console.log('[DEBUG] Raw response start:', text.slice(0, 200));
+
       let data;
       try {
         data = JSON.parse(text);
       } catch (e) {
-        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+        throw new Error(`Invalid JSON from server at ${url}: ${text.slice(0, 100)}`);
       }
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to fetch products (${response.status})`);
+        throw new Error(data.error || `Failed to fetch products (${response.status}) from ${url}`);
       }
 
       return data;
     } catch (error) {
-      console.error('getProducts error:', error);
+      console.error('[DEBUG] getProducts error:', error.message || error);
       throw error;
     }
   },

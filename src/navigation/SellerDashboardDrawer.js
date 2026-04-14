@@ -17,7 +17,7 @@ import {
   X,
   CreditCard,
   AlertCircle,
-  User as UserIcon,
+  CircleUser as UserIcon,
 } from 'lucide-react-native';
 
 import SellerOverviewScreen from '../screens/seller/SellerOverviewScreen';

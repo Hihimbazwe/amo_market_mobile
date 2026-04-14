@@ -9,7 +9,8 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
-  Image
+  Image,
+  ActivityIndicator
 } from 'react-native';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -316,9 +317,15 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           <View style={styles.productsGrid}>
-            {liveProducts.map((item) => (
-              <ProductCard key={item.id} product={item} onPress={() => navigation.navigate('ProductDetail', { product: item })} />
-            ))}
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color="#e67e22" />
+              </View>
+            ) : (
+              liveProducts.map((item) => (
+                <ProductCard key={item.id} product={item} onPress={() => navigation.navigate('ProductDetail', { product: item })} />
+              ))
+            )}
           </View>
         </View>
 
@@ -629,6 +636,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
 });
 

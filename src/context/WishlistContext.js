@@ -47,7 +47,19 @@ export const WishlistProvider = ({ children }) => {
 
     try {
       const result = await wishlistService.toggleWishlist(user.id, productId);
-      await fetchWishlist(); // Re-sync to get full product details if added
+      const isNowInWishlist = !isCurrentlyInWishlist;
+      
+      const { ToastAndroid, Platform } = require('react-native');
+      const message = isNowInWishlist ? 'Added to Wishlist' : 'Removed from Wishlist';
+      
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(message, ToastAndroid.SHORT);
+      } else {
+        // Fallback or better UI feedback could be added here
+        console.log(message);
+      }
+
+      await fetchWishlist(); 
       return result;
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to update wishlist');
