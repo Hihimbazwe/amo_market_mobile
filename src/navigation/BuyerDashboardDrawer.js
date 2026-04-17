@@ -18,7 +18,8 @@ import {
   AlertCircle, 
   RefreshCcw,
   LogOut,
-  X
+  X,
+  MessageCircle,
 } from 'lucide-react-native';
 
 import BuyerOverviewScreen from '../screens/buyer/BuyerOverviewScreen';
@@ -30,6 +31,9 @@ import BuyerDisputesScreen from '../screens/buyer/BuyerDisputesScreen';
 import BuyerReplacementsScreen from '../screens/buyer/BuyerReplacementsScreen';
 import BuyerSettingsScreen from '../screens/buyer/BuyerSettingsScreen';
 import BuyerOrderTrackingScreen from '../screens/buyer/BuyerOrderTrackingScreen';
+import ChatListScreen from '../screens/shared/ChatListScreen';
+import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
+import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
 
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
@@ -193,6 +197,7 @@ export default function BuyerDashboard({ navigation }) {
           <Stack.Screen name="Replacements" component={BuyerReplacementsScreen} />
           <Stack.Screen name="Settings" component={BuyerSettingsScreen} />
           <Stack.Screen name="OrderTracking" component={BuyerOrderTrackingScreen} />
+          <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
         </Stack.Navigator>
         
         <CustomDrawer 

@@ -45,6 +45,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const { user } = useAuth();
   const { addToCart, loading: cartLoading } = useCart();
   const { isInWishlist, toggleWishlist, loading: wishlistLoading } = useWishlist();
   const [addingToCart, setAddingToCart] = useState(false);
@@ -67,6 +68,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
       { label: 'Availability', value: routeProduct?.stock > 0 ? 'In Stock' : 'Out of Stock' },
     ],
     seller: {
+      userId: routeProduct?.seller?.userId || routeProduct?.sellerId,
       name: routeProduct?.seller?.user?.name || 'AMO Seller',
       rating: routeProduct?.seller?.rating || 0,
       reviews: routeProduct?.seller?._count?.reviews || 0,
@@ -120,8 +122,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
         <View style={styles.imageContainer}>
           {hasImages ? (
             <>
-              <FlatList
-                data={media}
+              <ScrollView
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
@@ -129,14 +130,18 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   const offset = e.nativeEvent.contentOffset.x;
                   setActiveImageIndex(Math.round(offset / width));
                 }}
-                renderItem={renderMediaItem}
-                keyExtractor={(item) => item.id}
-              />
+              >
+                {media.map((item, index) => (
+                  <View key={item.id || index} style={styles.carouselItem}>
+                    {renderMediaItem({ item })}
+                  </View>
+                ))}
+              </ScrollView>
               {media.length > 1 && (
                 <View style={styles.pagination}>
                   {media.map((_, i) => (
                     <View 
-                      key={i} 
+                      key={`dot-${i}`} 
                       style={[
                         styles.paginationDot, 
                         activeImageIndex === i && styles.paginationDotActive
@@ -226,9 +231,37 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 <CustomText variant="caption" style={styles.locationText}>{product.location}</CustomText>
               </View>
             </View>
-            <TouchableOpacity style={styles.viewMapButton}>
-               <CustomText style={styles.viewMapText}>Map</CustomText>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity 
+                style={[styles.viewMapButton, { backgroundColor: 'rgba(59, 130, 246, 0.1)', flexDirection: 'row', alignItems: 'center' }]}
+                onPress={() => {
+                  if (!user) {
+                    Alert.alert("Login Required", "Please login to chat with the seller.");
+                    navigation.navigate('Login');
+                    return;
+                  }
+                  navigation.navigate('Messages', {
+                    screen: 'ChatDetail',
+                    params: {
+                      conversation: {
+                        id: `new-${product.seller.userId}`,
+                        participantId: product.seller.userId,
+                        participantName: product.seller.name,
+                        participantColor: '#e67e22',
+                        participantInitials: product.seller.name[0] || 'S',
+                        isOnline: true
+                      }
+                    }
+                  });
+                }}
+              >
+                 <MessageCircle size={12} color="#3B82F6" style={{ marginRight: 4 }} />
+                 <CustomText style={[styles.viewMapText, { color: '#3B82F6' }]}>Chat</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.viewMapButton}>
+                 <CustomText style={styles.viewMapText}>Map</CustomText>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Trust Badges */}
@@ -318,11 +351,11 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
       {/* Buy Button Bar */}
       <View style={styles.bottomBar}>
-         <CustomButton 
+         {/* <CustomButton 
           title="Buy Now" 
           style={styles.buyButton}
           onPress={() => Alert.alert("Purchase", "Proceeding to checkout...")} 
-        />
+        /> */}
       </View>
     </View>
   );
@@ -469,6 +502,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   viewMapText: {
     color: '#e67e22',
@@ -476,6 +511,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   carouselImage: {
+    width: width,
+    height: 380,
+  },
+  carouselItem: {
     width: width,
     height: 380,
   },

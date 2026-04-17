@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "628531278836",
+    "project_id": "amo-market-7f0a5",
+    "storage_bucket": "amo-market-7f0a5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:628531278836:android:d9c53e687a85bf3c92ffa1",
+        "android_client_info": {
+          "package_name": "com.ihyacinthe.amo_mobile_market"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhOMtb-tXYyM1RFoc18L1J_uUNucL4rZw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

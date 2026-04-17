@@ -6,12 +6,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Home, ShoppingBag, ShoppingCart, CircleUser as UserIcon, Loader2 } from 'lucide-react-native';
+import { Home, ShoppingBag, MessageCircle, CircleUser as UserIcon, Loader2 } from 'lucide-react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
 import MarketplaceScreen from './src/screens/MarketplaceScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
-import CartScreen from './src/screens/CartScreen';
+// Cart removed from tabs
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -29,6 +29,9 @@ import { NotificationProvider, useNotifications } from './src/context/Notificati
 import CustomText from './src/components/CustomText';
 import BuyerDashboardDrawer from './src/navigation/BuyerDashboardDrawer';
 import SellerDashboardDrawer from './src/navigation/SellerDashboardDrawer';
+import ChatListScreen from './src/screens/shared/ChatListScreen';
+import ChatDetailScreen from './src/screens/shared/ChatDetailScreen';
+import StatusViewerScreen from './src/screens/shared/StatusViewerScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -44,6 +47,8 @@ const HomeStack = () => (
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
+    <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
+    <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
   </Stack.Navigator>
 );
 
@@ -56,13 +61,16 @@ const MarketplaceStack = () => (
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
+    <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
+    <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
   </Stack.Navigator>
 );
 
-const CartStack = () => (
+const MessagesStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="CartMain" component={CartScreen} />
-    <Stack.Screen name="Checkout" component={CheckoutScreen} />
+    <Stack.Screen name="MessagesMain" component={ChatListScreen} />
+    <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
+    <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
   </Stack.Navigator>
 );
 
@@ -102,17 +110,12 @@ const AppTabs = ({ user, cartCount, unreadCount }) => {
           let IconComponent;
           if (route.name === 'Home') IconComponent = Home;
           else if (route.name === 'Market') IconComponent = ShoppingBag;
-          else if (route.name === 'Cart') IconComponent = ShoppingCart;
+          else if (route.name === 'Messages') IconComponent = MessageCircle;
           else if (route.name === 'Me') IconComponent = UserIcon;
           
           return (
             <View>
               <IconComponent color={color} size={size} />
-              {route.name === 'Cart' && cartCount > 0 && (
-                <View style={styles.badge}>
-                  <CustomText style={styles.badgeText}>{cartCount}</CustomText>
-                </View>
-              )}
               {route.name === 'Me' && unreadCount > 0 && (
                 <View style={[styles.badge, { backgroundColor: '#ef4444' }]}>
                   <CustomText style={styles.badgeText}>{unreadCount}</CustomText>
@@ -125,7 +128,7 @@ const AppTabs = ({ user, cartCount, unreadCount }) => {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Market" component={MarketplaceStack} />
-      <Tab.Screen name="Cart" component={CartStack} />
+      <Tab.Screen name="Messages" component={MessagesStack} />
       <Tab.Screen 
         name="Me" 
         component={user?.role === 'SELLER' ? SellerDashboardDrawer : BuyerDashboardDrawer} 
@@ -221,13 +224,10 @@ const RootNavigator = () => {
     >
       <NavigationContainer linking={linking}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!user ? (
-            <Stack.Screen name="Auth" component={AuthStack} />
-          ) : (
-            <Stack.Screen name="MainApp">
-              {() => <AppTabs user={user} cartCount={cartCount} unreadCount={unreadCount} />}
-            </Stack.Screen>
-          )}
+          <Stack.Screen name="MainApp">
+            {() => <AppTabs user={user} cartCount={cartCount} unreadCount={unreadCount} />}
+          </Stack.Screen>
+          <Stack.Screen name="Auth" component={AuthStack} />
         </Stack.Navigator>
       </NavigationContainer>
     </View>

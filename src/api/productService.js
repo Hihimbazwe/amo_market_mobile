@@ -12,15 +12,15 @@ export const productService = {
     try {
       const { category, province, district } = filters;
       
-      let url = `${BASE_URL}/api/products?`;
+      let url = `${BASE_URL}/api/products?limit=50`;
       if (category && category !== 'All Categories') {
-        url += `category=${encodeURIComponent(category)}&`;
+        url += `&category=${encodeURIComponent(category)}`;
       }
       if (province && province !== 'All Provinces') {
-        url += `province=${encodeURIComponent(province)}&`;
+        url += `&province=${encodeURIComponent(province)}`;
       }
       if (district && district !== 'All Districts') {
-        url += `district=${encodeURIComponent(district)}&`;
+        url += `&district=${encodeURIComponent(district)}`;
       }
 
       console.log('[DEBUG] Fetching products from:', url);

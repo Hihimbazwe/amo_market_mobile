@@ -75,7 +75,13 @@ const LoginScreen = ({ navigation }) => {
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={() => navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+          })} 
+          style={styles.backButton}
+        >
           <ArrowLeft color="#e2e8f0" size={24} />
         </TouchableOpacity>
         <CustomText variant="h2">Login</CustomText>

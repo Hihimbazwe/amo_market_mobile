@@ -18,6 +18,7 @@ import {
   CreditCard,
   AlertCircle,
   CircleUser as UserIcon,
+  MessageCircle,
 } from 'lucide-react-native';
 
 import SellerOverviewScreen from '../screens/seller/SellerOverviewScreen';
@@ -32,6 +33,9 @@ import SellerWithdrawScreen from '../screens/seller/SellerWithdrawScreen';
 import SellerAnalyticsScreen from '../screens/seller/SellerAnalyticsScreen';
 import SellerMembershipScreen from '../screens/seller/SellerMembershipScreen';
 import SellerKYCScreen from '../screens/seller/SellerKYCScreen';
+import ChatListScreen from '../screens/shared/ChatListScreen';
+import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
+import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
 
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
@@ -229,6 +233,7 @@ export default function SellerDashboardDrawer({ navigation }) {
           <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
+          <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
         </Stack.Navigator>
 
         <CustomDrawer

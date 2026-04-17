@@ -11,8 +11,9 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Filter, X, ChevronDown } from 'lucide-react-native';
+import { Search, Filter, X, ChevronDown, ArrowUp } from 'lucide-react-native';
 import CustomText from '../components/CustomText';
+import { useRef } from 'react';
 import ProductCard from '../components/ProductCard';
 import CustomButton from '../components/CustomButton';
 import AuthOverlay from '../components/AuthOverlay';
@@ -146,6 +147,17 @@ const MarketplaceScreen = ({ navigation, route }) => {
   const [allProducts, setAllProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const listRef = useRef(null);
+
+  const handleScroll = (event) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setShowScrollTop(offsetY > 300);
+  };
+  
+  const scrollToTop = () => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -234,9 +246,12 @@ const MarketplaceScreen = ({ navigation, route }) => {
         </View>
       ) : (
         <FlatList 
+          ref={listRef}
           data={filteredProducts}
           refreshing={loading}
           onRefresh={fetchProducts}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <ProductCard product={item} onPress={() => navigation.navigate('ProductDetail', { product: item })} />
@@ -265,6 +280,12 @@ const MarketplaceScreen = ({ navigation, route }) => {
       )}
 
       <AuthOverlay />
+
+      {showScrollTop && (
+        <TouchableOpacity style={styles.fab} onPress={scrollToTop} activeOpacity={0.8}>
+          <ArrowUp color="#fff" size={24} />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 };
@@ -396,6 +417,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    backgroundColor: '#e67e22',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
   },
 });
 
