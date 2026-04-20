@@ -145,7 +145,7 @@ export default function ChatListScreen() {
   const loadData = () => {
     Promise.all([
       chatService.getConversations(user?.id, filterType),
-      chatService.getStatuses(user?.id, true) // Fetch summary only
+      chatService.getStatuses(user?.id, true) // Pass userId for prioritization
     ]).then(([convData, statusData]) => {
       // Sort pinned to top dynamically
       const sorted = convData.sort((a, b) => {
@@ -235,7 +235,7 @@ export default function ChatListScreen() {
       });
 
       if (result.success) {
-        navigation.navigate('ChatDetail', { conversation: conv });
+        navigation.navigate('ChatDetail', { conversation: conv, authenticated: true });
       }
     } else {
       navigation.navigate('ChatDetail', { conversation: conv });
@@ -352,7 +352,7 @@ export default function ChatListScreen() {
     });
 
     if (ok) {
-      const fresh = await chatService.getStatuses(user?.id);
+      const fresh = await chatService.getStatuses(user?.id, true);
       setStatuses(fresh);
       Alert.alert('Success', 'Status posted successfully!');
     } else {

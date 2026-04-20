@@ -22,6 +22,9 @@ export const productService = {
       if (district && district !== 'All Districts') {
         url += `&district=${encodeURIComponent(district)}`;
       }
+      if (filters.followerId) {
+        url += `&followerId=${encodeURIComponent(filters.followerId)}`;
+      }
 
       console.log('[DEBUG] Fetching products from:', url);
       

@@ -149,6 +149,7 @@ const MarketplaceScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const listRef = useRef(null);
+  const { user } = useAuth();
 
   const handleScroll = (event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -162,7 +163,10 @@ const MarketplaceScreen = ({ navigation, route }) => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const data = await productService.getProducts(filters);
+      const data = await productService.getProducts({
+        ...filters,
+        followerId: user?.id
+      });
       setAllProducts(data);
       applyLocalFilters(data, search, filters.maxPrice);
     } catch (error) {

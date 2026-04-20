@@ -168,6 +168,12 @@ export default function ChatDetailScreen() {
 
       // Handle biometric check for locked chats
       if (conversation.isLocked && !isAuthenticated) {
+        // If already authenticated via the list screen, skip prompt
+        if (route.params?.authenticated) {
+          setIsAuthenticated(true);
+          return;
+        }
+
         const result = await LocalAuthentication.authenticateAsync({
           promptMessage: 'Locked Chat',
           fallbackLabel: 'Enter Passcode',

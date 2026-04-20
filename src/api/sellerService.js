@@ -379,5 +379,36 @@ export const sellerService = {
       console.error('updateProfile error:', error);
       throw error;
     }
+  },
+
+  toggleFollow: async (userId, sellerId, action) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/mobile/user/follow`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ sellerId, action })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to toggle follow');
+      return data;
+    } catch (error) {
+      console.error('toggleFollow error:', error);
+      throw error;
+    }
+  },
+
+  getFollowStatus: async (userId, sellerId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/mobile/user/follow?sellerId=${encodeURIComponent(sellerId)}`, {
+        method: 'GET',
+        headers: buildHeaders(userId),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to get follow status');
+      return data;
+    } catch (error) {
+      console.error('getFollowStatus error:', error);
+      throw error;
+    }
   }
 };

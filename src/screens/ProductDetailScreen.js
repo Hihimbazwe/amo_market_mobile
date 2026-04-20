@@ -37,6 +37,8 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import ProductCard from '../components/ProductCard';
 import NotificationIcon from '../components/NotificationIcon';
+import { sellerService } from '../api/sellerService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -49,6 +51,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const { addToCart, loading: cartLoading } = useCart();
   const { isInWishlist, toggleWishlist, loading: wishlistLoading } = useWishlist();
   const [addingToCart, setAddingToCart] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
   
   const isFavorite = routeProduct?.id ? isInWishlist(routeProduct.id) : false;
   const media = routeProduct?.media || [];
@@ -68,12 +72,42 @@ const ProductDetailScreen = ({ route, navigation }) => {
       { label: 'Availability', value: routeProduct?.stock > 0 ? 'In Stock' : 'Out of Stock' },
     ],
     seller: {
+      id: routeProduct?.sellerId || routeProduct?.seller?.id,
       userId: routeProduct?.seller?.userId || routeProduct?.sellerId,
       name: routeProduct?.seller?.user?.name || 'AMO Seller',
       rating: routeProduct?.seller?.rating || 0,
       reviews: routeProduct?.seller?._count?.reviews || 0,
       isVerified: routeProduct?.seller?.kycVerified || false,
       image: routeProduct?.seller?.user?.image || null,
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id && product.seller.id) {
+        sellerService.getFollowStatus(user.id, product.seller.id)
+          .then(data => setIsFollowing(data.isFollowing))
+          .catch(err => console.log('[DEBUG] Follow status error:', err));
+      }
+    }, [user?.id, product.seller.id])
+  );
+
+  const handleFollow = async () => {
+    if (!user) {
+      Alert.alert("Login Required", "Please login to follow sellers and see their special updates.");
+      navigation.navigate('Login');
+      return;
+    }
+    console.log('[DEBUG] handleFollow | sellerId:', product.seller.id, '| action:', isFollowing ? 'unfollow' : 'follow');
+    setFollowLoading(true);
+    try {
+      const action = isFollowing ? 'unfollow' : 'follow';
+      await sellerService.toggleFollow(user.id, product.seller.id, action);
+      setIsFollowing(!isFollowing);
+    } catch (error) {
+      Alert.alert("Error", "Failed to update follow status.");
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -258,8 +292,21 @@ const ProductDetailScreen = ({ route, navigation }) => {
                  <MessageCircle size={12} color="#3B82F6" style={{ marginRight: 4 }} />
                  <CustomText style={[styles.viewMapText, { color: '#3B82F6' }]}>Chat</CustomText>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.viewMapButton}>
-                 <CustomText style={styles.viewMapText}>Map</CustomText>
+              <TouchableOpacity 
+                style={[
+                  styles.viewMapButton, 
+                  isFollowing && { backgroundColor: 'rgba(74, 222, 128, 0.1)' }
+                ]}
+                onPress={handleFollow}
+                disabled={followLoading}
+              >
+                 {followLoading ? (
+                   <Loader2 size={12} color={isFollowing ? "#4ade80" : "#e67e22"} />
+                 ) : (
+                   <CustomText style={[styles.viewMapText, isFollowing && { color: '#4ade80' }]}>
+                     {isFollowing ? 'Following' : 'Follow'}
+                   </CustomText>
+                 )}
               </TouchableOpacity>
             </View>
           </View>

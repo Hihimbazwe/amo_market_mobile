@@ -173,7 +173,9 @@ export const chatService = {
 
   getStatuses: async (userId, summary = false) => {
     try {
-      const url = `${BASE_URL}/api/mobile/chat/status${summary ? '?summary=true' : ''}`;
+      let url = `${BASE_URL}/api/mobile/chat/status?summary=${summary}`;
+      if (userId) url += `&followerId=${encodeURIComponent(userId)}`;
+      
       const res = await fetch(url, { headers: buildHeaders(userId) });
       if (!res.ok) throw new Error('API failed');
       return await res.json();
