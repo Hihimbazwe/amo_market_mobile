@@ -44,9 +44,9 @@ const decryptContent = (encryptedBase64, conversationId) => {
 };
 
 export const chatService = {
-  getConversations: async (userId) => {
+  getConversations: async (userId, filter = 'all') => {
     try {
-      const res = await fetch(`${BASE_URL}/api/mobile/chat/conversations`, { headers: buildHeaders(userId) });
+      const res = await fetch(`${BASE_URL}/api/mobile/chat/conversations?filter=${filter}`, { headers: buildHeaders(userId) });
       if (!res.ok) throw new Error('API failed');
       const data = await res.json();
       return data.map(c => ({
@@ -205,6 +205,34 @@ export const chatService = {
     } catch (e) {
       console.error('API addStatus failed:', e);
       return false;
+    }
+  },
+
+  manageConversation: async (conversationId, userId, action) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/mobile/chat/conversations/${conversationId}/manage`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ action })
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('API manageConversation failed:', e);
+      return { error: 'Network error' };
+    }
+  },
+
+  blockUser: async (userId, blockedUserId, action = 'block') => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/mobile/user/block`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ blockedUserId, action })
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('API blockUser failed:', e);
+      return { error: 'Network error' };
     }
   }
 };

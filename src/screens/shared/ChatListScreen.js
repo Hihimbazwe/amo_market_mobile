@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,12 +8,14 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  ScrollView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Menu, Search, MessageCircle, Plus, Archive, Trash2, Pin, PinOff } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { Menu, Search, MessageCircle, Plus, Archive, Trash2, Pin, PinOff, Lock } from 'lucide-react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -94,16 +96,19 @@ const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
       {/* Body */}
       <View style={styles.convBody}>
         <View style={styles.convRow}>
-          <CustomText style={[styles.convName, { color: colors.foreground }]} numberOfLines={1}>
-            {item.participantName}
-          </CustomText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <CustomText style={[styles.convName, { color: colors.foreground }]} numberOfLines={1}>
+              {item.participantName}
+            </CustomText>
+            {item.isLocked && <Lock color={colors.primary} size={14} style={{ marginLeft: 6, opacity: 0.8 }} />}
+          </View>
           <CustomText style={[styles.convTime, { color: item.unreadCount > 0 ? colors.primary : colors.muted }]}>
             {formatTime(item.time)}
           </CustomText>
         </View>
         <View style={styles.convRow}>
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-            {item.isPinned && <Pin color={colors.primary} size={12} style={{ marginRight: 6 }} />}
+            {item.isPinned && <PinOff color={colors.primary} size={12} style={{ marginRight: 6 }} />}
             <CustomText style={[styles.convLast, { color: colors.muted }]} numberOfLines={1}>
               {item.lastMessage}
             </CustomText>
@@ -119,6 +124,8 @@ const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
   </Swipeable>
 );
 
+// Add Lock to name row instead for better visibility
+
 export default function ChatListScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -127,7 +134,7 @@ export default function ChatListScreen() {
   const [statuses, setStatuses] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('all'); // 'all' | 'unread'
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'archived' | 'hidden'
   const [loading, setLoading] = useState(true);
 
   // Try to grab whichever drawer context is available
@@ -137,7 +144,7 @@ export default function ChatListScreen() {
 
   const loadData = () => {
     Promise.all([
-      chatService.getConversations(user?.id),
+      chatService.getConversations(user?.id, filterType),
       chatService.getStatuses(user?.id, true) // Fetch summary only
     ]).then(([convData, statusData]) => {
       // Sort pinned to top dynamically
@@ -148,18 +155,37 @@ export default function ChatListScreen() {
       });
       setConversations(sorted);
       setStatuses(statusData);
+      
+      // Update filtered synchronously to prevent flickering "No conversations" text
+      let res = sorted;
+      if (search) {
+        res = res.filter(c => 
+          c.participantName.toLowerCase().includes(search.toLowerCase()) ||
+          c.lastMessage.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+      if (filterType === 'unread') {
+        res = res.filter(c => c.unreadCount > 0);
+      }
+      setFiltered(res);
+
+      setLoading(false);
+    }).catch(err => {
+      console.warn('API load failed:', err);
       setLoading(false);
     });
   };
 
-  useEffect(() => {
-    loadData();
-    // Refresh statuses occasionally
-    const interval = setInterval(() => {
-      chatService.getStatuses(user?.id, true).then(setStatuses);
-    }, 30000); // 30s
-    return () => clearInterval(interval);
-  }, [user?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+      // Periodically refresh statuses
+      const interval = setInterval(() => {
+        chatService.getStatuses(user?.id, true).then(setStatuses);
+      }, 30000);
+      return () => clearInterval(interval);
+    }, [user?.id, filterType])
+  );
 
   useEffect(() => {
     let result = conversations;
@@ -189,8 +215,31 @@ export default function ChatListScreen() {
     setFiltered(result);
   }, [search, filterType, conversations]);
 
-  const handleOpen = (conv) => {
-    navigation.navigate('ChatDetail', { conversation: conv });
+  const handleOpen = async (conv) => {
+    if (conv.isLocked) {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        Alert.alert(
+          'Authentication Required',
+          'Biometric or Passcode security is required for locked chats. Please enable it in your device settings.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Locked Chat',
+        fallbackLabel: 'Enter Passcode',
+      });
+
+      if (result.success) {
+        navigation.navigate('ChatDetail', { conversation: conv });
+      }
+    } else {
+      navigation.navigate('ChatDetail', { conversation: conv });
+    }
   };
 
   const handleSwipeAction = (action, conv) => {
@@ -406,7 +455,12 @@ export default function ChatListScreen() {
         </View>
 
         {/* Pills */}
-        <View style={styles.pillsRow}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.pillsScrollContent}
+          style={styles.pillsRow}
+        >
           <TouchableOpacity 
             style={[styles.filterPill, filterType === 'all' && { backgroundColor: colors.primary }]} 
             onPress={() => setFilterType('all')}
@@ -425,7 +479,14 @@ export default function ChatListScreen() {
           >
             <CustomText style={[styles.pillText, { color: filterType === 'archived' ? '#fff' : colors.muted }]}>Archived</CustomText>
           </TouchableOpacity>
-        </View>
+
+          <TouchableOpacity 
+            style={[styles.filterPill, filterType === 'hidden' && { backgroundColor: colors.primary }]} 
+            onPress={() => setFilterType('hidden')}
+          >
+            <CustomText style={[styles.pillText, { color: filterType === 'hidden' ? '#fff' : colors.muted }]}>Hidden</CustomText>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* List */}
@@ -498,10 +559,12 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   pillsRow: { 
-    flexDirection: 'row', 
-    paddingHorizontal: 16, 
-    marginTop: 8,
-    gap: 8 
+    marginVertical: 4,
+  },
+  pillsScrollContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+    paddingVertical: 8,
   },
   filterPill: { 
     paddingHorizontal: 18, 

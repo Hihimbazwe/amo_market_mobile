@@ -12,6 +12,7 @@ import {
   Alert,
   TouchableWithoutFeedback,
 } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send, Phone, MoreVertical, Image as ImageIcon } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -95,14 +96,89 @@ export default function ChatDetailScreen() {
   const [editingMessageId, setEditingMessageId] = useState(null);
   const listRef = useRef(null);
 
-  // Report modal
+  // Report / Options modal
+  const [optionsVisible, setOptionsVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportReason, setReportReason] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(!conversation?.isLocked);
+
+  const handleManageChat = async (action) => {
+    setOptionsVisible(false);
+    
+    if (action === 'clear') {
+      Alert.alert('Clear Chat', 'Are you sure you want to clear all messages? This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Clear', 
+          style: 'destructive', 
+          onPress: async () => {
+            const res = await chatService.manageConversation(conversation.id, user?.id, 'clear');
+            if (res.success) {
+              setMessages([]);
+              Alert.alert('Cleared', 'Chat history has been cleared.');
+            } else {
+              Alert.alert('Error', res.error || 'Failed to clear chat.');
+            }
+          }
+        }
+      ]);
+    } else if (action === 'block') {
+      Alert.alert('Block User', `Are you sure you want to block ${conversation?.participantName}? They won't be able to message you.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Block', 
+          style: 'destructive', 
+          onPress: async () => {
+            const res = await chatService.blockUser(user?.id, conversation.userId, 'block');
+            if (res.success) {
+              Alert.alert('Blocked', 'User has been blocked.');
+              navigation.navigate('Messages', { screen: 'MessagesMain' });
+            } else {
+              Alert.alert('Error', res.error || 'Failed to block user.');
+            }
+          }
+        }
+      ]);
+    } else if (action === 'lock' || action === 'unlock') {
+      const realAction = action === 'lock' ? (conversation.isLocked ? 'unlock' : 'lock') : action;
+      const res = await chatService.manageConversation(conversation.id, user?.id, realAction);
+      if (res.success) {
+        Alert.alert(realAction === 'lock' ? 'Locked' : 'Unlocked', `Chat has been ${realAction === 'lock' ? 'locked' : 'unlocked'}.`);
+        navigation.navigate('Messages', { screen: 'MessagesMain' });
+      } else {
+        Alert.alert('Error', res.error || 'Action failed');
+      }
+    } else if (action === 'hide' || action === 'unhide') {
+      const res = await chatService.manageConversation(conversation.id, user?.id, action);
+      if (res.success) {
+        Alert.alert(action === 'hide' ? 'Hidden' : 'Visible', `Chat has been ${action === 'hide' ? 'hidden' : 'unhidden'}.`);
+        navigation.navigate('Messages', { screen: 'MessagesMain' });
+      } else {
+        Alert.alert('Error', res.error || 'Action failed');
+      }
+    } else if (action === 'report') {
+      setReportVisible(true);
+    }
+  };
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
   useEffect(() => {
     async function init() {
       if (!conversation?.id || !user?.id) return;
+
+      // Handle biometric check for locked chats
+      if (conversation.isLocked && !isAuthenticated) {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Locked Chat',
+          fallbackLabel: 'Enter Passcode',
+        });
+        if (result.success) {
+          setIsAuthenticated(true);
+        } else {
+          navigation.goBack();
+          return;
+        }
+      }
       
       let cid = conversation.id;
       if (cid.startsWith('new-')) {
@@ -231,10 +307,35 @@ export default function ChatDetailScreen() {
           </CustomText>
         </View>
 
-        <TouchableOpacity style={styles.headerAction} onPress={() => setReportVisible(true)} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)} activeOpacity={0.7}>
           <MoreVertical color={colors.muted} size={20} />
         </TouchableOpacity>
       </View>
+
+      {/* Options Modal */}
+      <Modal visible={optionsVisible} transparent animationType="fade" onRequestClose={() => setOptionsVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setOptionsVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.optionsMenu, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+              <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat('clear')}>
+                <CustomText style={{ color: colors.foreground }}>Clear Chat</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat('lock')}>
+                <CustomText style={{ color: colors.foreground }}>{conversation?.isLocked ? 'Unlock Chat' : 'Lock Chat'}</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat(conversation?.isHidden ? 'unhide' : 'hide')}>
+                <CustomText style={{ color: colors.foreground }}>{conversation?.isHidden ? 'Unhide Chat' : 'Hide Chat'}</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat('block')}>
+                <CustomText style={{ color: '#ef4444' }}>Block User</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.optionItem, { borderBottomWidth: 0 }]} onPress={() => handleManageChat('report')}>
+                <CustomText style={{ color: colors.muted }}>Report</CustomText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* Date chip */}
       <View style={styles.dateDivider}>
@@ -244,7 +345,7 @@ export default function ChatDetailScreen() {
       </View>
 
       {/* Messages */}
-      {loading ? (
+      {loading || (conversation?.isLocked && !isAuthenticated) ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
@@ -601,4 +702,31 @@ const styles = StyleSheet.create({
   },
   submitBtn: {},
   reportBtnText: { fontSize: 15, fontWeight: '700' },
+  
+  // Options Menu
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 60,
+    paddingRight: 15,
+  },
+  optionsMenu: {
+    width: 170,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  optionItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
 });
