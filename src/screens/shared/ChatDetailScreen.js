@@ -23,7 +23,34 @@ import { chatService } from '../../api/chatService';
 
 function formatMsgTime(date) {
   if (!date) return '';
-  return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const d = new Date(date);
+  const now = new Date();
+  
+  const isToday = d.getDate() === now.getDate() && 
+                  d.getMonth() === now.getMonth() && 
+                  d.getFullYear() === now.getFullYear();
+                  
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = d.getDate() === yesterday.getDate() && 
+                      d.getMonth() === yesterday.getMonth() && 
+                      d.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) {
+    return `Today, ${timeStr}`;
+  } else if (isYesterday) {
+    return `Yesterday, ${timeStr}`;
+  } else {
+    const isSameYear = d.getFullYear() === now.getFullYear();
+    const dateStr = d.toLocaleDateString([], { 
+        month: 'short', 
+        day: 'numeric', 
+        year: isSameYear ? undefined : 'numeric' 
+    });
+    return `${dateStr}, ${timeStr}`;
+  }
 }
 
 const Bubble = ({ msg, colors, onAction }) => {
@@ -100,7 +127,7 @@ export default function ChatDetailScreen() {
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportReason, setReportReason] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(!conversation?.isLocked);
+  const [isAuthenticated, setIsAuthenticated] = useState(!conversation?.isLocked || !!route.params?.authenticated);
 
   const handleManageChat = async (action) => {
     setOptionsVisible(false);
@@ -129,7 +156,7 @@ export default function ChatDetailScreen() {
           text: 'Block', 
           style: 'destructive', 
           onPress: async () => {
-            const res = await chatService.blockUser(user?.id, conversation.userId, 'block');
+            const res = await chatService.blockUser(user?.id, conversation.participantId, 'block');
             if (res.success) {
               Alert.alert('Blocked', 'User has been blocked.');
               navigation.navigate('Messages', { screen: 'MessagesMain' });
@@ -171,18 +198,17 @@ export default function ChatDetailScreen() {
         // If already authenticated via the list screen, skip prompt
         if (route.params?.authenticated) {
           setIsAuthenticated(true);
-          return;
-        }
-
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'Locked Chat',
-          fallbackLabel: 'Enter Passcode',
-        });
-        if (result.success) {
-          setIsAuthenticated(true);
         } else {
-          navigation.goBack();
-          return;
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Locked Chat',
+            fallbackLabel: 'Enter Passcode',
+          });
+          if (result.success) {
+            setIsAuthenticated(true);
+          } else {
+            navigation.goBack();
+            return;
+          }
         }
       }
       
@@ -343,12 +369,7 @@ export default function ChatDetailScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Date chip */}
-      <View style={styles.dateDivider}>
-        <View style={[styles.dateChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-          <CustomText style={[styles.dateChipText, { color: colors.muted }]}>Today</CustomText>
-        </View>
-      </View>
+
 
       {/* Messages */}
       {loading || (conversation?.isLocked && !isAuthenticated) ? (

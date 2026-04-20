@@ -134,7 +134,7 @@ export default function ChatListScreen() {
   const [statuses, setStatuses] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'archived' | 'hidden'
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'archived' | 'locked'
   const [loading, setLoading] = useState(true);
 
   // Try to grab whichever drawer context is available
@@ -193,14 +193,21 @@ export default function ChatListScreen() {
     // Hide deleted conversations always
     result = result.filter(c => !c.hasDeleted);
 
-    // Filter by type
-    if (filterType === 'all') {
-      // Show only non-archived in 'All'
-      result = result.filter(c => !c.isArchived);
-    } else if (filterType === 'unread') {
-      result = result.filter(c => c.unreadCount > 0 && !c.isArchived);
-    } else if (filterType === 'archived') {
-      result = result.filter(c => c.isArchived);
+    if (filterType === 'locked') {
+      result = result.filter(c => c.isLocked);
+    } else {
+      // Show non-locked for other types
+      result = result.filter(c => !c.isLocked);
+
+      // Filter by type
+      if (filterType === 'all') {
+        // Show only non-archived in 'All'
+        result = result.filter(c => !c.isArchived);
+      } else if (filterType === 'unread') {
+        result = result.filter(c => c.unreadCount > 0 && !c.isArchived);
+      } else if (filterType === 'archived') {
+        result = result.filter(c => c.isArchived);
+      }
     }
 
     // Text Search filter
@@ -215,28 +222,34 @@ export default function ChatListScreen() {
     setFiltered(result);
   }, [search, filterType, conversations]);
 
+  const handleLockedTabPress = async () => {
+    if (filterType === 'locked') return;
+
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+    if (!hasHardware || !isEnrolled) {
+      Alert.alert(
+        'Authentication Required',
+        'Biometric or Passcode security is required to view locked chats. Please enable it in your device settings.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'View Locked Chats',
+      fallbackLabel: 'Enter Passcode',
+    });
+
+    if (result.success) {
+      setFilterType('locked');
+    }
+  };
+
   const handleOpen = async (conv) => {
     if (conv.isLocked) {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
-      if (!hasHardware || !isEnrolled) {
-        Alert.alert(
-          'Authentication Required',
-          'Biometric or Passcode security is required for locked chats. Please enable it in your device settings.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Locked Chat',
-        fallbackLabel: 'Enter Passcode',
-      });
-
-      if (result.success) {
-        navigation.navigate('ChatDetail', { conversation: conv, authenticated: true });
-      }
+      navigation.navigate('ChatDetail', { conversation: conv, authenticated: true });
     } else {
       navigation.navigate('ChatDetail', { conversation: conv });
     }
@@ -481,10 +494,10 @@ export default function ChatListScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.filterPill, filterType === 'hidden' && { backgroundColor: colors.primary }]} 
-            onPress={() => setFilterType('hidden')}
+            style={[styles.filterPill, filterType === 'locked' && { backgroundColor: colors.primary }]} 
+            onPress={handleLockedTabPress}
           >
-            <CustomText style={[styles.pillText, { color: filterType === 'hidden' ? '#fff' : colors.muted }]}>Hidden</CustomText>
+            <CustomText style={[styles.pillText, { color: filterType === 'locked' ? '#fff' : colors.muted }]}>Locked</CustomText>
           </TouchableOpacity>
         </ScrollView>
       </View>
