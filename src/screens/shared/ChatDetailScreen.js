@@ -57,12 +57,15 @@ const Bubble = ({ msg, colors, onAction }) => {
   const isMe = msg.senderId === 'me';
 
   const handleLongPress = () => {
-    if (isMe && onAction) {
-      Alert.alert('Message Options', 'What would you like to do?', [
-        { text: 'Edit', onPress: () => onAction('edit', msg) },
-        { text: 'Delete', style: 'destructive', onPress: () => onAction('delete', msg) },
-        { text: 'Cancel', style: 'cancel' }
-      ]);
+    if (onAction) {
+      const opts = [];
+      if (isMe && !msg.isDeleted && !msg.statusItemId) {
+        opts.push({ text: 'Edit', onPress: () => onAction('edit', msg) });
+      }
+      opts.push({ text: 'Delete', style: 'destructive', onPress: () => onAction('delete', msg) });
+      opts.push({ text: 'Cancel', style: 'cancel' });
+      
+      Alert.alert('Message Options', 'What would you like to do?', opts);
     }
   };
 
@@ -82,8 +85,8 @@ const Bubble = ({ msg, colors, onAction }) => {
           style={[
             styles.bubble,
             isMe
-              ? [styles.bubbleMe, { backgroundColor: colors.primary }]
-              : [styles.bubbleOther, { backgroundColor: colors.card, borderColor: colors.glassBorder }],
+              ? [styles.bubbleMe, { backgroundColor: colors.primary, opacity: msg.isDeleted ? 0.7 : 1 }]
+              : [styles.bubbleOther, { backgroundColor: colors.card, borderColor: colors.glassBorder, opacity: msg.isDeleted ? 0.7 : 1 }],
           ]}
         >
           {msg.statusItemId && (
@@ -94,14 +97,14 @@ const Bubble = ({ msg, colors, onAction }) => {
               </CustomText>
             </View>
           )}
-          <CustomText style={[styles.bubbleText, { color: isMe ? '#fff' : colors.foreground }]}>
+          <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}>
             {msg.text}
           </CustomText>
           <CustomText
             style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.65)' : colors.muted }]}
           >
             {formatMsgTime(msg.timestamp)}
-            {isMe && '  ✓✓'}
+            {!msg.isDeleted && isMe && '  ✓✓'}
           </CustomText>
         </TouchableOpacity>
       </View>
@@ -243,6 +246,7 @@ export default function ChatDetailScreen() {
         }
       }
 
+      chatService.markAsRead(cid, user.id);
       chatService.getMessages(cid, user.id).then((data) => {
         setMessages(data);
         setLoading(false);
@@ -253,18 +257,33 @@ export default function ChatDetailScreen() {
 
   const handleBubbleAction = (action, msg) => {
     if (action === 'delete') {
-      Alert.alert('Delete Message', 'Are you sure you want to delete this message?', [
+      const isMe = msg.senderId === 'me';
+      const options = [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Delete', 
+          text: 'Delete for me', 
           style: 'destructive', 
           onPress: () => {
-            chatService.deleteMessage(conversation.id, msg.id).then(() => {
+            chatService.deleteMessage(conversation.id, msg.id, user?.id, 'me').then(() => {
               setMessages(prev => prev.filter(m => m.id !== msg.id));
             });
           }
         }
-      ]);
+      ];
+
+      if (isMe && !msg.isDeleted) {
+        options.push({ 
+          text: 'Delete for everyone',
+          style: 'destructive',
+          onPress: () => {
+            chatService.deleteMessage(conversation.id, msg.id, user?.id, 'everyone').then(() => {
+              setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, text: 'This message was deleted', isDeleted: true, statusItemId: null } : m));
+            });
+          }
+        });
+      }
+
+      Alert.alert('Delete Message', 'What would you like to do?', options);
     } else if (action === 'edit') {
       setEditingMessageId(msg.id);
       setInput(msg.text);
@@ -317,15 +336,16 @@ export default function ChatDetailScreen() {
     }
   };
 
-  const handleReport = () => {
+  const handleReport = async () => {
     if (!reportReason.trim()) {
       Alert.alert('Required', 'Please enter a reason for the report.');
       return;
     }
     setReportSubmitting(true);
-    // TODO: wire to real API — POST /api/reports
-    setTimeout(() => {
-      setReportSubmitting(false);
+    const res = await chatService.reportUser(user?.id, conversation?.participantId, reportReason.trim());
+    setReportSubmitting(false);
+
+    if (res.success || res.error === undefined) {
       setReportVisible(false);
       setReportReason('');
       Alert.alert(
@@ -333,7 +353,9 @@ export default function ChatDetailScreen() {
         `Your report against ${conversation?.participantName || 'this user'} has been submitted. Our team will review it shortly.`,
         [{ text: 'OK' }]
       );
-    }, 900);
+    } else {
+      Alert.alert('Error', res.error || 'Failed to submit report. Please try again.');
+    }
   };
 
   return (

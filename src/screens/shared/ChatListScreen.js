@@ -448,10 +448,10 @@ export default function ChatListScreen() {
         <TouchableOpacity onPress={toggleDrawer} style={styles.headerIconBtn}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText style={[styles.headerTitle, { color: colors.foreground }]}>Messages</CustomText>
-        <TouchableOpacity style={styles.headerIconBtn}>
-          <MessageCircle color={colors.foreground} size={24} />
-        </TouchableOpacity>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <CustomText style={[styles.headerTitle, { color: colors.foreground }]}>Messages</CustomText>
+        </View>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Search Bar & Filters */}

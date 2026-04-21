@@ -25,8 +25,27 @@ export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
   const [expoPushToken, setExpoPushToken] = useState('');
   const [notification, setNotification] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const notificationListener = useRef();
   const responseListener = useRef();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/mobile/chat/conversations/unread-count`, {
+          headers: { 'x-user-id': user.id, 'ngrok-skip-browser-warning': 'true' }
+        });
+        const data = await res.json();
+        setUnreadChatCount(data.total || 0);
+      } catch (e) {
+        console.warn('Failed to fetch unread chat count', e);
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000); // Polling every 15s to keep navigation tab fresh
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   // Register push notifications when a user logs in
   useEffect(() => {
@@ -82,7 +101,7 @@ export const NotificationProvider = ({ children }) => {
   return (
     <NotificationContext.Provider value={{ 
       notifications: [], // Return to empty, rely array on push alerts
-      unreadCount: 0, 
+      unreadCount: unreadChatCount, 
       loading: false, 
       expoPushToken,
       fetchNotifications: () => {},

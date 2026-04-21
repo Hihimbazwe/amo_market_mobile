@@ -161,14 +161,35 @@ export const chatService = {
     }
   },
 
-  deleteMessage: async (conversationId, messageId) => {
-    // TODO: implement real DELETE /api/chat/[conversationId]/messages/[messageId]
-    return true;
+  deleteMessage: async (conversationId, messageId, userId, type = 'me') => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/mobile/chat/${conversationId}/messages/${messageId}?type=${type}`, {
+        method: 'DELETE',
+        headers: buildHeaders(userId)
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('API deleteMessage failed:', e);
+      return false;
+    }
   },
 
   updateMessage: async (conversationId, messageId, newText) => {
     // TODO: implement real PATCH /api/chat/[conversationId]/messages/[messageId]
     return true;
+  },
+
+  markAsRead: async (conversationId, userId) => {
+    try {
+      await fetch(`${BASE_URL}/api/mobile/chat/${conversationId}/read`, {
+        method: 'POST',
+        headers: buildHeaders(userId)
+      });
+      return true;
+    } catch (e) {
+      console.warn('API markAsRead failed:', e);
+      return false;
+    }
   },
 
   getStatuses: async (userId, summary = false) => {
@@ -234,6 +255,20 @@ export const chatService = {
       return await res.json();
     } catch (e) {
       console.error('API blockUser failed:', e);
+      return { error: 'Network error' };
+    }
+  },
+
+  reportUser: async (userId, reportedUserId, reason) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/mobile/user/report`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ reportedUserId, reason })
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('API reportUser failed:', e);
       return { error: 'Network error' };
     }
   }
