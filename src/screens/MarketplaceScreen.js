@@ -21,6 +21,7 @@ import NotificationIcon from '../components/NotificationIcon';
 import {Text } from 'react-native';
 import { productService } from '../api/productService';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
 
 const provinces = ["All Provinces", "Kigali", "East", "North", "South", "West"];
 const provinceDistricts = {

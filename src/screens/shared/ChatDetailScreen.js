@@ -20,8 +20,15 @@ import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { chatService } from '../../api/chatService';
+import { useNotifications } from '../../context/NotificationContext';
 
 function formatMsgTime(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateSeparator(date) {
   if (!date) return '';
   const d = new Date(date);
   const now = new Date();
@@ -36,21 +43,15 @@ function formatMsgTime(date) {
                       d.getMonth() === yesterday.getMonth() && 
                       d.getFullYear() === yesterday.getFullYear();
 
-  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  if (isToday) {
-    return `Today, ${timeStr}`;
-  } else if (isYesterday) {
-    return `Yesterday, ${timeStr}`;
-  } else {
-    const isSameYear = d.getFullYear() === now.getFullYear();
-    const dateStr = d.toLocaleDateString([], { 
-        month: 'short', 
-        day: 'numeric', 
-        year: isSameYear ? undefined : 'numeric' 
-    });
-    return `${dateStr}, ${timeStr}`;
-  }
+  if (isToday) return 'Today';
+  if (isYesterday) return 'Yesterday';
+  
+  const isSameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString([], { 
+    month: 'short', 
+    day: 'numeric', 
+    year: isSameYear ? undefined : 'numeric' 
+  });
 }
 
 const Bubble = ({ msg, colors, onAction }) => {
@@ -115,6 +116,7 @@ const Bubble = ({ msg, colors, onAction }) => {
 export default function ChatDetailScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const { refreshUnread } = useNotifications();
   const navigation = useNavigation();
   const route = useRoute();
   const { conversation } = route.params || {};
@@ -431,7 +433,29 @@ export default function ChatDetailScreen() {
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <Bubble msg={item} colors={colors} onAction={handleBubbleAction} />}
+          renderItem={({ item, index }) => {
+            const prevMsg = index > 0 ? messages[index - 1] : null;
+            const prevDate = prevMsg ? new Date(prevMsg.timestamp).toDateString() : null;
+            const currentDate = new Date(item.timestamp).toDateString();
+            const showSeparator = prevDate !== currentDate;
+
+            return (
+              <View>
+                {showSeparator && (
+                  <View style={styles.dateSeparator}>
+                    <View style={[styles.dateSeparatorLine, { backgroundColor: colors.glassBorder }]} />
+                    <View style={[styles.dateSeparatorBadge, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+                      <CustomText style={[styles.dateSeparatorText, { color: colors.muted }]}>
+                        {formatDateSeparator(item.timestamp)}
+                      </CustomText>
+                    </View>
+                    <View style={[styles.dateSeparatorLine, { backgroundColor: colors.glassBorder }]} />
+                  </View>
+                )}
+                <Bubble msg={item} colors={colors} onAction={handleBubbleAction} />
+              </View>
+            );
+          }}
           contentContainerStyle={styles.messageList}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
@@ -817,5 +841,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+
+  // Date Separators
+  dateSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    paddingHorizontal: 10,
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    opacity: 0.3,
+  },
+  dateSeparatorBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  dateSeparatorText: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 });

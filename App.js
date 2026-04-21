@@ -116,11 +116,6 @@ const AppTabs = ({ user, cartCount, unreadCount }) => {
           return (
             <View>
               <IconComponent color={color} size={size} />
-              {route.name === 'Me' && unreadCount > 0 && (
-                <View style={[styles.badge, { backgroundColor: '#ef4444' }]}>
-                  <CustomText style={styles.badgeText}>{unreadCount}</CustomText>
-                </View>
-              )}
             </View>
           );
         },
@@ -128,7 +123,14 @@ const AppTabs = ({ user, cartCount, unreadCount }) => {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Market" component={MarketplaceStack} />
-      <Tab.Screen name="Messages" component={MessagesStack} />
+      <Tab.Screen 
+        name="Messages" 
+        component={MessagesStack} 
+        options={{ 
+          tabBarBadge: unreadCount > 0 ? unreadCount : null,
+          tabBarBadgeStyle: { backgroundColor: '#ef4444', fontSize: 10 }
+        }}
+      />
       <Tab.Screen 
         name="Me" 
         component={user?.role === 'SELLER' ? SellerDashboardDrawer : BuyerDashboardDrawer} 

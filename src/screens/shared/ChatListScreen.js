@@ -97,24 +97,27 @@ const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
       <View style={styles.convBody}>
         <View style={styles.convRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <CustomText style={[styles.convName, { color: colors.foreground }]} numberOfLines={1}>
+            <CustomText style={[styles.convName, { color: colors.foreground, fontWeight: item.unreadCount > 0 ? '800' : '700' }]} numberOfLines={1}>
               {item.participantName}
             </CustomText>
             {item.isLocked && <Lock color={colors.primary} size={14} style={{ marginLeft: 6, opacity: 0.8 }} />}
           </View>
-          <CustomText style={[styles.convTime, { color: item.unreadCount > 0 ? colors.primary : colors.muted }]}>
-            {formatTime(item.time)}
-          </CustomText>
+          <View style={{ alignItems: 'flex-end' }}>
+            <CustomText style={[styles.convTime, { color: item.unreadCount > 0 ? '#25D366' : colors.muted, fontWeight: item.unreadCount > 0 ? '700' : '500' }]}>
+              {formatTime(item.time)}
+            </CustomText>
+            {item.unreadCount > 0 && <View style={styles.unreadDot} />}
+          </View>
         </View>
         <View style={styles.convRow}>
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
             {item.isPinned && <PinOff color={colors.primary} size={12} style={{ marginRight: 6 }} />}
-            <CustomText style={[styles.convLast, { color: colors.muted }]} numberOfLines={1}>
+            <CustomText style={[styles.convLast, { color: item.unreadCount > 0 ? colors.foreground : colors.muted, fontWeight: item.unreadCount > 0 ? '600' : '400' }]} numberOfLines={1}>
               {item.lastMessage}
             </CustomText>
           </View>
           {item.unreadCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+            <View style={[styles.badge, { backgroundColor: '#25D366' }]}>
               <CustomText style={styles.badgeText}>{item.unreadCount}</CustomText>
             </View>
           )}
@@ -650,6 +653,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#25D366',
+    marginTop: 4,
+  },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   statusLabelRow: {
@@ -699,8 +709,8 @@ const styles = StyleSheet.create({
     height: 68,
     borderRadius: 34,
     borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderStyle: 'solid',
+    borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
