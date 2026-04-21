@@ -128,6 +128,24 @@ export default function ChatDetailScreen() {
   const [reportVisible, setReportVisible] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(!conversation?.isLocked || !!route.params?.authenticated);
+  const [isBlockedByMe, setIsBlockedByMe] = useState(conversation?.isBlockedByMe || false);
+
+  const handleUnblockPrompt = () => {
+    Alert.alert('Unblock User', `Do you want to unblock ${conversation?.participantName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Unblock', 
+        onPress: async () => {
+          const res = await chatService.blockUser(user?.id, conversation?.participantId, 'unblock');
+          if (res.success || res.error === undefined) {
+            setIsBlockedByMe(false);
+          } else {
+            Alert.alert('Error', 'Failed to unblock.');
+          }
+        }
+      }
+    ]);
+  };
 
   const handleManageChat = async (action) => {
     setOptionsVisible(false);
@@ -156,10 +174,9 @@ export default function ChatDetailScreen() {
           text: 'Block', 
           style: 'destructive', 
           onPress: async () => {
-            const res = await chatService.blockUser(user?.id, conversation.participantId, 'block');
-            if (res.success) {
-              Alert.alert('Blocked', 'User has been blocked.');
-              navigation.navigate('Messages', { screen: 'MessagesMain' });
+            const res = await chatService.blockUser(user?.id, conversation?.participantId, 'block');
+            if (res.success || res.error === undefined) {
+              setIsBlockedByMe(true);
             } else {
               Alert.alert('Error', res.error || 'Failed to block user.');
             }
@@ -289,10 +306,15 @@ export default function ChatDetailScreen() {
        navigation.setParams({ conversation: { ...conversation, id: cid } });
     }
 
-    const realMsg = await chatService.sendMessage(cid, user?.id, text);
-    setMessages((prev) => 
-      prev.map((m) => (m.id === tempId ? realMsg : m))
-    );
+    try {
+      const realMsg = await chatService.sendMessage(cid, user?.id, text);
+      setMessages((prev) => 
+        prev.map((m) => (m.id === tempId ? realMsg : m))
+      );
+    } catch (e) {
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
+      Alert.alert('Message Failed', e.message === 'You are blocked by this user' ? 'You cannot send messages to this user.' : e.message || 'Failed to send message.');
+    }
   };
 
   const handleReport = () => {
@@ -358,9 +380,15 @@ export default function ChatDetailScreen() {
               <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat(conversation?.isHidden ? 'unhide' : 'hide')}>
                 <CustomText style={{ color: colors.foreground }}>{conversation?.isHidden ? 'Unhide Chat' : 'Hide Chat'}</CustomText>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat('block')}>
-                <CustomText style={{ color: '#ef4444' }}>Block User</CustomText>
-              </TouchableOpacity>
+              {isBlockedByMe ? (
+                <TouchableOpacity style={styles.optionItem} onPress={handleUnblockPrompt}>
+                  <CustomText style={{ color: '#ef4444' }}>Unblock User</CustomText>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat('block')}>
+                  <CustomText style={{ color: '#ef4444' }}>Block User</CustomText>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={[styles.optionItem, { borderBottomWidth: 0 }]} onPress={() => handleManageChat('report')}>
                 <CustomText style={{ color: colors.muted }}>Report</CustomText>
               </TouchableOpacity>
@@ -407,6 +435,17 @@ export default function ChatDetailScreen() {
 
       {/* Input Bar */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {isBlockedByMe ? (
+          <TouchableOpacity 
+             style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder, justifyContent: 'center', paddingVertical: 18 }]}
+             onPress={handleUnblockPrompt}
+             activeOpacity={0.7}
+          >
+             <CustomText style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>
+               You blocked this contact. Tap to unblock.
+             </CustomText>
+          </TouchableOpacity>
+        ) : (
         <View style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }]}>
           <View style={[styles.inputWrap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
             {editingMessageId && (
@@ -442,6 +481,7 @@ export default function ChatDetailScreen() {
             <Send color={input.trim() ? '#fff' : colors.muted} size={20} />
           </TouchableOpacity>
         </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* ── Report Modal ── */}

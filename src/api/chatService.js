@@ -106,7 +106,7 @@ export const chatService = {
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         console.error('[DEBUG-API] sendMessage failed details:', errData);
-        throw new Error('API failed');
+        throw new Error(errData.error || 'API failed');
       }
       const msg = await res.json();
       return {
