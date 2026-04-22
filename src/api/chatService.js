@@ -62,14 +62,21 @@ export const chatService = {
   getMessages: async (conversationId, userId) => {
     try {
       const res = await fetch(`${BASE_URL}/api/mobile/chat/${conversationId}/messages`, { headers: buildHeaders(userId) });
-      if (!res.ok) throw new Error('API failed');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.details || err.error || 'API failed');
+      }
       const data = await res.json();
       return data.map(m => ({
         ...m,
-        text: decryptContent(m.text, conversationId)
+        text: decryptContent(m.text, conversationId),
+        replyTo: m.replyTo ? {
+          ...m.replyTo,
+          text: decryptContent(m.replyTo.text, conversationId)
+        } : null
       }));
     } catch (e) {
-      console.warn('API getMessages failed:', e);
+      console.warn('API getMessages error detail:', e);
       return [];
     }
   },
@@ -90,29 +97,29 @@ export const chatService = {
     }
   },
 
-  sendMessage: async (conversationId, userId, text, statusItemId = null) => {
+  sendMessage: async (conversationId, userId, text, statusItemId = null, replyToId = null) => {
     try {
       console.log('[DEBUG-API] sendMessage started for:', conversationId);
       const encrypted = encryptContent(text, conversationId);
-      console.log('[DEBUG-API] Encrypted length:', encrypted.length);
       
       const res = await fetch(`${BASE_URL}/api/mobile/chat/${conversationId}/messages`, {
         method: 'POST',
         headers: buildHeaders(userId),
-        body: JSON.stringify({ content: encrypted, statusItemId })
+        body: JSON.stringify({ content: encrypted, statusItemId, replyToId })
       });
-      console.log('[DEBUG-API] sendMessage response status:', res.status);
       
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        console.error('[DEBUG-API] sendMessage failed details:', errData);
         throw new Error(errData.error || 'API failed');
       }
       const msg = await res.json();
       return {
         ...msg,
         text: decryptContent(msg.text, conversationId),
-        statusItemId: msg.statusItemId
+        replyTo: msg.replyTo ? {
+          ...msg.replyTo,
+          text: decryptContent(msg.replyTo.text, conversationId)
+        } : null
       };
     } catch (e) {
       console.error('[DEBUG-API] sendMessage COMPLETE ERROR:', e);

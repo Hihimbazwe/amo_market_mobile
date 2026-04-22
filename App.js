@@ -96,8 +96,12 @@ const LoadingScreen = () => {
   );
 };
 
-const AppTabs = ({ user, cartCount, unreadCount }) => {
+const AppTabs = () => {
+  const { user } = useAuth();
+  const { cartCount } = useCart();
+  const { unreadCount } = useNotifications();
   const { colors } = useTheme();
+
   return (
     <Tab.Navigator
       initialRouteName={user?.role === 'SELLER' ? 'Me' : 'Home'}
@@ -226,9 +230,7 @@ const RootNavigator = () => {
     >
       <NavigationContainer linking={linking}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="MainApp">
-            {() => <AppTabs user={user} cartCount={cartCount} unreadCount={unreadCount} />}
-          </Stack.Screen>
+          <Stack.Screen name="MainApp" component={AppTabs} />
           <Stack.Screen name="Auth" component={AuthStack} />
         </Stack.Navigator>
       </NavigationContainer>

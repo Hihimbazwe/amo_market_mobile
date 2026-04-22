@@ -43,6 +43,9 @@ export const authService = {
       try {
         data = JSON.parse(responseText);
       } catch (e) {
+        if (responseText?.includes('<html') || responseText?.includes('<!DOCTYPE')) {
+          throw new Error('Server error: Invalid response format.');
+        }
         if (!response.ok) throw new Error(responseText || 'Login failed');
         throw new Error('Invalid server response');
       }
@@ -75,6 +78,9 @@ export const authService = {
       try {
         data = JSON.parse(responseText);
       } catch (e) {
+        if (responseText?.includes('<html') || responseText?.includes('<!DOCTYPE')) {
+          throw new Error('Server error: Invalid response format.');
+        }
         if (!response.ok) throw new Error(responseText || 'Registration failed');
         throw new Error('Invalid server response');
       }

@@ -36,7 +36,9 @@ export const NotificationProvider = ({ children }) => {
         headers: { 'x-user-id': user.id, 'ngrok-skip-browser-warning': 'true' }
       });
       const data = await res.json();
-      setUnreadChatCount(data.total || 0);
+      if (data && typeof data.total === 'number') {
+        setUnreadChatCount(data.total);
+      }
     } catch (e) {
       console.warn('Failed to fetch unread chat count', e);
     }

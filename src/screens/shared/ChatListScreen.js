@@ -103,22 +103,29 @@ const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
             {item.isLocked && <Lock color={colors.primary} size={14} style={{ marginLeft: 6, opacity: 0.8 }} />}
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <CustomText style={[styles.convTime, { color: item.unreadCount > 0 ? '#25D366' : colors.muted, fontWeight: item.unreadCount > 0 ? '700' : '500' }]}>
+            <CustomText style={[styles.convTime, { 
+              color: item.unreadCount > 0 ? '#25D366' : colors.muted, 
+              fontWeight: item.unreadCount > 0 ? '800' : '500',
+              fontSize: 12
+            }]}>
               {formatTime(item.time)}
             </CustomText>
-            {item.unreadCount > 0 && <View style={styles.unreadDot} />}
+            {item.unreadCount > 0 && <View style={[styles.unreadDot, { backgroundColor: '#25D366', width: 8, height: 8, marginTop: 4 }]} />}
           </View>
         </View>
         <View style={styles.convRow}>
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
             {item.isPinned && <PinOff color={colors.primary} size={12} style={{ marginRight: 6 }} />}
-            <CustomText style={[styles.convLast, { color: item.unreadCount > 0 ? colors.foreground : colors.muted, fontWeight: item.unreadCount > 0 ? '600' : '400' }]} numberOfLines={1}>
+            <CustomText style={[styles.convLast, { 
+              color: item.unreadCount > 0 ? colors.foreground : colors.muted, 
+              fontWeight: item.unreadCount > 0 ? '700' : '400' 
+            }]} numberOfLines={1}>
               {item.lastMessage}
             </CustomText>
           </View>
           {item.unreadCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: '#25D366' }]}>
-              <CustomText style={styles.badgeText}>{item.unreadCount}</CustomText>
+            <View style={[styles.badge, { backgroundColor: '#25D366', minWidth: 20, height: 20, borderRadius: 10 }]}>
+              <CustomText style={[styles.badgeText, { fontSize: 10, fontWeight: '900' }]}>{item.unreadCount}</CustomText>
             </View>
           )}
         </View>

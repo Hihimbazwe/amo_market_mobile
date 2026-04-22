@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,11 +11,13 @@ import {
   Modal,
   Alert,
   TouchableWithoutFeedback,
+  Animated,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, Phone, MoreVertical, Image as ImageIcon } from 'lucide-react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { ArrowLeft, Send, MoreVertical, Image as ImageIcon, CornerUpLeft } from 'lucide-react-native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -54,62 +56,149 @@ function formatDateSeparator(date) {
   });
 }
 
-const Bubble = ({ msg, colors, onAction }) => {
+const Bubble = ({ msg, colors, onAction, onSwipeReply }) => {
   const isMe = msg.senderId === 'me';
+  const swipeableRef = useRef(null);
 
   const handleLongPress = () => {
     if (onAction) {
       const opts = [];
+      // Edit only for my non-deleted, non-status messages
       if (isMe && !msg.isDeleted && !msg.statusItemId) {
         opts.push({ text: 'Edit', onPress: () => onAction('edit', msg) });
       }
       opts.push({ text: 'Delete', style: 'destructive', onPress: () => onAction('delete', msg) });
       opts.push({ text: 'Cancel', style: 'cancel' });
-      
       Alert.alert('Message Options', 'What would you like to do?', opts);
     }
   };
 
-  return (
-    <View style={[styles.bubbleRow, isMe ? styles.rowRight : styles.rowLeft]}>
-      {/* Avatar for received messages */}
-      {!isMe && (
-        <View style={[styles.miniAvatar, { backgroundColor: colors.primary + '22', borderColor: colors.primary + '44' }]}>
-          <CustomText style={[styles.miniAvatarText, { color: colors.primary }]}>S</CustomText>
+  // Render the reply icon that appears when swiping
+  const renderReplyAction = (progress) => {
+    const scale = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.5, 1],
+      extrapolate: 'clamp',
+    });
+    const opacity = progress.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0, 0.5, 1],
+      extrapolate: 'clamp',
+    });
+    return (
+      <Animated.View
+        style={[
+          styles.swipeReplyAction,
+          isMe ? styles.swipeReplyLeft : styles.swipeReplyRight,
+          { opacity, transform: [{ scale }] },
+        ]}
+      >
+        <View style={[styles.swipeReplyIconWrap, { backgroundColor: colors.primary + '22', borderColor: colors.primary + '44' }]}>
+          <CornerUpLeft size={18} color={colors.primary} />
         </View>
-      )}
-      <View style={{ maxWidth: '74%' }}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onLongPress={handleLongPress}
-          delayLongPress={250}
-          style={[
-            styles.bubble,
-            isMe
-              ? [styles.bubbleMe, { backgroundColor: colors.primary, opacity: msg.isDeleted ? 0.7 : 1 }]
-              : [styles.bubbleOther, { backgroundColor: colors.card, borderColor: colors.glassBorder, opacity: msg.isDeleted ? 0.7 : 1 }],
-          ]}
-        >
-          {msg.statusItemId && (
-            <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(230, 126, 34, 0.1)' }]}>
-              <ImageIcon size={10} color={isMe ? '#fff' : '#e67e22'} />
-              <CustomText style={[styles.statusReplyText, { color: isMe ? '#fff' : '#e67e22' }]}>
-                Status Reply
-              </CustomText>
-            </View>
-          )}
-          <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}>
-            {msg.text}
-          </CustomText>
-          <CustomText
-            style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.65)' : colors.muted }]}
+      </Animated.View>
+    );
+  };
+
+  const handleSwipeOpen = () => {
+    if (!msg.isDeleted && onSwipeReply) {
+      onSwipeReply(msg);
+    }
+    // Snap back immediately
+    if (swipeableRef.current) {
+      swipeableRef.current.close();
+    }
+  };
+
+  const isSameSenderAsNext = msg.isSameSenderAsNext;
+  const isSameSenderAsPrev = msg.isSameSenderAsPrev;
+  
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      renderLeftActions={!isMe ? renderReplyAction : undefined}
+      renderRightActions={isMe ? renderReplyAction : undefined}
+      onSwipeableOpen={handleSwipeOpen}
+      friction={2}
+      leftThreshold={50}
+      rightThreshold={50}
+      overshootLeft={false}
+      overshootRight={false}
+    >
+      <View style={[
+        styles.bubbleRow, 
+        isMe ? styles.rowRight : styles.rowLeft,
+        { marginTop: msg.showSeparator ? 12 : (isSameSenderAsPrev ? 2 : 10) }
+      ]}>
+        {!isMe && (
+          <View style={{ width: 28, height: 28, justifyContent: 'flex-end' }}>
+            {!isSameSenderAsNext && (
+              <View style={[styles.miniAvatar, { backgroundColor: colors.primary + '22', borderColor: colors.primary + '44' }]}>
+                <CustomText style={[styles.miniAvatarText, { color: colors.primary }]}>S</CustomText>
+              </View>
+            )}
+          </View>
+        )}
+        <View style={{ maxWidth: '80%' }}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onLongPress={handleLongPress}
+            delayLongPress={250}
+            style={[
+              styles.bubble,
+              isMe
+                ? [styles.bubbleMe, { backgroundColor: colors.primary, opacity: msg.isDeleted ? 0.7 : 1 }]
+                : [styles.bubbleOther, { backgroundColor: colors.card, borderColor: colors.glassBorder, opacity: msg.isDeleted ? 0.7 : 1 }],
+              msg.isDeleted && { paddingVertical: 4, minHeight: 26 },
+              // Smart borders
+              isMe && isSameSenderAsNext && { borderBottomRightRadius: 16 },
+              isMe && isSameSenderAsPrev && { borderTopRightRadius: 4 },
+              !isMe && isSameSenderAsNext && { borderBottomLeftRadius: 16 },
+              !isMe && isSameSenderAsPrev && { borderTopLeftRadius: 4 }
+            ]}
           >
-            {formatMsgTime(msg.timestamp)}
-            {!msg.isDeleted && isMe && '  ✓✓'}
-          </CustomText>
-        </TouchableOpacity>
+            {msg.statusItemId && (
+              <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(230, 126, 34, 0.1)' }]}>
+                <ImageIcon size={10} color={isMe ? '#fff' : '#e67e22'} />
+                <CustomText style={[styles.statusReplyText, { color: isMe ? '#fff' : '#e67e22' }]}>
+                  Status Reply
+                </CustomText>
+              </View>
+            )}
+
+            {msg.replyTo && (
+              <View style={[styles.quotedBubble, { backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                <View style={[styles.quotedBorder, { backgroundColor: colors.primary }]} />
+                <View style={styles.quotedBody}>
+                  <CustomText style={[styles.quotedSender, { color: colors.primary }]} numberOfLines={1}>
+                    {msg.replyTo.senderName}
+                  </CustomText>
+                  <CustomText style={[styles.quotedText, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={2}>
+                    {msg.replyTo.text}
+                  </CustomText>
+                </View>
+              </View>
+            )}
+            
+            <View style={styles.bubbleTextWrapper}>
+              <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}>
+                {msg.text}
+                <CustomText style={styles.invisibleSpacer}>
+                  {'   '}{formatMsgTime(msg.timestamp)}{!msg.isDeleted && isMe && ' ✓✓'}
+                </CustomText>
+              </CustomText>
+              
+              <View style={styles.timestampWrap}>
+                <CustomText style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
+                  {formatMsgTime(msg.timestamp)}
+                  {!msg.isDeleted && isMe && ' ✓✓'}
+                </CustomText>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </Swipeable>
   );
 };
 
@@ -127,6 +216,7 @@ export default function ChatDetailScreen() {
   const [typing, setTyping] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const listRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Report / Options modal
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -212,12 +302,9 @@ export default function ChatDetailScreen() {
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
   useEffect(() => {
-    async function init() {
+    async function checkAuth() {
       if (!conversation?.id || !user?.id) return;
-
-      // Handle biometric check for locked chats
       if (conversation.isLocked && !isAuthenticated) {
-        // If already authenticated via the list screen, skip prompt
         if (route.params?.authenticated) {
           setIsAuthenticated(true);
         } else {
@@ -225,39 +312,59 @@ export default function ChatDetailScreen() {
             promptMessage: 'Locked Chat',
             fallbackLabel: 'Enter Passcode',
           });
-          if (result.success) {
-            setIsAuthenticated(true);
-          } else {
-            navigation.goBack();
+          if (result.success) setIsAuthenticated(true);
+          else navigation.goBack();
+        }
+      }
+    }
+    checkAuth();
+  }, [conversation?.id, user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const initMessages = async () => {
+        if (!conversation?.id || !user?.id) return;
+        if (conversation.isLocked && !isAuthenticated) return;
+
+        let cid = conversation.id;
+        if (cid.startsWith('new-')) {
+          try {
+            const pId = cid.replace('new-', '');
+            cid = await chatService.createConversation(pId, user.id);
+            navigation.setParams({ conversation: { ...conversation, id: cid } });
+          } catch (e) {
+            console.error('Failed to resolve conversation:', e);
+            setLoading(false);
             return;
           }
         }
-      }
-      
-      let cid = conversation.id;
-      if (cid.startsWith('new-')) {
-        try {
-          const pId = cid.replace('new-', '');
-          cid = await chatService.createConversation(pId, user?.id);
-          // Update navigation params so other effects use the real ID
-          navigation.setParams({ conversation: { ...conversation, id: cid } });
-        } catch (e) {
-          console.error('Failed to resolve conversation:', e);
-          setLoading(false);
-          return;
-        }
-      }
 
-      chatService.markAsRead(cid, user.id);
-      chatService.getMessages(cid, user.id).then((data) => {
+        // Mark as read and refresh unread immediately
+        chatService.markAsRead(cid, user.id);
+        refreshUnread();
+
+        const data = await chatService.getMessages(cid, user.id);
         setMessages(data);
         setLoading(false);
-      });
-    }
-    init();
-  }, [conversation?.id, user?.id]);
+      };
+
+      initMessages();
+      return () => {};
+    }, [conversation?.id, user?.id, isAuthenticated])
+  );
+
+  const [replyingTo, setReplyingTo] = useState(null);
+
+  const handleSwipeReply = useCallback((msg) => {
+    setReplyingTo(msg);
+    // Small delay so swipe animation finishes before keyboard shows
+    setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus();
+    }, 150);
+  }, []);
 
   const handleBubbleAction = (action, msg) => {
+
     if (action === 'delete') {
       const isMe = msg.senderId === 'me';
       const options = [
@@ -299,17 +406,23 @@ export default function ChatDetailScreen() {
   };
 
   const handleSend = async () => {
+    if (!input.trim() || !user?.id) return;
     const text = input.trim();
-    if (!text) return;
+    const rId = replyingTo?.id;
+    const isEditing = !!editingMessageId;
+    const editId = editingMessageId;
 
-    if (editingMessageId) {
-      chatService.updateMessage(conversation.id, editingMessageId, text).then(() => {
-        setMessages(prev => prev.map(m => m.id === editingMessageId ? { ...m, text } : m));
+    if (isEditing) {
+      chatService.updateMessage(conversation.id, editId, text).then(() => {
+        setMessages(prev => prev.map(m => m.id === editId ? { ...m, text } : m));
         setEditingMessageId(null);
         setInput('');
       });
       return;
     }
+
+    setReplyingTo(null);
+    setInput('');
 
     const tempId = `m-${Date.now()}`;
     const myMsg = {
@@ -317,20 +430,33 @@ export default function ChatDetailScreen() {
       text,
       senderId: 'me',
       timestamp: new Date(),
+      replyTo: replyingTo ? {
+        id: replyingTo.id,
+        text: replyingTo.text,
+        senderName: replyingTo.senderId === 'me' ? 'You' : (replyingTo.senderName || 'Other')
+      } : null
     };
+    
     setMessages((prev) => [...prev, myMsg]);
-    setInput('');
+    
     let cid = conversation.id;
     if (cid.startsWith('new-')) {
-       const pId = cid.replace('new-', '');
-       cid = await chatService.createConversation(pId, user?.id);
-       navigation.setParams({ conversation: { ...conversation, id: cid } });
+       try {
+         const pId = cid.replace('new-', '');
+         cid = await chatService.createConversation(pId, user?.id);
+         navigation.setParams({ conversation: { ...conversation, id: cid } });
+       } catch (e) {
+         setMessages((prev) => prev.filter(m => m.id !== tempId));
+         Alert.alert('Error', 'Could not create conversation.');
+         return;
+       }
     }
 
     try {
-      const realMsg = await chatService.sendMessage(cid, user?.id, text);
+      const statusItemId = route.params?.statusId || null;
+      const realMsg = await chatService.sendMessage(cid, user?.id, text, statusItemId, rId);
       setMessages((prev) => 
-        prev.map((m) => (m.id === tempId ? realMsg : m))
+        prev.map((m) => (m.id === tempId ? { ...realMsg, replyTo: myMsg.replyTo || realMsg.replyTo } : m))
       );
     } catch (e) {
       setMessages((prev) => prev.filter(m => m.id !== tempId));
@@ -435,9 +561,21 @@ export default function ChatDetailScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => {
             const prevMsg = index > 0 ? messages[index - 1] : null;
+            const nextMsg = index < messages.length - 1 ? messages[index + 1] : null;
             const prevDate = prevMsg ? new Date(prevMsg.timestamp).toDateString() : null;
             const currentDate = new Date(item.timestamp).toDateString();
             const showSeparator = prevDate !== currentDate;
+
+            const isSameSenderAsPrev = !showSeparator && prevMsg && prevMsg.senderId === item.senderId;
+            const nextDate = nextMsg ? new Date(nextMsg.timestamp).toDateString() : null;
+            const isSameSenderAsNext = nextDate === currentDate && nextMsg && nextMsg.senderId === item.senderId;
+
+            const enhancedMsg = {
+               ...item,
+               showSeparator,
+               isSameSenderAsPrev,
+               isSameSenderAsNext
+            };
 
             return (
               <View>
@@ -452,7 +590,7 @@ export default function ChatDetailScreen() {
                     <View style={[styles.dateSeparatorLine, { backgroundColor: colors.glassBorder }]} />
                   </View>
                 )}
-                <Bubble msg={item} colors={colors} onAction={handleBubbleAction} />
+                <Bubble msg={enhancedMsg} colors={colors} onAction={handleBubbleAction} onSwipeReply={handleSwipeReply} />
               </View>
             );
           }}
@@ -492,40 +630,60 @@ export default function ChatDetailScreen() {
              </CustomText>
           </TouchableOpacity>
         ) : (
-        <View style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }]}>
-          <View style={[styles.inputWrap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-            {editingMessageId && (
-              <CustomText style={{ fontSize: 10, color: colors.primary, marginBottom: 2, fontWeight: '700' }}>
-                Editing Message
-              </CustomText>
-            )}
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              placeholder="Type a message..."
-              placeholderTextColor={colors.muted}
-              style={[styles.input, { color: colors.foreground }]}
-              multiline
-              maxLength={1000}
-              returnKeyType="default"
-            />
-          </View>
-          {editingMessageId && (
-            <TouchableOpacity onPress={() => { setEditingMessageId(null); setInput(''); }} style={{ marginRight: 6, marginBottom: 12 }}>
-              <CustomText style={{ color: colors.muted, fontSize: 13, fontWeight: '600' }}>Cancel</CustomText>
-            </TouchableOpacity>
+        <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }]}>
+          {replyingTo && (
+            <View style={[styles.replyPreview, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
+              <View style={styles.replyPreviewBody}>
+                <CustomText style={[styles.replyPreviewSender, { color: colors.primary }]}>
+                  {replyingTo.senderId === 'me' ? 'You' : (replyingTo.senderName || 'Other')}
+                </CustomText>
+                <CustomText style={[styles.replyPreviewText, { color: colors.muted }]} numberOfLines={1}>
+                  {replyingTo.text}
+                </CustomText>
+              </View>
+              <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyClose}>
+                <View style={[styles.replyCloseCircle, { backgroundColor: colors.glassBorder }]}>
+                  <CustomText style={{ fontSize: 10, color: colors.muted }}>✕</CustomText>
+                </View>
+              </TouchableOpacity>
+            </View>
           )}
-          <TouchableOpacity
-            onPress={handleSend}
-            disabled={!input.trim()}
-            style={[
-              styles.sendBtn,
-              { backgroundColor: input.trim() ? colors.primary : colors.glass },
-            ]}
-            activeOpacity={0.8}
-          >
-            <Send color={input.trim() ? '#fff' : colors.muted} size={20} />
-          </TouchableOpacity>
+          <View style={styles.inputBar}>
+            <View style={[styles.inputWrap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+              {editingMessageId && (
+                <CustomText style={{ fontSize: 10, color: colors.primary, marginBottom: 2, fontWeight: '700' }}>
+                  Editing Message
+                </CustomText>
+              )}
+              <TextInput
+                ref={inputRef}
+                value={input}
+                onChangeText={setInput}
+                placeholder="Type a message..."
+                placeholderTextColor={colors.muted}
+                style={[styles.input, { color: colors.foreground }]}
+                multiline
+                maxLength={1000}
+                returnKeyType="default"
+              />
+            </View>
+            {editingMessageId && (
+              <TouchableOpacity onPress={() => { setEditingMessageId(null); setInput(''); }} style={{ marginRight: 6, marginBottom: 12 }}>
+                <CustomText style={{ color: colors.muted, fontSize: 13, fontWeight: '600' }}>Cancel</CustomText>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={handleSend}
+              disabled={!input.trim()}
+              style={[
+                styles.sendBtn,
+                { backgroundColor: input.trim() ? colors.primary : colors.glass },
+              ]}
+              activeOpacity={0.8}
+            >
+              <Send color={input.trim() ? '#fff' : colors.muted} size={20} />
+            </TouchableOpacity>
+          </View>
         </View>
         )}
       </KeyboardAvoidingView>
@@ -667,10 +825,27 @@ const styles = StyleSheet.create({
   dateChipText: { fontSize: 11, fontWeight: '600' },
 
   // Messages
-  messageList: { paddingHorizontal: 14, paddingBottom: 14 },
-  bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 8, gap: 8 },
+  messageList: { paddingHorizontal: 12, paddingBottom: 14 },
+  bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
   rowRight: { justifyContent: 'flex-end' },
   rowLeft: { justifyContent: 'flex-start' },
+
+  // Swipe-to-reply
+  swipeReplyAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 48,
+  },
+  swipeReplyLeft: { justifyContent: 'center', alignItems: 'flex-start', paddingLeft: 6 },
+  swipeReplyRight: { justifyContent: 'center', alignItems: 'flex-end', paddingRight: 6 },
+  swipeReplyIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
 
   miniAvatar: {
     width: 28,
@@ -682,11 +857,32 @@ const styles = StyleSheet.create({
   },
   miniAvatarText: { fontSize: 11, fontWeight: '900' },
 
-  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
+  bubble: { 
+    borderRadius: 16, 
+    paddingHorizontal: 10, 
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
   bubbleMe: { borderBottomRightRadius: 4 },
   bubbleOther: { borderWidth: 1, borderBottomLeftRadius: 4 },
+  bubbleTextWrapper: {
+    position: 'relative',
+    minWidth: 50,
+  },
   bubbleText: { fontSize: 15, lineHeight: 21 },
-  bubbleTime: { fontSize: 10, marginTop: 4, textAlign: 'right', fontWeight: '600' },
+  invisibleSpacer: {
+    opacity: 0,
+    fontSize: 11,
+    lineHeight: 21,
+  },
+  timestampWrap: {
+    position: 'absolute',
+    bottom: -2,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bubbleTime: { fontSize: 10.5, fontWeight: '600' },
 
   // Typing
   typingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 14, marginBottom: 8, marginTop: 4 },
@@ -712,12 +908,15 @@ const styles = StyleSheet.create({
   },
 
   // Input bar
+  inputBarWrapper: {
+    flexDirection: 'column',
+    borderTopWidth: 1,
+  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderTopWidth: 1,
     gap: 10,
   },
   inputWrap: {
@@ -847,7 +1046,7 @@ const styles = StyleSheet.create({
   dateSeparator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 12,
     paddingHorizontal: 10,
   },
   dateSeparatorLine: {
@@ -856,8 +1055,8 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   dateSeparatorBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
     marginHorizontal: 12,
@@ -868,9 +1067,64 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   dateSeparatorText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+
+  // Reply styles
+  replyPreview: {
+    flexDirection: 'row',
+    padding: 10,
+    borderLeftWidth: 4,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    marginTop: 8,
+    marginBottom: -4,
+  },
+  replyPreviewBody: {
+    flex: 1,
+  },
+  replyPreviewSender: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  replyPreviewText: {
+    fontSize: 13,
+  },
+  replyClose: {
+    padding: 4,
+  },
+  replyCloseCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quotedBubble: {
+    flexDirection: 'row',
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  quotedBorder: {
+    width: 3,
+  },
+  quotedBody: {
+    flex: 1,
+    padding: 6,
+    paddingLeft: 8,
+  },
+  quotedSender: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  quotedText: {
+    fontSize: 12,
+    opacity: 0.9,
   },
 });

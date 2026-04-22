@@ -41,6 +41,9 @@ export const productService = {
       try {
         data = JSON.parse(text);
       } catch (e) {
+        if (text?.includes('<html') || text?.includes('<!DOCTYPE')) {
+          throw new Error('Server error: Invalid response format.');
+        }
         throw new Error(`Invalid JSON from server at ${url}: ${text.slice(0, 100)}`);
       }
 
@@ -67,6 +70,9 @@ export const productService = {
       try {
         data = JSON.parse(text);
       } catch (e) {
+        if (text?.includes('<html') || text?.includes('<!DOCTYPE')) {
+          throw new Error('Server error: Invalid response format.');
+        }
         throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
       }
 
