@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Switch, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { Menu, Bell, Lock, Shield, Globe, Moon, User, ChevronRight, XCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
+import { chatService } from '../../api/chatService';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -40,6 +41,27 @@ const SellerSettingsScreen = () => {
   const navigation = useNavigation();
   const [notifs, setNotifs] = useState(true);
   const [marketing, setMarketing] = useState(false);
+  const [hideAvailability, setHideAvailability] = useState(false);
+  const [loadingPrivacy, setLoadingPrivacy] = useState(true);
+
+  useEffect(() => {
+    if (user?.id) {
+      chatService.getPrivacySettings(user.id).then(res => {
+        setHideAvailability(res.hideAvailability);
+        setLoadingPrivacy(false);
+      });
+    }
+  }, [user?.id]);
+
+  const toggleAvailability = async () => {
+    const newValue = !hideAvailability;
+    setHideAvailability(newValue);
+    const res = await chatService.updatePrivacySettings(user.id, { hideAvailability: newValue });
+    if (res.error) {
+      Alert.alert('Error', `Failed to update privacy settings: ${res.details || res.error}`);
+      setHideAvailability(!newValue);
+    }
+  };
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -125,6 +147,15 @@ const SellerSettingsScreen = () => {
             <SettingRow icon={Lock} title="Password" subtitle="Secure your account" type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow icon={Shield} title="Two-Factor Auth" subtitle="Enhance store security" value={marketing} onValueChange={setMarketing} colors={colors} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <SettingRow 
+              icon={Shield} 
+              title="Hide Availability" 
+              subtitle="Hide online status and last seen" 
+              value={hideAvailability} 
+              onValueChange={toggleAvailability} 
+              colors={colors} 
+            />
           </View>
         </View>
 

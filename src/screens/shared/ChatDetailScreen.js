@@ -12,6 +12,7 @@ import {
   Alert,
   TouchableWithoutFeedback,
   Animated,
+  Image,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -24,29 +25,44 @@ import { useAuth } from '../../context/AuthContext';
 import { chatService } from '../../api/chatService';
 import { useNotifications } from '../../context/NotificationContext';
 
+function formatLastSeen(timestamp) {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  if (diffDays === 0) {
+    if (now.getDate() === date.getDate()) {
+       return `today at ${timeStr}`;
+    }
+    return `yesterday at ${timeStr}`;
+  } else if (diffDays === 1) {
+    return `yesterday at ${timeStr}`;
+  } else if (diffDays < 7) {
+    const weekday = date.toLocaleDateString([], { weekday: 'long' });
+    return `${weekday} at ${timeStr}`;
+  } else {
+    return date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' }) + ` at ${timeStr}`;
+  }
+}
+
 function formatMsgTime(date) {
   if (!date) return '';
   const d = new Date(date);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function formatDateSeparator(date) {
+const formatDateSeparator = (date) => {
   if (!date) return '';
   const d = new Date(date);
   const now = new Date();
-  
-  const isToday = d.getDate() === now.getDate() && 
-                  d.getMonth() === now.getMonth() && 
-                  d.getFullYear() === now.getFullYear();
-                  
+  if (d.toDateString() === now.toDateString()) return 'Today';
   const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday = d.getDate() === yesterday.getDate() && 
-                      d.getMonth() === yesterday.getMonth() && 
-                      d.getFullYear() === yesterday.getFullYear();
-
-  if (isToday) return 'Today';
-  if (isYesterday) return 'Yesterday';
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   
   const isSameYear = d.getFullYear() === now.getFullYear();
   return d.toLocaleDateString([], { 
@@ -54,7 +70,41 @@ function formatDateSeparator(date) {
     day: 'numeric', 
     year: isSameYear ? undefined : 'numeric' 
   });
-}
+};
+
+const TypingDotsPulsing = ({ colors }) => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulse = (anim, delay) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 400, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    pulse(dot1, 0);
+    pulse(dot2, 200);
+    pulse(dot3, 400);
+  }, [dot1, dot2, dot3]);
+
+  const getStyle = (anim) => ({
+    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.25] }) }]
+  });
+
+  return (
+    <View style={styles.typingDots}>
+      <Animated.View style={[styles.dot, { backgroundColor: colors.muted }, getStyle(dot1)]} />
+      <Animated.View style={[styles.dot, { backgroundColor: colors.muted }, getStyle(dot2)]} />
+      <Animated.View style={[styles.dot, { backgroundColor: colors.muted }, getStyle(dot3)]} />
+    </View>
+  );
+};
 
 const Bubble = ({ msg, colors, onAction, onSwipeReply }) => {
   const isMe = msg.senderId === 'me';
@@ -157,7 +207,25 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply }) => {
               !isMe && isSameSenderAsPrev && { borderTopLeftRadius: 4 }
             ]}
           >
-            {msg.statusItemId && (
+            {msg.statusItem && (
+              <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                {(msg.statusItem.type === 'image' || msg.statusItem.type === 'video') ? (
+                  <Image source={{ uri: msg.statusItem.content }} style={styles.statusReplyImage} />
+                ) : (
+                  <View style={[styles.statusReplyColorBlock, { backgroundColor: msg.statusItem.backgroundColor || colors.primary }]} />
+                )}
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <CustomText style={[styles.statusReplyTitle, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={1}>
+                    Status Reply
+                  </CustomText>
+                  <CustomText style={[styles.statusReplySubtitle, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]} numberOfLines={1}>
+                    {msg.statusItem.type === 'text' ? msg.statusItem.content : 'Media'}
+                  </CustomText>
+                </View>
+              </View>
+            )}
+
+            {!msg.statusItem && msg.statusItemId && (
               <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(230, 126, 34, 0.1)' }]}>
                 <ImageIcon size={10} color={isMe ? '#fff' : '#e67e22'} />
                 <CustomText style={[styles.statusReplyText, { color: isMe ? '#fff' : '#e67e22' }]}>
@@ -211,12 +279,62 @@ export default function ChatDetailScreen() {
   const { conversation } = route.params || {};
 
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
+  const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
+  const [lastSeen, setLastSeen] = useState(null); // Clear initial to avoid stale flicker
+  const [isOnline, setIsOnline] = useState(false);
+  const [isHidden, setIsHidden] = useState(true); // Don't show status until first fetch to avoid flicker
   const [editingMessageId, setEditingMessageId] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
   const listRef = useRef(null);
   const inputRef = useRef(null);
+  const heartbeatAnim = useRef(new Animated.Value(1)).current;
+
+  // Heartbeat pulsing animation
+  useEffect(() => {
+    if (isOnline && !isHidden) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(heartbeatAnim, {
+            toValue: 1.25,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(heartbeatAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      heartbeatAnim.setValue(1);
+    }
+  }, [isOnline, isHidden]);
+
+  // Typing dots animation for header
+  const [typingDots, setTypingDots] = useState('');
+  useEffect(() => {
+    if (typing && !isHidden) {
+      const itv = setInterval(() => {
+        setTypingDots(prev => (prev.length >= 3 ? '' : prev + '.'));
+      }, 400);
+      return () => clearInterval(itv);
+    } else {
+      setTypingDots('');
+    }
+  }, [typing, isHidden]);
+
+  // Active presence heartbeat (pings server to keep us online)
+  useEffect(() => {
+    if (!user?.id) return;
+    chatService.pingOnlineStatus(user.id);
+    const pingInterval = setInterval(() => {
+      chatService.pingOnlineStatus(user.id);
+    }, 15000); // 15s interval for 30s server window
+    return () => clearInterval(pingInterval);
+  }, [user?.id]);
 
   // Report / Options modal
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -349,11 +467,36 @@ export default function ChatDetailScreen() {
       };
 
       initMessages();
-      return () => {};
+      
+      const pollInterval = setInterval(async () => {
+        if (!conversation?.id || !user?.id) return;
+        const cid = conversation.id.startsWith('new-') ? null : conversation.id;
+        if (cid) {
+          // Poll new messages
+          const data = await chatService.getMessages(cid, user.id);
+          // Only update if lengths diff or last message diff to avoid over-rendering janks
+          setMessages(prev => {
+             if (prev.length !== data.length || (data.length > 0 && prev[prev.length-1]?.id !== data[data.length-1]?.id)) {
+               return data;
+             }
+             return prev;
+          });
+          
+          // Poll typing and online status
+          const statusResult = await chatService.checkTyping(cid, user.id, conversation.participantId);
+          console.log(`[DEBUG-CHAT-DETAIL] Polling status for ${conversation.participantId}:`, statusResult);
+          setTyping(statusResult.typing);
+          setIsOnline(statusResult.isOnline);
+          setLastSeen(statusResult.lastSeen);
+          setIsHidden(!!statusResult.isHidden);
+        }
+      }, 3000);
+
+      return () => { clearInterval(pollInterval); };
     }, [conversation?.id, user?.id, isAuthenticated])
   );
 
-  const [replyingTo, setReplyingTo] = useState(null);
+
 
   const handleSwipeReply = useCallback((msg) => {
     setReplyingTo(msg);
@@ -454,7 +597,11 @@ export default function ChatDetailScreen() {
 
     try {
       const statusItemId = route.params?.statusId || null;
-      const realMsg = await chatService.sendMessage(cid, user?.id, text, statusItemId, rId);
+      const realMsg = await chatService.sendMessage(cid, user.id, text, statusItemId, rId);
+      
+      // Stop typing immediately on send
+      if (cid) chatService.stopTyping(cid, user.id);
+
       setMessages((prev) => 
         prev.map((m) => (m.id === tempId ? { ...realMsg, replyTo: myMsg.replyTo || realMsg.replyTo } : m))
       );
@@ -499,16 +646,31 @@ export default function ChatDetailScreen() {
           <CustomText style={[styles.headerAvatarText, { color: conversation?.participantColor || colors.primary }]}>
             {conversation?.participantInitials || '??'}
           </CustomText>
-          {conversation?.isOnline && <View style={styles.onlineDotHeader} />}
+          {isOnline && !isHidden && (
+            <Animated.View 
+              style={[
+                styles.onlineDotHeader, 
+                { 
+                  transform: [{ scale: heartbeatAnim }],
+                  shadowColor: '#22c55e',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.5,
+                  shadowRadius: 4,
+                }
+              ]} 
+            />
+          )}
         </View>
 
         <View style={styles.headerInfo}>
           <CustomText style={[styles.headerName, { color: colors.foreground }]} numberOfLines={1}>
-            {conversation?.participantName || 'Chat'}
+            {conversation?.participantName}
           </CustomText>
-          <CustomText style={[styles.headerStatus, { color: typing ? colors.primary : (conversation?.isOnline ? '#22c55e' : colors.muted) }]}>
-            {typing ? 'typing...' : conversation?.isOnline ? 'Online' : 'Offline'}
-          </CustomText>
+          {!isHidden && (
+            <CustomText style={[styles.headerStatus, { color: typing ? colors.primary : (isOnline ? '#22c55e' : colors.muted) }]}>
+              {typing ? `typing${typingDots}` : isOnline ? 'Online' : (lastSeen ? `Last seen ${formatLastSeen(lastSeen)}` : 'Offline')}
+            </CustomText>
+          )}
         </View>
 
         <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)} activeOpacity={0.7}>
@@ -605,11 +767,7 @@ export default function ChatDetailScreen() {
                   <CustomText style={[styles.miniAvatarText, { color: colors.primary }]}>S</CustomText>
                 </View>
                 <View style={[styles.typingBubble, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
-                  <View style={styles.typingDots}>
-                    {[0, 1, 2].map(i => (
-                      <View key={i} style={[styles.dot, { backgroundColor: colors.muted }]} />
-                    ))}
-                  </View>
+                  <TypingDotsPulsing colors={colors} />
                 </View>
               </View>
             ) : null
@@ -658,7 +816,12 @@ export default function ChatDetailScreen() {
               <TextInput
                 ref={inputRef}
                 value={input}
-                onChangeText={setInput}
+                onChangeText={(txt) => {
+                  setInput(txt);
+                  if (conversation?.id && !conversation.id.startsWith('new-') && user?.id) {
+                    chatService.sendTyping(conversation.id, user.id);
+                  }
+                }}
                 placeholder="Type a message..."
                 placeholderTextColor={colors.muted}
                 style={[styles.input, { color: colors.foreground }]}
@@ -894,17 +1057,35 @@ const styles = StyleSheet.create({
   statusReplyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    padding: 6,
     borderRadius: 8,
     marginBottom: 6,
-    gap: 4,
+    marginTop: 2,
+  },
+  statusReplyImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+  },
+  statusReplyColorBlock: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+  },
+  statusReplyTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusReplySubtitle: {
+    fontSize: 11,
+    marginTop: 1,
   },
   statusReplyText: {
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginLeft: 4,
   },
 
   // Input bar

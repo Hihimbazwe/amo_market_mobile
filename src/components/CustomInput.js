@@ -13,6 +13,7 @@ const CustomInput = ({
   keyboardType,
   error,
   containerStyle,
+  leftIcon: LeftIcon,
 }) => {
   const { colors } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
@@ -27,6 +28,11 @@ const CustomInput = ({
         isFocused && { borderColor: colors.primary, backgroundColor: colors.isDarkMode ? 'rgba(249, 115, 22, 0.05)' : 'rgba(249, 115, 22, 0.02)' },
         error && { borderColor: colors.error }
       ]}>
+        {LeftIcon && (
+          <View style={styles.leftIconWrap}>
+            <LeftIcon size={18} color={isFocused ? colors.primary : colors.muted} />
+          </View>
+        )}
         <TextInput
           style={[styles.input, { color: colors.foreground }]}
           value={value}
@@ -80,6 +86,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     height: '100%',
+    marginLeft: 0, // Reset to ensure consistency
+  },
+  leftIconWrap: {
+    marginRight: 12,
   },
   eyeIcon: {
     padding: 8,

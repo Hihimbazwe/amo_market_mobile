@@ -140,6 +140,56 @@ export const chatService = {
     }
   },
 
+  pingOnlineStatus: async (userId) => {
+    try {
+      if (!userId) return;
+      await fetch(`${BASE_URL}/api/mobile/chat/ping`, {
+        method: 'POST',
+        headers: buildHeaders(userId)
+      });
+    } catch (e) {
+      // Background ping, fail silently
+    }
+  },
+
+  sendTyping: async (conversationId, userId) => {
+    try {
+      await fetch(`${BASE_URL}/api/mobile/chat/${conversationId}/typing`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ action: 'start' })
+      });
+    } catch (e) {
+      // Background ping, fail silently
+    }
+  },
+
+  stopTyping: async (conversationId, userId) => {
+    try {
+      await fetch(`${BASE_URL}/api/mobile/chat/${conversationId}/typing`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ action: 'stop' })
+      });
+    } catch (e) {
+      // Background ping, fail silently
+    }
+  },
+
+  checkTyping: async (conversationId, userId, participantId) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/mobile/chat/${conversationId}/typing?participantId=${participantId}`, {
+        headers: buildHeaders(userId)
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      return { typing: false, isOnline: false };
+    } catch (e) {
+      return { typing: false, isOnline: false };
+    }
+  },
+
   togglePinConversation: async (id, userId, currentPinned) => {
     try {
       const res = await fetch(`${BASE_URL}/api/mobile/chat/conversations/${id}`, {
@@ -276,6 +326,30 @@ export const chatService = {
       return await res.json();
     } catch (e) {
       console.error('API reportUser failed:', e);
+      return { error: 'Network error' };
+    }
+  },
+  getPrivacySettings: async (userId) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/mobile/user/privacy`, {
+        headers: buildHeaders(userId)
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('API getPrivacySettings failed:', e);
+      return { hideAvailability: false };
+    }
+  },
+  updatePrivacySettings: async (userId, settings) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/mobile/user/privacy`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+        body: JSON.stringify(settings)
+      });
+      return await res.json();
+    } catch (e) {
+      console.error('API updatePrivacySettings failed:', e);
       return { error: 'Network error' };
     }
   }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { Menu, User, Mail, Shield, Phone, MapPin } from 'lucide-react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
+import { Menu, User, Mail, Shield, Calendar, Camera, ArrowLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
@@ -14,7 +15,8 @@ import { authService } from '../../api/authService';
 const BuyerProfileScreen = () => {
   const { toggleDrawer } = React.useContext(DrawerContext);
   const { colors } = useTheme();
-  const { user, login } = useAuth(); // login here acts as updating the user context
+  const { user, login } = useAuth();
+  const navigation = useNavigation();
 
   const [name, setName] = useState(user?.name || '');
   const [loading, setLoading] = useState(false);
@@ -23,17 +25,16 @@ const BuyerProfileScreen = () => {
     if (user?.name) setName(user.name);
   }, [user]);
 
+  const initials = (user?.name || "U").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const accentColor = '#f97316'; // Web's buyer orange
+
   const handleSaveProfile = async () => {
     if (!name.trim()) return Alert.alert('Error', 'Name cannot be empty.');
     
     setLoading(true);
     try {
-      // Update backend via the newly supported mobile user flow on the existing route
       const response = await authService.updateProfile(user.id, { name });
-      
-      // Update local storage context so the UI responds immediately everywhere
       login({ ...user, name: response.user?.name || name });
-      
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (e) {
       Alert.alert('Error', e.message || 'Failed to update profile.');
@@ -44,46 +45,86 @@ const BuyerProfileScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.glassBorder }]}>
-        <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
-          <Menu color={colors.foreground} size={24} />
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: colors.glass }]}>
+          <ArrowLeft color={colors.foreground} size={20} />
         </TouchableOpacity>
-        <CustomText variant="h2">Profile</CustomText>
+        <CustomText variant="h2">My Profile</CustomText>
       </View>
+
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.avatarSection}>
-          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20', borderColor: colors.primary + '50' }]}>
-            <User color={colors.primary} size={48} />
-          </View>
-          <CustomText variant="h2" style={{ marginTop: 16 }}>{user?.name || 'AMO User'}</CustomText>
-          <CustomText style={{ color: colors.muted }}>{user?.email || 'user@example.com'}</CustomText>
+        <View style={styles.introSection}>
+          <CustomText style={{ fontSize: 24, fontWeight: '900', color: colors.foreground }}>My Profile</CustomText>
+          <CustomText style={{ color: colors.muted, marginTop: 4 }}>View and update your account information.</CustomText>
         </View>
 
-        <View style={styles.formSection}>
-          <CustomInput 
-            label="Full Name" 
-            value={name} 
-            onChangeText={setName} 
-            placeholder="Enter your full name" 
-          />
-          <CustomInput 
-            label="Email Address" 
-            value={user?.email || 'user@example.com'} 
-            editable={false} 
-            keyboardType="email-address" 
-          />
-          <CustomInput 
-            label="Role" 
-            value={user?.role || 'BUYER'} 
-            editable={false} 
-          />
-          
-          <CustomButton 
-            title={loading ? "Saving..." : "Save Changes"} 
-            style={styles.editButton} 
-            onPress={handleSaveProfile} 
-            disabled={loading}
-          />
+        {/* Avatar Card */}
+        <View style={[styles.glassCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.avatarWrap}>
+            <View style={[styles.avatarBox, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
+              {user?.image ? (
+                <Image source={{ uri: user.image }} style={styles.avatarImage} />
+              ) : (
+                <CustomText style={[styles.avatarInitials, { color: accentColor }]}>{initials}</CustomText>
+              )}
+              <View style={[styles.cameraBtn, { backgroundColor: accentColor }]}>
+                <Camera color="#fff" size={12} />
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <CustomText style={[styles.profileName, { color: colors.foreground }]}>{user?.name || '—'}</CustomText>
+              <CustomText style={[styles.profileEmail, { color: colors.muted }]}>{user?.email}</CustomText>
+              <View style={[styles.roleBadge, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
+                <Shield color={accentColor} size={11} />
+                <CustomText style={[styles.roleText, { color: accentColor }]}>BUYER</CustomText>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Account Information */}
+        <View style={[styles.glassCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>ACCOUNT INFORMATION</CustomText>
+          <View style={styles.formGrid}>
+            <CustomInput 
+              label="Full Name" 
+              leftIcon={User}
+              value={name} 
+              onChangeText={setName} 
+              placeholder="Enter your full name" 
+            />
+            <CustomInput 
+              label="Email Address" 
+              leftIcon={Mail}
+              value={user?.email || ''} 
+              editable={false} 
+            />
+          </View>
+
+          <View style={[styles.actionSection, { borderTopColor: colors.border }]}>
+            <CustomButton 
+              title={loading ? "Saving..." : "Save Changes"} 
+              onPress={handleSaveProfile} 
+              disabled={loading}
+              style={{ backgroundColor: accentColor }}
+            />
+          </View>
+        </View>
+
+        {/* Account Meta */}
+        <View style={[styles.glassCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>ACCOUNT META</CustomText>
+          <View style={styles.metaRow}>
+            <View style={[styles.metaIcon, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
+              <Calendar color={accentColor} size={15} />
+            </View>
+            <View>
+              <CustomText style={[styles.metaLabel, { color: colors.muted }]}>MEMBER SINCE</CustomText>
+              <CustomText style={[styles.metaValue, { color: colors.foreground }]}>
+                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'April 20, 2026'}
+              </CustomText>
+            </View>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -91,41 +132,81 @@ const BuyerProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
+    gap: 16
   },
-  menuButton: {
-    marginRight: 16,
+  backBtn: {
     padding: 8,
     borderRadius: 12,
   },
-  content: {
-    padding: 24,
+  content: { padding: 20 },
+  introSection: { marginBottom: 24 },
+  glassCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    marginBottom: 20,
   },
-  avatarSection: {
+  avatarWrap: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  avatarBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    borderWidth: 1,
     alignItems: 'center',
-    marginBottom: 32,
-  },
-  avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
     justifyContent: 'center',
+    position: 'relative'
+  },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 16 },
+  avatarInitials: { fontSize: 24, fontWeight: '900' },
+  cameraBtn: {
+    position: 'absolute',
+    bottom: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 8,
     alignItems: 'center',
-    borderWidth: 2,
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  formSection: {
-    gap: 16,
+  profileName: { fontSize: 20, fontWeight: '900' },
+  profileEmail: { fontSize: 13, marginTop: 2 },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+    marginTop: 10,
   },
-  editButton: {
-    marginTop: 16,
+  roleText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 20 },
+  formGrid: { gap: 16 },
+  actionSection: { marginTop: 24, paddingTop: 20, borderTopWidth: 1 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  metaIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
+  metaLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  metaValue: { fontSize: 14, fontWeight: 'bold', marginTop: 2 },
 });
 
 export default BuyerProfileScreen;

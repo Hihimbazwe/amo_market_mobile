@@ -26,6 +26,7 @@ import Constants from 'expo-constants';
 import { CartProvider, useCart } from './src/context/CartContext';
 import { WishlistProvider } from './src/context/WishlistContext';
 import { NotificationProvider, useNotifications } from './src/context/NotificationContext';
+import { PresenceProvider } from './src/context/PresenceContext';
 import CustomText from './src/components/CustomText';
 import BuyerDashboardDrawer from './src/navigation/BuyerDashboardDrawer';
 import SellerDashboardDrawer from './src/navigation/SellerDashboardDrawer';
@@ -242,17 +243,19 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <ThemeProvider>
-          <NotificationProvider>
-            <CartProvider>
-              <WishlistProvider>
-                <SafeAreaProvider>
-                  <RootNavigator />
-                </SafeAreaProvider>
-              </WishlistProvider>
-            </CartProvider>
-          </NotificationProvider>
-        </ThemeProvider>
+        <PresenceProvider>
+          <ThemeProvider>
+            <NotificationProvider>
+              <CartProvider>
+                <WishlistProvider>
+                  <SafeAreaProvider>
+                    <RootNavigator />
+                  </SafeAreaProvider>
+                </WishlistProvider>
+              </CartProvider>
+            </NotificationProvider>
+          </ThemeProvider>
+        </PresenceProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

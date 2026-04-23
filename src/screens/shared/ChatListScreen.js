@@ -25,6 +25,7 @@ import { chatService } from '../../api/chatService';
 import { BuyerDrawerContext } from '../../context/BuyerDrawerContext';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 
+
 function formatTime(date) {
   if (!date) return '';
   const now = new Date();
@@ -90,17 +91,17 @@ const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
             {item.participantInitials}
           </CustomText>
         </View>
-        {item.isOnline && <View style={[styles.onlineDot, { borderColor: colors.background }]} />}
       </View>
 
-      {/* Body */}
-      <View style={styles.convBody}>
+        <View style={styles.convBody}>
         <View style={styles.convRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <CustomText style={[styles.convName, { color: colors.foreground, fontWeight: item.unreadCount > 0 ? '800' : '700' }]} numberOfLines={1}>
-              {item.participantName}
-            </CustomText>
-            {item.isLocked && <Lock color={colors.primary} size={14} style={{ marginLeft: 6, opacity: 0.8 }} />}
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+              <CustomText style={[styles.convName, { color: colors.foreground, fontWeight: item.unreadCount > 0 ? '800' : '700' }]} numberOfLines={1}>
+                {item.participantName}
+              </CustomText>
+            </View>
+            {item.isLocked && <Lock color={colors.primary} size={13} style={{ marginTop: 2, opacity: 0.8 }} />}
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <CustomText style={[styles.convTime, { 
@@ -189,12 +190,20 @@ export default function ChatListScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
+      
+      if (user?.id) {
+        // Legacy ping removed - handled by PresenceProvider WebSocket
+      }
+      
       // Periodically refresh statuses
       const interval = setInterval(() => {
         chatService.getStatuses(user?.id, true).then(setStatuses);
       }, 30000);
-      return () => clearInterval(interval);
-    }, [user?.id, filterType])
+      
+      return () => {
+        clearInterval(interval);
+      };
+    }, [loadData, user?.id])
   );
 
   useEffect(() => {
