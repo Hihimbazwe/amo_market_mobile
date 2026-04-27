@@ -10,7 +10,9 @@ import {
   Image,
   ActivityIndicator,
   Alert,
-  Dimensions
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import {
   User,
@@ -40,53 +42,79 @@ import { checkoutService } from '../api/checkoutService';
 import {Text, } from 'react-native';
 const { width } = Dimensions.get('window');
 
-const CheckoutScreen = ({ navigation }) => {
-  const { cartItems, cartTotal, clearCart } = useCart();
+const CheckoutScreen = ({ route, navigation }) => {
+  const { cartItems, cartTotal, clearCart, removeFromCart } = useCart();
+  
+  const selectedItemIds = route.params?.selectedItemIds;
+
+  const checkoutItems = useMemo(() => {
+    if (!selectedItemIds) return cartItems;
+    return cartItems.filter(item => selectedItemIds.includes(item.id));
+  }, [cartItems, selectedItemIds]);
+
+  const checkoutTotal = useMemo(() => {
+    if (!selectedItemIds) return cartTotal;
+    return checkoutItems.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  }, [checkoutItems, cartTotal, selectedItemIds]);
+
   const { user } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors, isDarkMode } = useTheme();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Form State
-  const [recipientName, setRecipientName] = useState(user?.name || '');
-  const [phoneNumber, setPhoneNumber] = useState(user?.phone || '');
+  // Recipient Details
+  const [recipientName, setRecipientName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [giftMessage, setGiftMessage] = useState('');
-  const [pickupType, setPickupType] = useState('DELIVERY'); // 'DELIVERY' or 'PICKUP'
-  const [paymentMethod, setPaymentMethod] = useState('MOBILE_MONEY');
 
-  // Location State
+  // Delivery Method
+  const [pickupType, setPickupType] = useState('DELIVERY');
+  const [pickupLocationId, setPickupLocationId] = useState('');
+  const [pickupSlot, setPickupSlot] = useState('');
+  const [pickupLocations, setPickupLocations] = useState([]);
+  const [landmark, setLandmark] = useState('');
+
+  // Location details
+  const [loc, setLoc] = useState({ province: '', district: '', sector: '', cell: '', village: '' });
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [sectors, setSectors] = useState([]);
   const [cells, setCells] = useState([]);
   const [villages, setVillages] = useState([]);
-  const [loc, setLoc] = useState({ province: '', district: '', sector: '', cell: '', village: '' });
   const [locLoading, setLocLoading] = useState(false);
-
-  // Agents & Pickup State
   const [agents, setAgents] = useState([]);
   const [selectedAgentId, setSelectedAgentId] = useState(null);
-  const [pickupLocations, setPickupLocations] = useState([]);
-  const [pickupLocationId, setPickupLocationId] = useState(null);
-  const [pickupSlot, setPickupSlot] = useState('');
 
-  // Card Payment State
+  // Payment details
+  const [paymentMethod, setPaymentMethod] = useState('MOBILE_MONEY');
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [cardholderName, setCardholderName] = useState('');
 
-  // Initial Fetches
+  // Fees
+  const deliveryFee = useMemo(() => (pickupType === 'PICKUP' ? 0 : 1000), [pickupType]);
+  const protectionFee = 500;
+  const totalAmount = checkoutTotal + deliveryFee + protectionFee;
+
   useEffect(() => {
-    locationService.fetchProvinces().then(setProvinces);
-    checkoutService.fetchPickupLocations().then(setPickupLocations);
+    const init = async () => {
+      setLocLoading(true);
+      const [p, pl] = await Promise.all([
+        locationService.fetchProvinces(),
+        checkoutService.fetchPickupLocations()
+      ]);
+      setProvinces(p);
+      setPickupLocations(pl);
+      setLocLoading(false);
+    };
+    init();
   }, []);
 
-  // Location Change Handlers
   const onProvinceChange = async (p) => {
     setLoc({ province: p, district: '', sector: '', cell: '', village: '' });
-    setDistricts([]); setSectors([]); setCells([]); setVillages([]); setAgents([]);
+    setDistricts([]); setSectors([]); setCells([]); setVillages([]);
     if (!p) return;
     setLocLoading(true);
     setDistricts(await locationService.fetchDistricts(p));
@@ -95,7 +123,7 @@ const CheckoutScreen = ({ navigation }) => {
 
   const onDistrictChange = async (d) => {
     setLoc(l => ({ ...l, district: d, sector: '', cell: '', village: '' }));
-    setSectors([]); setCells([]); setVillages([]); setAgents([]);
+    setSectors([]); setCells([]); setVillages([]);
     if (!d) return;
     setLocLoading(true);
     setSectors(await locationService.fetchSectors(loc.province, d));
@@ -104,7 +132,7 @@ const CheckoutScreen = ({ navigation }) => {
 
   const onSectorChange = async (s) => {
     setLoc(l => ({ ...l, sector: s, cell: '', village: '' }));
-    setCells([]); setVillages([]); setAgents([]);
+    setCells([]); setVillages([]);
     if (!s) return;
     setLocLoading(true);
     setCells(await locationService.fetchCells(loc.province, loc.district, s));
@@ -113,7 +141,7 @@ const CheckoutScreen = ({ navigation }) => {
 
   const onCellChange = async (c) => {
     setLoc(l => ({ ...l, cell: c, village: '' }));
-    setVillages([]); setAgents([]);
+    setVillages([]);
     if (!c) return;
     setLocLoading(true);
     setVillages(await locationService.fetchVillages(loc.province, loc.district, loc.sector, c));
@@ -123,44 +151,39 @@ const CheckoutScreen = ({ navigation }) => {
   const onVillageChange = async (v) => {
     setLoc(l => ({ ...l, village: v }));
     if (!v) return;
-    const agentsList = await checkoutService.fetchAgents(v, loc.cell, loc.sector, loc.district, loc.province);
-    setAgents(agentsList);
+    const data = await checkoutService.fetchAgents(v, loc.cell, loc.sector, loc.district, loc.province);
+    setAgents(data);
   };
-
-  const addressString = [loc.village, loc.cell, loc.sector, loc.district, loc.province].filter(Boolean).join(', ');
-
-  // Fees
-  const deliveryFee = pickupType === 'DELIVERY' ? 1000 : 0;
-  const protectionFee = 500;
-  const totalAmount = cartTotal + deliveryFee + protectionFee;
 
   const handlePlaceOrder = async () => {
     if (!recipientName || !phoneNumber) {
-      Alert.alert('Incomplete Details', 'Please enter recipient name and phone number.');
+      Alert.alert('Missing Details', 'Please fill in the recipient details.');
+      setStep(1);
       return;
     }
+
     if (pickupType === 'DELIVERY' && (!loc.province || !loc.district || !loc.sector)) {
-      Alert.alert('Incomplete Address', 'Please select your delivery location.');
-      return;
-    }
-    if (pickupType === 'PICKUP' && (!pickupLocationId || !pickupSlot)) {
-      Alert.alert('Incomplete Details', 'Please select a pickup location and time slot.');
+      Alert.alert('Missing Location', 'Please complete your delivery address.');
+      setStep(2);
       return;
     }
 
     setLoading(true);
     try {
+      const address = [loc.village, loc.cell, loc.sector, loc.district, loc.province].filter(Boolean).join(', ');
+      
       const orderData = {
         recipientName,
         phoneNumber,
         giftMessage,
         pickupType,
-        address: pickupType === 'DELIVERY' ? addressString : '',
-        agentId: pickupType === 'DELIVERY' ? (selectedAgentId || undefined) : undefined,
+        address: pickupType === 'DELIVERY' ? address : '',
+        agentId: selectedAgentId || undefined,
         pickupLocationId: pickupType === 'PICKUP' ? pickupLocationId : undefined,
         pickupSlot: pickupType === 'PICKUP' ? pickupSlot : undefined,
-        items: cartItems.map(item => ({
-          productId: item.productId,
+        shippingCost: deliveryFee,
+        items: checkoutItems.map(item => ({
+          productId: item.product.id,
           quantity: item.quantity,
           price: item.product.price
         }))
@@ -168,25 +191,27 @@ const CheckoutScreen = ({ navigation }) => {
 
       const order = await checkoutService.placeOrder(user.id, orderData);
       
-      // Process Payment
-      await checkoutService.processPayment(user.id, { 
-        orderId: order.id, 
-        method: paymentMethod 
-      });
+      const paymentData = {
+        orderId: order.id,
+        method: paymentMethod,
+        phone: paymentMethod === 'MOBILE_MONEY' ? phoneNumber : undefined,
+        cardDetails: paymentMethod === 'CARD' ? { cardNumber, expiryDate, cvv, cardholderName } : undefined
+      };
 
-      Alert.alert(
-        'Order Successful',
-        'Your order has been placed and payment is processed. You can track it in your orders.',
-        [{ text: 'View My Orders', onPress: () => {
-          clearCart();
-          navigation.navigate('Me'); // Navigate to Buyer Orders eventually
-        }}]
-      );
+      await checkoutService.processPayment(user.id, paymentData);
+      
+      // Remove only the items that were checked out
+      if (selectedItemIds && selectedItemIds.length < cartItems.length) {
+        await Promise.all(checkoutItems.map(item => removeFromCart(item.product.id)));
+      } else {
+        clearCart();
+      }
+
+      navigation.navigate('OrderSuccess', { orderId: order.id });
     } catch (error) {
-      Alert.alert('Checkout Error', error.message);
+      Alert.alert('Order Failed', error.message || 'Something went wrong while placing your order.');
     } finally {
-      setLoading(true);
-      setTimeout(() => setLoading(false), 500); // Small artificial delay for UX
+      setLoading(false);
     }
   };
 
@@ -209,11 +234,11 @@ const CheckoutScreen = ({ navigation }) => {
   );
 
   const renderLabel = (text) => (
-    <CustomText style={styles.inputLabel}>{text}</CustomText>
+    <CustomText style={[styles.inputLabel, { color: colors.muted }]}>{text}</CustomText>
   );
 
   const renderInput = (icon, placeholder, value, onChange, type = 'default') => (
-    <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[styles.inputWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
       {icon}
       <TextInput
         style={[styles.input, { color: colors.foreground }]}
@@ -229,10 +254,9 @@ const CheckoutScreen = ({ navigation }) => {
   const renderDropdown = (label, value, onValueChange, options, disabled) => (
     <View style={[styles.dropdownGroup, disabled && { opacity: 0.5 }]}>
       {renderLabel(label)}
-      <View style={[styles.dropdownWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {/* Simple mock of a picker since standard Picker is often problematic in Expo/mobile without a dedicated lib */}
+      <View style={[styles.dropdownWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
         <TouchableOpacity 
-          style={styles.dropdownTrigger}
+          style={[styles.dropdownTrigger, { borderColor: colors.border }]}
           onPress={() => {
             if (disabled) return;
             Alert.alert(`Select ${label}`, '', options.map(o => ({
@@ -241,7 +265,7 @@ const CheckoutScreen = ({ navigation }) => {
             })).concat([{ text: 'Cancel', style: 'cancel' }]));
           }}
         >
-          <CustomText style={[styles.dropdownValue, !value && { color: colors.muted }]}>
+          <CustomText style={[styles.dropdownValue, { color: value ? colors.foreground : colors.muted }]}>
             {value || `Select ${label}`}
           </CustomText>
           <ChevronDown size={14} color={colors.muted} />
@@ -252,17 +276,25 @@ const CheckoutScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: colors.glass }]}>
           <ChevronLeft color={colors.foreground} size={24} />
         </TouchableOpacity>
         <CustomText variant="h2" style={{ color: colors.foreground }}>Checkout</CustomText>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         {renderStepIndicator()}
 
         {step === 1 && (
@@ -282,7 +314,7 @@ const CheckoutScreen = ({ navigation }) => {
               {renderInput(<Phone size={18} color={colors.muted} />, '+250 7XX XXX XXX', phoneNumber, setPhoneNumber, 'phone-pad')}
               
               {renderLabel('GIFT MESSAGE (OPTIONAL)')}
-              <View style={[styles.textAreaWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.textAreaWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
                 <TextInput
                   style={[styles.textArea, { color: colors.foreground }]}
                   placeholder="Enter a personal message..."
@@ -311,22 +343,24 @@ const CheckoutScreen = ({ navigation }) => {
                 onPress={() => setPickupType('DELIVERY')}
                 style={[
                   styles.toggleBtn, 
-                  pickupType === 'DELIVERY' ? { backgroundColor: colors.primary + '20', borderColor: colors.primary } : { borderColor: colors.border }
+                  { backgroundColor: colors.glass, borderColor: colors.border },
+                  pickupType === 'DELIVERY' && { backgroundColor: colors.primary + '20', borderColor: colors.primary }
                 ]}
               >
                 <Truck size={20} color={pickupType === 'DELIVERY' ? colors.primary : colors.muted} />
-                <CustomText style={[styles.toggleText, pickupType === 'DELIVERY' ? { color: colors.primary } : { color: colors.muted }]}>Delivery</CustomText>
+                <CustomText style={[styles.toggleText, { color: pickupType === 'DELIVERY' ? colors.primary : colors.muted }]}>Delivery</CustomText>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 onPress={() => setPickupType('PICKUP')}
                 style={[
                   styles.toggleBtn, 
-                  pickupType === 'PICKUP' ? { backgroundColor: colors.primary + '20', borderColor: colors.primary } : { borderColor: colors.border }
+                  { backgroundColor: colors.glass, borderColor: colors.border },
+                  pickupType === 'PICKUP' && { backgroundColor: colors.primary + '20', borderColor: colors.primary }
                 ]}
               >
                 <Building2 size={20} color={pickupType === 'PICKUP' ? colors.primary : colors.muted} />
-                <CustomText style={[styles.toggleText, pickupType === 'PICKUP' ? { color: colors.primary } : { color: colors.muted }]}>Pickup</CustomText>
+                <CustomText style={[styles.toggleText, { color: pickupType === 'PICKUP' ? colors.primary : colors.muted }]}>Pickup</CustomText>
               </TouchableOpacity>
             </View>
 
@@ -348,7 +382,7 @@ const CheckoutScreen = ({ navigation }) => {
                     onPress={() => setPickupLocationId(location.id)}
                     style={[
                       styles.pickupLocationItem, 
-                      { backgroundColor: colors.card, borderColor: pickupLocationId === location.id ? colors.primary : colors.border }
+                      { backgroundColor: colors.glass, borderColor: pickupLocationId === location.id ? colors.primary : colors.border }
                     ]}
                   >
                     <View style={styles.pickupHeader}>
@@ -356,8 +390,8 @@ const CheckoutScreen = ({ navigation }) => {
                       <CustomText style={[styles.pickupName, { color: colors.foreground }]}>{location.name}</CustomText>
                       {pickupLocationId === location.id && <CheckCircle2 size={16} color={colors.primary} />}
                     </View>
-                    <CustomText style={styles.pickupAddress}>{location.address}</CustomText>
-                    <CustomText style={styles.pickupHours}>Hours: {location.openTime} - {location.closeTime}</CustomText>
+                    <CustomText style={[styles.pickupAddress, { color: colors.muted }]}>{location.address}</CustomText>
+                    <CustomText style={[styles.pickupHours, { color: colors.muted }]}>Hours: {location.openTime} - {location.closeTime}</CustomText>
                   </TouchableOpacity>
                 ))}
                 
@@ -365,7 +399,7 @@ const CheckoutScreen = ({ navigation }) => {
                   <View style={{ marginTop: 12 }}>
                     {renderLabel('PICKUP TIME SLOT')}
                      <TouchableOpacity 
-                      style={[styles.dropdownTrigger, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      style={[styles.dropdownTrigger, { backgroundColor: colors.glass, borderColor: colors.border }]}
                       onPress={() => {
                         Alert.alert("Select Time Slot", "", [
                           { text: "Tomorrow 10:00 AM", onPress: () => setPickupSlot("Tomorrow 10:00 AM") },
@@ -375,9 +409,10 @@ const CheckoutScreen = ({ navigation }) => {
                         ]);
                       }}
                     >
-                      <CustomText style={[styles.dropdownValue, !pickupSlot && { color: colors.muted }]}>
+                      <CustomText style={[styles.dropdownValue, { color: pickupSlot ? colors.foreground : colors.muted }]}>
                         {pickupSlot || "Select time slot"}
                       </CustomText>
+                      <ChevronDown size={14} color={colors.muted} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -407,7 +442,7 @@ const CheckoutScreen = ({ navigation }) => {
                     onPress={() => setPaymentMethod(method.id)}
                     style={[
                       styles.paymentMethodItem, 
-                      { backgroundColor: colors.card, borderColor: paymentMethod === method.id ? colors.primary : colors.border }
+                      { backgroundColor: colors.glass, borderColor: paymentMethod === method.id ? colors.primary : colors.border }
                     ]}
                   >
                     <method.icon size={24} color={paymentMethod === method.id ? colors.primary : colors.muted} />
@@ -421,7 +456,7 @@ const CheckoutScreen = ({ navigation }) => {
 
             {paymentMethod === 'MOBILE_MONEY' && (
               <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                <CustomText style={styles.paymentInfoText}>You will receive a USSD prompt on your phone to authorize the transaction.</CustomText>
+                <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>You will receive a USSD prompt on your phone to authorize the transaction.</CustomText>
                 {renderLabel('MOBILE NUMBER')}
                 {renderInput(<Smartphone size={18} color={colors.muted} />, '+250 7XX XXX XXX', phoneNumber, setPhoneNumber, 'phone-pad')}
               </View>
@@ -430,21 +465,21 @@ const CheckoutScreen = ({ navigation }) => {
             {paymentMethod === 'BANK_TRANSFER' && (
               <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
                 <View style={styles.bankInfoRow}>
-                  <CustomText style={styles.bankLabel}>Bank:</CustomText>
+                  <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Bank:</CustomText>
                   <CustomText style={[styles.bankValue, { color: colors.foreground }]}>Bank of Kigali</CustomText>
                 </View>
                 <View style={styles.bankInfoRow}>
-                  <CustomText style={styles.bankLabel}>Account:</CustomText>
+                  <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Account:</CustomText>
                   <CustomText style={[styles.bankValue, { color: colors.foreground }]}>00040-0123456-78</CustomText>
                 </View>
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                <CustomText style={styles.paymentInfoText}>Please upload proof of payment after the transfer.</CustomText>
+                <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Please upload proof of payment after the transfer.</CustomText>
               </View>
             )}
 
             {paymentMethod === 'CARD' && (
               <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                <CustomText style={styles.paymentInfoText}>Your card details are encrypted and never stored.</CustomText>
+                <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your card details are encrypted and never stored.</CustomText>
                 
                 {renderLabel('CARD NUMBER')}
                 {renderInput(<CreditCard size={18} color={colors.muted} />, '1234 5678 9012 3456', cardNumber, setCardNumber, 'numeric')}
@@ -469,12 +504,12 @@ const CheckoutScreen = ({ navigation }) => {
               <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
                 <View style={[styles.walletBalance, { backgroundColor: colors.primary + '10' }]}>
                   <View>
-                    <CustomText style={styles.walletLabel}>AMO Wallet Balance</CustomText>
+                    <CustomText style={[styles.walletLabel, { color: colors.foreground }]}>AMO Wallet Balance</CustomText>
                     <CustomText style={[styles.walletAmount, { color: colors.primary }]}>Rwf 0</CustomText>
                   </View>
                   <Wallet size={32} color={colors.primary} opacity={0.3} />
                 </View>
-                <CustomText style={styles.paymentInfoText}>Your wallet balance will be deducted upon order confirmation.</CustomText>
+                <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your wallet balance will be deducted upon order confirmation.</CustomText>
               </View>
             )}
           </View>
@@ -489,11 +524,11 @@ const CheckoutScreen = ({ navigation }) => {
               <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Review & Confirm</CustomText>
             </View>
 
-            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <CustomText variant="h3" style={styles.summaryTitle}>Order Summary</CustomText>
+            <View style={[styles.summaryCard, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+              <CustomText variant="h3" style={[styles.summaryTitle, { color: colors.muted }]}>Order Summary</CustomText>
               
               <View style={styles.itemsReview}>
-                {cartItems.map(item => {
+                {checkoutItems.map(item => {
                   const imageUrl = item.product.media?.[0]?.url || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=200&q=80';
                   return (
                     <View key={item.id} style={styles.reviewItem}>
@@ -502,7 +537,7 @@ const CheckoutScreen = ({ navigation }) => {
                         <CustomText style={[styles.reviewItemText, { color: colors.foreground }]} numberOfLines={1}>
                           {item.product.title}
                         </CustomText>
-                        <CustomText style={styles.reviewItemQty}>Qty: {item.quantity}</CustomText>
+                        <CustomText style={[styles.reviewItemQty, { color: colors.muted }]}>Qty: {item.quantity}</CustomText>
                         <CustomText style={[styles.reviewPrice, { color: colors.primary }]}>
                           Rwf {(item.product.price * item.quantity).toLocaleString()}
                         </CustomText>
@@ -515,17 +550,17 @@ const CheckoutScreen = ({ navigation }) => {
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
               <View style={styles.summaryRow}>
-                <CustomText style={styles.summaryLabel}>Subtotal</CustomText>
-                <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>Rwf {cartTotal.toLocaleString()}</CustomText>
+                <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Subtotal</CustomText>
+                <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>Rwf {checkoutTotal.toLocaleString()}</CustomText>
               </View>
               <View style={styles.summaryRow}>
-                <CustomText style={styles.summaryLabel}>Delivery</CustomText>
+                <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Delivery</CustomText>
                 <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>
                   {deliveryFee > 0 ? `Rwf ${deliveryFee.toLocaleString()}` : 'Free'}
                 </CustomText>
               </View>
               <View style={styles.summaryRow}>
-                <CustomText style={styles.summaryLabel}>Protection Fee</CustomText>
+                <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Protection Fee</CustomText>
                 <CustomText style={[styles.summaryValue, { color: '#4ade80' }]}>Rwf {protectionFee.toLocaleString()}</CustomText>
               </View>
 
@@ -538,7 +573,7 @@ const CheckoutScreen = ({ navigation }) => {
 
               <View style={[styles.protectionBadge, { backgroundColor: colors.primary + '10' }]}>
                 <ShieldCheck size={18} color="#4ade80" />
-                <CustomText style={styles.protectionText}>Funds held in escrow until delivery is confirmed.</CustomText>
+                <CustomText style={[styles.protectionText, { color: colors.muted }]}>Funds held in escrow until delivery is confirmed.</CustomText>
               </View>
             </View>
           </View>
@@ -546,10 +581,10 @@ const CheckoutScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* Footer Navigation */}
-      <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+      <View style={[styles.footer, { backgroundColor: colors.glass, borderTopColor: colors.border }]}>
         {step > 1 && (
           <TouchableOpacity 
-            style={[styles.navBtn, styles.prevBtn, { borderStyle: 'solid', borderWidth: 1, borderColor: colors.border }]}
+            style={[styles.navBtn, styles.prevBtn, { borderStyle: 'solid', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass }]}
             onPress={() => setStep(step - 1)}
           >
             <ChevronLeft size={20} color={colors.foreground} />
@@ -569,6 +604,7 @@ const CheckoutScreen = ({ navigation }) => {
           {step < 4 && <ChevronRight size={20} color="#FFF" style={{ marginLeft: 4 }} />}
         </CustomButton>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

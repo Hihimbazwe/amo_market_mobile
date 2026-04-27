@@ -3,38 +3,28 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated, Dimens
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { SellerDrawerContext } from '../context/SellerDrawerContext';
+import { AgentDrawerContext } from '../context/AgentDrawerContext';
 import CustomText from '../components/CustomText';
 import Svg, { Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import {
   Home,
+  Truck,
   Package,
-  ShoppingBag,
-  Wallet,
+  MapPin,
   Settings,
   ShieldCheck,
   LogOut,
   X,
-  CreditCard,
-  AlertCircle,
   CircleUser as UserIcon,
   MessageCircle,
-  Truck,
 } from 'lucide-react-native';
 
-import SellerOverviewScreen from '../screens/seller/SellerOverviewScreen';
-import SellerProductsScreen from '../screens/seller/SellerProductsScreen';
-import SellerOrdersScreen from '../screens/seller/SellerOrdersScreen';
-import SellerShipmentScreen from '../screens/seller/SellerShipmentScreen';
-import SellerWalletScreen from '../screens/seller/SellerWalletScreen';
-import SellerReplacementsScreen from '../screens/seller/SellerReplacementsScreen';
-import SellerDisputesScreen from '../screens/seller/SellerDisputesScreen';
-import SellerProfileScreen from '../screens/seller/SellerProfileScreen';
-import SellerSettingsScreen from '../screens/seller/SellerSettingsScreen';
-import SellerWithdrawScreen from '../screens/seller/SellerWithdrawScreen';
-import SellerAnalyticsScreen from '../screens/seller/SellerAnalyticsScreen';
-import SellerMembershipScreen from '../screens/seller/SellerMembershipScreen';
-import SellerKYCScreen from '../screens/seller/SellerKYCScreen';
+import AgentDashboardScreen from '../screens/agent/AgentDashboardScreen';
+import DeliveryRequestsScreen from '../screens/agent/DeliveryRequestsScreen';
+import AgentOrdersScreen from '../screens/agent/AgentOrdersScreen';
+import AgentCoverageScreen from '../screens/agent/AgentCoverageScreen';
+import AgentProfileScreen from '../screens/agent/AgentProfileScreen';
+import AgentSettingsScreen from '../screens/agent/AgentSettingsScreen';
 import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
@@ -42,30 +32,21 @@ import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
-// Core nav groups — secondary items (Withdraw, Replacements, Analytics, Profile) live inside their related screens
 const NAV_GROUPS = [
   {
-    label: 'STORE',
+    label: 'DELIVERY',
     items: [
-      { name: 'Dashboard', icon: Home, screen: 'SellerOverview' },
-      { name: 'My Products', icon: Package, screen: 'SellerProducts' },
-      { name: 'Orders', icon: ShoppingBag, screen: 'SellerOrders' },
-      { name: 'Shipping', icon: Truck, screen: 'SellerShipment' },
-      { name: 'Disputes', icon: AlertCircle, screen: 'SellerDisputes' },
-    ],
-  },
-  {
-    label: 'FINANCE',
-    items: [
-      { name: 'Wallet', icon: Wallet, screen: 'SellerWallet' },
-      { name: 'Membership', icon: CreditCard, screen: 'SellerMembership' },
+      { name: 'Dashboard', icon: Home, screen: 'AgentDashboard' },
+      { name: 'Requests', icon: Truck, screen: 'DeliveryRequests' },
+      { name: 'My Deliveries', icon: Package, screen: 'AgentOrders' },
     ],
   },
   {
     label: 'ACCOUNT',
     items: [
-      { name: 'KYC Verification', icon: ShieldCheck, screen: 'SellerKYC' },
-      { name: 'Settings', icon: Settings, screen: 'SellerSettings' },
+      { name: 'Coverage', icon: MapPin, screen: 'AgentCoverage' },
+      { name: 'Profile', icon: ShieldCheck, screen: 'AgentProfile' },
+      { name: 'Settings', icon: Settings, screen: 'AgentSettings' },
     ],
   },
 ];
@@ -108,7 +89,6 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
     ]);
   };
 
-
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
@@ -122,7 +102,6 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
             { transform: [{ translateX: slideAnim }], backgroundColor: colors.background, borderRightColor: colors.border },
           ]}
         >
-          {/* ── Header ── */}
           <View style={[styles.drawerHeader, { borderBottomColor: colors.border }]}>
             <View style={styles.headerTop}>
               <View style={styles.brandRow}>
@@ -144,7 +123,6 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            {/* User info — only email, no avatar */}
             <View style={styles.userInfo}>
               <View style={{ 
                 width: 36, 
@@ -164,19 +142,15 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <CustomText style={[styles.userEmail, { color: colors.foreground, fontSize: 14, fontWeight: '700' }]} numberOfLines={1}>
-                  {user?.name || 'Seller'}
+                <CustomText style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
+                  {user?.name || 'Agent'}
                 </CustomText>
+                <CustomText style={[styles.userRole, { color: colors.primary }]}>Verified Agent</CustomText>
               </View>
             </View>
           </View>
 
-          {/* ── Nav ── */}
-          <ScrollView
-            style={styles.navContent}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 24 }}
-          >
+          <ScrollView style={styles.navContent} showsVerticalScrollIndicator={false}>
             {NAV_GROUPS.map((group, gIdx) => (
               <View key={group.label} style={[styles.group, gIdx > 0 && { marginTop: 8 }]}>
                 <CustomText style={[styles.groupLabel, { color: colors.muted }]}>{group.label}</CustomText>
@@ -200,7 +174,6 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
             ))}
           </ScrollView>
 
-          {/* ── Footer ── */}
           <View style={[styles.drawerFooter, { borderTopColor: colors.border }]}>
             <TouchableOpacity
               style={[styles.logoutBtn, { backgroundColor: 'rgba(239,68,68,0.08)' }]}
@@ -217,26 +190,19 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   );
 };
 
-export default function SellerDashboardDrawer({ navigation }) {
+export default function AgentDashboardDrawer({ navigation }) {
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   return (
-    <SellerDrawerContext.Provider value={{ toggleDrawer: () => setDrawerVisible(v => !v) }}>
+    <AgentDrawerContext.Provider value={{ toggleDrawer: () => setDrawerVisible(v => !v) }}>
       <View style={{ flex: 1 }}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="SellerOverview" component={SellerOverviewScreen} />
-          <Stack.Screen name="SellerProducts" component={SellerProductsScreen} />
-          <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} />
-          <Stack.Screen name="SellerShipment" component={SellerShipmentScreen} />
-          <Stack.Screen name="SellerReplacements" component={SellerReplacementsScreen} />
-          <Stack.Screen name="SellerDisputes" component={SellerDisputesScreen} />
-          <Stack.Screen name="SellerWallet" component={SellerWalletScreen} />
-          <Stack.Screen name="SellerWithdraw" component={SellerWithdrawScreen} />
-          <Stack.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
-          <Stack.Screen name="SellerMembership" component={SellerMembershipScreen} />
-          <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
-          <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
-          <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
+          <Stack.Screen name="AgentDashboard" component={AgentDashboardScreen} />
+          <Stack.Screen name="DeliveryRequests" component={DeliveryRequestsScreen} />
+          <Stack.Screen name="AgentOrders" component={AgentOrdersScreen} />
+          <Stack.Screen name="AgentCoverage" component={AgentCoverageScreen} />
+          <Stack.Screen name="AgentProfile" component={AgentProfileScreen} />
+          <Stack.Screen name="AgentSettings" component={AgentSettingsScreen} />
           <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
         </Stack.Navigator>
 
@@ -246,7 +212,7 @@ export default function SellerDashboardDrawer({ navigation }) {
           navigation={navigation?.navigate ? navigation : { navigate: () => {} }}
         />
       </View>
-    </SellerDrawerContext.Provider>
+    </AgentDrawerContext.Provider>
   );
 }
 
@@ -267,8 +233,6 @@ const styles = StyleSheet.create({
     elevation: 20,
     borderRightWidth: 1,
   },
-
-  // Header
   drawerHeader: {
     paddingHorizontal: 20,
     paddingTop: 56,
@@ -280,23 +244,15 @@ const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandLogo: { width: 34, height: 34, resizeMode: 'contain' },
   closeBtn: { padding: 8, borderRadius: 10 },
-
-  // User info (no card/border)
   userInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarText: { fontSize: 14, fontWeight: '900' },
   userName: { fontSize: 14, fontWeight: '700' },
-  userEmail: { fontSize: 11, marginTop: 1 },
-
-  // Nav
+  userRole: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   navContent: { flex: 1, paddingHorizontal: 14, paddingTop: 16 },
   group: { marginBottom: 4 },
   groupLabel: {
     fontSize: 10, fontWeight: '800', letterSpacing: 1.4,
     marginBottom: 6, marginLeft: 4,
+    textTransform: 'uppercase',
   },
   navItem: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -305,8 +261,6 @@ const styles = StyleSheet.create({
   },
   navIconBox: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   navItemText: { fontSize: 14, fontWeight: '600' },
-
-  // Footer
   drawerFooter: { paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: 1 },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

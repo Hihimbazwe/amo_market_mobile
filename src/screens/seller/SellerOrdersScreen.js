@@ -32,6 +32,12 @@ const SellerOrdersScreen = () => {
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState(null);
 
+  // Assign courier modal state
+  const [showCourierModal, setShowCourierModal] = useState(false);
+  const [couriers, setCouriers] = useState([]);
+  const [loadingCouriers, setLoadingCouriers] = useState(false);
+  const [selectedCourierId, setSelectedCourierId] = useState('');
+
   const statusColors = {
     PENDING: { bg: colors.glass, text: colors.muted },
     PROCESSING: { bg: 'rgba(59, 130, 246, 0.1)', text: '#3B82F6' },
@@ -97,6 +103,37 @@ const SellerOrdersScreen = () => {
       fetchOrdersAndReplacements();
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to assign agent');
+    }
+  };
+
+  const openCourierModal = async (order) => {
+    setTargetOrderId(order.id);
+    setSelectedCourierId(order.Courier?.id || '');
+    setShowCourierModal(true);
+    setLoadingCouriers(true);
+    try {
+      const data = await sellerService.getCouriers(user.id);
+      setCouriers(data);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to fetch couriers');
+      setShowCourierModal(false);
+    } finally {
+      setLoadingCouriers(false);
+    }
+  };
+
+  const submitAssignCourier = async () => {
+    if (!selectedCourierId) {
+      Alert.alert('Selection Required', 'Please select a courier to assign.');
+      return;
+    }
+    try {
+      await sellerService.assignCourier(user.id, targetOrderId, selectedCourierId);
+      Alert.alert('Success', 'Courier assigned successfully');
+      setShowCourierModal(false);
+      fetchOrdersAndReplacements();
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to assign courier');
     }
   };
 
@@ -272,7 +309,7 @@ const SellerOrdersScreen = () => {
                     {/* Assign/Change Agent Option */}
                     {(selectedOrderForActions.status === 'PAID' || selectedOrderForActions.status === 'PROCESSING' || selectedOrderForActions.status === 'PENDING') && (
                       <TouchableOpacity 
-                        style={[styles.actionMenuItem]}
+                        style={[styles.actionMenuItem, { borderBottomColor: colors.border }]}
                         onPress={() => {
                           setActionModalVisible(false);
                           openAgentModal(selectedOrderForActions);
@@ -280,6 +317,20 @@ const SellerOrdersScreen = () => {
                       >
                         <UserCheck size={18} color={colors.primary} />
                         <CustomText style={styles.actionMenuText}>{selectedOrderForActions.agent ? 'Change Agent' : 'Assign Agent'}</CustomText>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Assign Courier Option */}
+                    {['PAID', 'PROCESSING', 'PENDING', 'SHIPPED'].includes(selectedOrderForActions.status?.toUpperCase()) && (
+                      <TouchableOpacity 
+                        style={[styles.actionMenuItem]}
+                        onPress={() => {
+                          setActionModalVisible(false);
+                          openCourierModal(selectedOrderForActions);
+                        }}
+                      >
+                        <Truck size={18} color={colors.primary} />
+                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.Courier ? 'Change Courier' : 'Assign Courier'}</CustomText>
                       </TouchableOpacity>
                     )}
                   </>
@@ -409,6 +460,77 @@ const SellerOrdersScreen = () => {
         </View>
       </Modal>
 
+      {/* Couriers Modal */}
+      <Modal visible={showCourierModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '70%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <CustomText variant="h2">Assign Courier</CustomText>
+                {targetOrderId && <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>Order #{targetOrderId.slice(-8).toUpperCase()}</CustomText>}
+              </View>
+              <TouchableOpacity onPress={() => setShowCourierModal(false)} style={styles.closeBtn}>
+                <X color={colors.muted} size={24} />
+              </TouchableOpacity>
+            </View>
+            
+            {loadingCouriers ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator color={colors.primary} size="large" />
+              </View>
+            ) : couriers.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <CustomText style={{ color: colors.muted }}>No active couriers found.</CustomText>
+              </View>
+            ) : (
+              <ScrollView style={{ flex: 1, paddingRight: 4 }}>
+                {couriers.map((courier) => (
+                   <TouchableOpacity
+                     key={courier.id}
+                     style={[styles.agentRow, selectedCourierId === courier.id ? styles.agentRowSelected : styles.agentRowUnselected]}
+                     onPress={() => setSelectedCourierId(courier.id)}
+                   >
+                     <View style={[styles.radioOuter, selectedCourierId === courier.id ? styles.radioOuterSelected : styles.radioOuterUnselected]} />
+                     
+                     <View style={[styles.agentAvatar, { backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: 'rgba(59, 130, 246, 0.3)' }]}>
+                       <Truck color="#3B82F6" size={20} />
+                     </View>
+ 
+                     <View style={{ flex: 1 }}>
+                       <CustomText style={{ fontWeight: 'bold', fontSize: 13, color: colors.foreground }} numberOfLines={1}>{courier.name}</CustomText>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+                         <CustomText style={{ fontSize: 10, color: colors.muted }}>{courier.company || 'Private'}</CustomText>
+                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                           <Phone size={10} color={colors.muted} />
+                           <CustomText style={{ fontSize: 10, color: colors.muted }}>{courier.phone}</CustomText>
+                         </View>
+                       </View>
+                       <CustomText style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>Area: {courier.coverageArea || 'N/A'}</CustomText>
+                     </View>
+                   </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+ 
+            {!loadingCouriers && (
+              <View style={styles.modalFooter}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCourierModal(false)}>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>Cancel</CustomText>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.submitAssignBtn, { backgroundColor: colors.primary }, !selectedCourierId && { opacity: 0.5 }]} 
+                  onPress={submitAssignCourier}
+                  disabled={!selectedCourierId}
+                >
+                  <Truck size={16} color="white" />
+                  <CustomText style={{ fontWeight: 'bold', color: 'white' }}>Assign Courier</CustomText>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -462,7 +584,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#030712'
   },
   badgeText: { color: 'white', fontSize: 9, fontWeight: '900' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalOverlay: { 
+    flex: 1, 
+    justifyContent: 'flex-end', 
+    backgroundColor: 'rgba(0,0,0,0.85)' 
+  },
   modalContent: { height: '60%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   closeBtn: { padding: 4 },
@@ -481,7 +607,7 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   submitAssignBtn: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, gap: 8 },
   moreButton: { padding: 8, marginRight: -8 },
-  overlayCentered: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  overlayCentered: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   actionMenuCard: { width: '80%', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   actionMenuHeader: { padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
   actionMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1 },

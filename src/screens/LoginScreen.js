@@ -8,6 +8,8 @@ import CustomButton from '../components/CustomButton';
 import CustomInput from '../components/CustomInput';
 import { authService } from '../api/authService';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { StatusBar } from 'react-native';
 
 const GoogleIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 48 48">
@@ -20,6 +22,7 @@ const GoogleIcon = () => (
 );
 
 const LoginScreen = ({ navigation }) => {
+  const { colors, isDarkMode } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,7 +51,7 @@ const LoginScreen = ({ navigation }) => {
               });
             }
             
-            navigation.navigate(result.role === 'SELLER' ? 'Me' : 'Home');
+            navigation.navigate(['SELLER', 'COURIER', 'AGENT'].includes(result.role?.toUpperCase()) ? 'Me' : 'Home');
           },
         },
       ]);
@@ -69,7 +72,8 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -80,11 +84,11 @@ const LoginScreen = ({ navigation }) => {
             index: 0,
             routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
           })} 
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: colors.glass }]}
         >
-          <ArrowLeft color="#e2e8f0" size={24} />
+          <ArrowLeft color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Login</CustomText>
+        <CustomText variant="h2" style={{ color: colors.foreground }}>Login</CustomText>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -111,8 +115,8 @@ const LoginScreen = ({ navigation }) => {
               >AMO Market</SvgText>
             </Svg>
           </View>
-          <CustomText variant="h2" style={{ marginBottom: 12, marginTop: 12 }}>Welcome Back</CustomText>
-          <CustomText variant="subtitle" style={styles.subtitle}>
+          <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 12, marginTop: 12 }}>Welcome Back</CustomText>
+          <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted }]}>
             Sign in to your AMO account to continue shopping.
           </CustomText>
 
@@ -147,13 +151,13 @@ const LoginScreen = ({ navigation }) => {
             />
 
             <View style={styles.separator}>
-              <View style={styles.line} />
-              <CustomText style={styles.separatorText}>OR</CustomText>
-              <View style={styles.line} />
+              <View style={[styles.line, { backgroundColor: colors.border }]} />
+              <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
+              <View style={[styles.line, { backgroundColor: colors.border }]} />
             </View>
 
             <TouchableOpacity 
-              style={styles.googleButton}
+              style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }]}
               onPress={() => Alert.alert('Google Sign-In', 'Google Sign-In reached! Configuration needed for full experience.')}
               activeOpacity={0.8}
             >
@@ -166,8 +170,8 @@ const LoginScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('Register')}
             style={styles.link}
           >
-            <CustomText style={styles.linkText}>
-              Don't have an account? <CustomText style={{ color: '#e67e22' }}>Register</CustomText>
+            <CustomText style={[styles.linkText, { color: colors.muted }]}>
+              Don't have an account? <CustomText style={{ color: colors.primary }}>Register</CustomText>
             </CustomText>
           </TouchableOpacity>
         </View>
@@ -180,7 +184,6 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
   },
   header: {
     flexDirection: 'row',
@@ -191,7 +194,6 @@ const styles = StyleSheet.create({
     marginRight: 16,
     padding: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   content: {
     padding: 24,
@@ -219,22 +221,6 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 48,
-    color: '#94a3b8',
-  },
-  placeholderForm: {
-    width: '100%',
-    height: 200,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  placeholderText: {
-    color: '#94a3b8',
-    fontStyle: 'italic',
   },
   button: {
     width: '100%',
@@ -243,7 +229,6 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   linkText: {
-    color: '#94a3b8',
     fontSize: 14,
   },
   separator: {
@@ -254,10 +239,8 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   separatorText: {
-    color: '#64748b',
     fontSize: 12,
     fontWeight: '800',
     marginHorizontal: 16,

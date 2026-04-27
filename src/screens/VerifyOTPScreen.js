@@ -16,8 +16,11 @@ import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
 import { authService } from '../api/authService';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { StatusBar } from 'react-native';
 
 const VerifyOTPScreen = ({ navigation, route }) => {
+  const { colors, isDarkMode } = useTheme();
   const { email } = route.params;
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,16 +34,8 @@ const VerifyOTPScreen = ({ navigation, route }) => {
 
     setLoading(true);
     try {
-      // In a real app, we call the verify endpoint
-      // const result = await authService.verifyOTP(email, otp);
-
-      // For now, mirroring backend logic with fetch
       const result = await authService.verifyOTP(email, otp);
-
       Alert.alert('Success', 'Email verified successfully!');
-      // After verification, we could auto-login or go to login screen
-      // The user said "navigate to an otp verification screen instead of going to the login screen"
-      // Usually, after OTP success, you log in.
       navigation.navigate('Login');
     } catch (error) {
       Alert.alert('Verification Failed', error.message || 'Invalid code');
@@ -50,27 +45,28 @@ const VerifyOTPScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <ArrowLeft color="#ffffff" size={24} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.glass }]}>
+            <ArrowLeft color={colors.foreground} size={24} />
           </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.iconContainer}>
-            <CheckCircle color="#e67e22" size={64} />
+            <CheckCircle color={colors.primary} size={64} />
           </View>
 
           <View style={styles.textContainer}>
-            <CustomText variant="h1" style={styles.title}>Verify Email</CustomText>
-            <CustomText style={styles.subtitle}>
+            <CustomText variant="h1" style={[styles.title, { color: colors.foreground }]}>Verify Email</CustomText>
+            <CustomText style={[styles.subtitle, { color: colors.muted }]}>
               We sent a 6-digit code to {'\n'}
-              <CustomText style={{ color: '#e67e22', fontWeight: '700' }}>{email}</CustomText>
+              <CustomText style={{ color: colors.primary, fontWeight: '700' }}>{email}</CustomText>
             </CustomText>
           </View>
 
@@ -92,8 +88,8 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             />
 
             <TouchableOpacity style={styles.resendLink}>
-              <CustomText style={styles.resendText}>
-                Didn't receive code? <CustomText style={{ color: '#e67e22' }}>Resend</CustomText>
+              <CustomText style={[styles.resendText, { color: colors.muted }]}>
+                Didn't receive code? <CustomText style={{ color: colors.primary }}>Resend</CustomText>
               </CustomText>
             </TouchableOpacity>
           </View>
@@ -106,7 +102,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
   },
   header: {
     paddingHorizontal: 20,
@@ -116,7 +111,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -138,7 +132,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     textAlign: 'center',
-    color: '#94a3b8',
     lineHeight: 22,
   },
   form: {
@@ -152,7 +145,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resendText: {
-    color: '#94a3b8',
     fontSize: 14,
   },
 });

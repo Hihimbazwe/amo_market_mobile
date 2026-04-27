@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -10,7 +10,8 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,7 +46,8 @@ import ProductCard from '../components/ProductCard';
 import GlassContainer from '../components/GlassContainer';
 import NotificationIcon from '../components/NotificationIcon';
 import { productService } from '../api/productService';
-import {Text,} from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -67,24 +69,36 @@ const categories = [
 const trendingSearches = ["iPhone 15", "Nike sneakers", "MacBook Pro", "Gaming chair", "Smart watch"];
 
 const HomeScreen = ({ navigation }) => {
+  const { colors, isDarkMode } = useTheme();
   const [liveProducts, setLiveProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    const fetchFeatured = async () => {
-      setLoading(true);
-      try {
-        const data = await productService.getProducts();
-        setLiveProducts(data.slice(0, 4));
-      } catch (error) {
-        console.error('Home fetch error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchFeatured();
+  const fetchFeatured = async (showRefresher = false) => {
+    if (showRefresher) setRefreshing(true);
+    else setLoading(true);
+    
+    try {
+      const data = await productService.getProducts();
+      setLiveProducts(data.slice(0, 4));
+    } catch (error) {
+      console.error('Home fetch error:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchFeatured();
+    }, [])
+  );
+
+  const onRefresh = useCallback(() => {
+    fetchFeatured(true);
   }, []);
 
   const toggleSearch = () => {
@@ -101,28 +115,28 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       {/* Search Overlay */}
       {isSearchMode && (
-        <View style={styles.searchOverlay}>
-          <View style={styles.searchOverlayHeader}>
-            <TouchableOpacity onPress={toggleSearch} style={styles.closeSearchBtnOverlay}>
-              <X color="#e2e8f0" size={24} />
+        <View style={[styles.searchOverlay, { backgroundColor: colors.background }]}>
+          <View style={[styles.searchOverlayHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={toggleSearch} style={[styles.closeSearchBtnOverlay, { backgroundColor: colors.glass }]}>
+              <X color={colors.foreground} size={24} />
             </TouchableOpacity>
-            <View style={styles.searchInputWrapperOverlay}>
+            <View style={[styles.searchInputWrapperOverlay, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
               <TextInput
-                style={styles.searchInputOverlay}
+                style={[styles.searchInputOverlay, { color: colors.foreground }]}
                 placeholder="Search products, categories..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.muted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoFocus
                 onSubmitEditing={handleSearchSubmit}
               />
               <TouchableOpacity onPress={handleSearchSubmit}>
-                <Search color="#e67e22" size={20} />
+                <Search color={colors.primary} size={20} />
               </TouchableOpacity>
             </View>
           </View>
@@ -132,22 +146,22 @@ const HomeScreen = ({ navigation }) => {
             {!searchQuery && (
               <View style={styles.searchSection}>
                 <View style={styles.searchSectionHeader}>
-                  <TrendingUp size={14} color="#94a3b8" />
-                  <CustomText style={styles.searchSectionTitle}>TRENDING SEARCHES</CustomText>
+                  <TrendingUp size={14} color={colors.muted} />
+                  <CustomText style={[styles.searchSectionTitle, { color: colors.muted }]}>TRENDING SEARCHES</CustomText>
                 </View>
                 <View style={styles.trendingGrid}>
                   {trendingSearches.map((t, idx) => (
                     <TouchableOpacity 
                       key={idx} 
-                      style={styles.trendingItem}
+                      style={[styles.trendingItem, { backgroundColor: colors.glass, borderColor: colors.border }]}
                       onPress={() => {
                         setSearchQuery(t);
                         navigation.navigate('Market', { search: t });
                         toggleSearch();
                       }}
                     >
-                      <Zap size={14} color="#e67e22" style={{ marginRight: 8 }} />
-                      <CustomText style={styles.trendingText}>{t}</CustomText>
+                      <Zap size={14} color={colors.primary} style={{ marginRight: 8 }} />
+                      <CustomText style={[styles.trendingText, { color: colors.foreground }]}>{t}</CustomText>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -158,23 +172,23 @@ const HomeScreen = ({ navigation }) => {
             {!searchQuery && (
               <View style={styles.searchSection}>
                 <View style={styles.searchSectionHeader}>
-                  <Tag size={14} color="#94a3b8" />
-                  <CustomText style={styles.searchSectionTitle}>BROWSE CATEGORIES</CustomText>
+                  <Tag size={14} color={colors.muted} />
+                  <CustomText style={[styles.searchSectionTitle, { color: colors.muted }]}>BROWSE CATEGORIES</CustomText>
                 </View>
                 <View style={styles.searchCategoriesGrid}>
                   {categories.map((cat, index) => (
                     <TouchableOpacity 
                       key={index} 
-                      style={styles.searchCategoryCard}
+                      style={[styles.searchCategoryCard, { backgroundColor: colors.glass, borderColor: colors.border }]}
                       onPress={() => {
                         navigation.navigate('Market', { category: cat.label });
                         toggleSearch();
                       }}
                     >
-                      <View style={[styles.searchCategoryIcon, { backgroundColor: cat.color + '20' }]}>
+                      <View style={[styles.searchCategoryIcon, { backgroundColor: cat.color + '15' }]}>
                         <cat.icon size={22} color={cat.color} />
                       </View>
-                      <CustomText style={styles.searchCategoryLabel}>{cat.label}</CustomText>
+                      <CustomText style={[styles.searchCategoryLabel, { color: colors.foreground }]}>{cat.label}</CustomText>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -185,12 +199,12 @@ const HomeScreen = ({ navigation }) => {
             {searchQuery.length > 0 && (
               <View style={styles.searchSection}>
                 <TouchableOpacity 
-                  style={styles.searchResultItem}
+                  style={[styles.searchResultItem, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
                   onPress={handleSearchSubmit}
                 >
-                  <Search size={18} color="#94a3b8" style={{ marginRight: 12 }} />
-                  <CustomText style={styles.searchResultText}>Search for "{searchQuery}"</CustomText>
-                  <ArrowUpRight size={16} color="#e67e22" />
+                  <Search size={18} color={colors.muted} style={{ marginRight: 12 }} />
+                  <CustomText style={[styles.searchResultText, { color: colors.foreground }]}>Search for "{searchQuery}"</CustomText>
+                  <ArrowUpRight size={16} color={colors.primary} />
                 </TouchableOpacity>
               </View>
             )}
@@ -199,10 +213,10 @@ const HomeScreen = ({ navigation }) => {
       )}
 
       {/* Main Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity style={{ marginRight: 16 }}>
-            <Menu color="#e2e8f0" size={24} />
+          <TouchableOpacity style={[styles.iconButton, { backgroundColor: colors.glass }]}>
+            <Menu color={colors.foreground} size={24} />
           </TouchableOpacity>
           
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -230,17 +244,22 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={toggleSearch}>
-            <Search color="#e2e8f0" size={24} style={{ marginRight: 12 }} />
+          <TouchableOpacity onPress={toggleSearch} style={[styles.iconButton, { backgroundColor: colors.glass, marginRight: 8 }]}>
+            <Search color={colors.foreground} size={20} />
           </TouchableOpacity>
           <NotificationIcon />
-          <TouchableOpacity onPress={() => navigation.navigate('Cart')} style={{ marginLeft: 12 }}>
-            <ShoppingCart color="#e2e8f0" size={24} />
+          <TouchableOpacity onPress={() => navigation.navigate('Cart')} style={[styles.iconButton, { backgroundColor: colors.glass, marginLeft: 8 }]}>
+            <ShoppingCart color={colors.foreground} size={20} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
   
         {/* Hero Section */}
         <View style={styles.heroContainer}>
@@ -270,7 +289,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.sectionHeader}>
             <CustomText variant="h2">Popular Categories</CustomText>
             <TouchableOpacity onPress={() => navigation.navigate('Market')}>
-              <CustomText variant="subtitle" style={{ color: '#e67e22' }}>View all</CustomText>
+              <CustomText variant="subtitle" style={{ color: colors.primary }}>View all</CustomText>
             </TouchableOpacity>
           </View>
           <View style={styles.categoriesGrid}>
@@ -290,7 +309,7 @@ const HomeScreen = ({ navigation }) => {
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
-          style={styles.trustBar}
+          style={[styles.trustBar, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}
           contentContainerStyle={styles.trustBarContent}
         >
           {[
@@ -299,11 +318,11 @@ const HomeScreen = ({ navigation }) => {
             { icon: Headphones, title: "24/7 Support" },
             { icon: Star, title: "Verified Sellers" }
           ].map((item, index) => (
-            <View key={index} style={styles.trustItem}>
+            <View key={index} style={[styles.trustItem, { backgroundColor: colors.primary + '10' }]}>
               <View style={styles.trustIconContainer}>
-                <item.icon size={20} color={'#e67e22'} />
+                <item.icon size={20} color={colors.primary} />
               </View>
-              <CustomText variant="caption" style={styles.trustText}>{item.title}</CustomText>
+              <CustomText variant="caption" style={[styles.trustText, { color: colors.foreground }]}>{item.title}</CustomText>
             </View>
           ))}
         </ScrollView>
@@ -313,13 +332,13 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.sectionHeader}>
             <CustomText variant="h2">Featured Products</CustomText>
             <TouchableOpacity onPress={() => navigation.navigate('Market')}>
-              <CustomText variant="subtitle" style={{ color: '#e67e22' }}>See all</CustomText>
+              <CustomText variant="subtitle" style={{ color: colors.primary }}>See all</CustomText>
             </TouchableOpacity>
           </View>
           <View style={styles.productsGrid}>
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator color="#e67e22" />
+                <ActivityIndicator color={colors.primary} />
               </View>
             ) : (
               liveProducts.map((item) => (
@@ -359,7 +378,6 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
   },
   header: {
     flexDirection: 'row',
@@ -368,14 +386,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  headerSearchMode: {
-    paddingHorizontal: 12,
+  iconButton: {
+    padding: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#030712',
     zIndex: 1000,
     paddingTop: Platform.OS === 'ios' ? 50 : 20,
   },
@@ -385,26 +404,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   closeSearchBtnOverlay: {
     padding: 8,
     marginRight: 8,
+    borderRadius: 12,
   },
   searchInputWrapperOverlay: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 50,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   searchInputOverlay: {
     flex: 1,
-    color: '#e2e8f0',
     fontSize: 16,
     fontWeight: '500',
   },
@@ -424,7 +440,6 @@ const styles = StyleSheet.create({
   searchSectionTitle: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#94a3b8',
     letterSpacing: 1,
   },
   trendingGrid: {
@@ -435,17 +450,14 @@ const styles = StyleSheet.create({
   trendingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.03)',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
   },
   trendingText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#e2e8f0',
   },
   searchCategoriesGrid: {
     flexDirection: 'row',
@@ -455,12 +467,10 @@ const styles = StyleSheet.create({
   },
   searchCategoryCard: {
     width: (width - 52) / 2,
-    backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
   },
   searchCategoryIcon: {
     width: 48,
@@ -473,76 +483,22 @@ const styles = StyleSheet.create({
   searchCategoryLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#e2e8f0',
   },
   searchResultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(230, 126, 34, 0.05)',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(230, 126, 34, 0.2)',
   },
   searchResultText: {
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: '#e2e8f0',
-  },
-  logoText: {
-    letterSpacing: 1,
-    fontWeight: '900',
   },
   headerIcons: {
     flexDirection: 'row',
-  },
-  welcomeBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  welcomeInfo: {
-    flex: 1,
-  },
-  authButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  loginBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.3)',
-    backgroundColor: 'rgba(249, 115, 22, 0.05)',
-  },
-  loginBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#e67e22',
-  },
-  registerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#e67e22',
-  },
-  registerBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
+    alignItems: 'center'
   },
   heroContainer: {
     padding: 16,
@@ -586,13 +542,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   trustBar: {
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
     borderRadius: 20,
     marginVertical: 10,
-    paddingHorizontal: 10,
+    marginHorizontal: 20,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.2)',
   },
   trustBarContent: {
     flexDirection: 'row',
@@ -602,7 +556,6 @@ const styles = StyleSheet.create({
   trustItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
@@ -613,7 +566,6 @@ const styles = StyleSheet.create({
   },
   trustText: {
     fontWeight: '600',
-    color: '#e2e8f0',
   },
   productsGrid: {
     flexDirection: 'row',

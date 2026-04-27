@@ -30,9 +30,12 @@ import { PresenceProvider } from './src/context/PresenceContext';
 import CustomText from './src/components/CustomText';
 import BuyerDashboardDrawer from './src/navigation/BuyerDashboardDrawer';
 import SellerDashboardDrawer from './src/navigation/SellerDashboardDrawer';
+import AgentDashboardDrawer from './src/navigation/AgentDashboardDrawer';
+import CourierDashboardDrawer from './src/navigation/CourierDashboardDrawer';
 import ChatListScreen from './src/screens/shared/ChatListScreen';
 import ChatDetailScreen from './src/screens/shared/ChatDetailScreen';
 import StatusViewerScreen from './src/screens/shared/StatusViewerScreen';
+import CartScreen from './src/screens/CartScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -42,10 +45,13 @@ const Stack = createNativeStackNavigator();
 const HomeStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="HomeMain" component={HomeScreen} />
+    <Stack.Screen name="Cart" component={CartScreen} />
     <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
     <Stack.Screen name="Checkout" component={CheckoutScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
     <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
@@ -56,10 +62,13 @@ const HomeStack = () => (
 const MarketplaceStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="MarketMain" component={MarketplaceScreen} />
+    <Stack.Screen name="Cart" component={CartScreen} />
     <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
     <Stack.Screen name="Checkout" component={CheckoutScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
     <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
@@ -105,7 +114,7 @@ const AppTabs = () => {
 
   return (
     <Tab.Navigator
-      initialRouteName={user?.role === 'SELLER' ? 'Me' : 'Home'}
+      initialRouteName={['SELLER', 'COURIER', 'AGENT'].includes(user?.role?.toUpperCase()) ? 'Me' : 'Home'}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: [styles.tabBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }],
@@ -138,7 +147,15 @@ const AppTabs = () => {
       />
       <Tab.Screen 
         name="Me" 
-        component={user?.role === 'SELLER' ? SellerDashboardDrawer : BuyerDashboardDrawer} 
+        component={
+          user?.role?.toUpperCase() === 'SELLER' 
+            ? SellerDashboardDrawer 
+            : user?.role?.toUpperCase() === 'AGENT'
+              ? AgentDashboardDrawer
+              : user?.role?.toUpperCase() === 'COURIER'
+                ? CourierDashboardDrawer
+                : BuyerDashboardDrawer
+        } 
       />
     </Tab.Navigator>
   );

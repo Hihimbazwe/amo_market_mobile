@@ -9,11 +9,12 @@ import CustomInput from '../components/CustomInput';
 import { authService } from '../api/authService';
 import { useTheme } from '../context/ThemeContext';
 import Constants from 'expo-constants';
+import { StatusBar } from 'react-native';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
 
   const handleSendReset = async () => {
     if (!email) {
@@ -45,6 +46,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -53,7 +55,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.glass }]}>
             <ArrowLeft color={colors.foreground} size={24} />
           </TouchableOpacity>
-          <CustomText variant="h2">Reset Password</CustomText>
+          <CustomText variant="h2" style={{ color: colors.foreground }}>Reset Password</CustomText>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -62,7 +64,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
               <View style={[styles.iconContainer, { backgroundColor: colors.glass }]}>
                 <Mail color={colors.primary} size={40} />
               </View>
-              <CustomText variant="h2" style={{ marginBottom: 12, marginTop: 24 }}>Forgot Password?</CustomText>
+              <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 12, marginTop: 24 }}>Forgot Password?</CustomText>
               <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted }]}>
                 Enter your email address and we'll send you a link to reset your password.
               </CustomText>

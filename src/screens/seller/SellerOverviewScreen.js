@@ -37,11 +37,13 @@ const SellerOverviewScreen = () => {
           console.log('[DEBUG] Dashboard data received:', dashboard);
 
           // KYC gate — redirect if not ready
+          /* 
           if (!dashboard.kycReady) {
             console.log('[DEBUG] KYC not ready, navigating to SellerKYC');
             navigation.navigate('SellerKYC');
             return;
           }
+          */
 
           setData({
             revenue: dashboard.revenue || 0,

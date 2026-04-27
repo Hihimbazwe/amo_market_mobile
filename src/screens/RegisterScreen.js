@@ -7,6 +7,8 @@ import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
 import CustomInput from '../components/CustomInput';
 import { authService } from '../api/authService';
+import { useTheme } from '../context/ThemeContext';
+import { StatusBar } from 'react-native';
 
 const GoogleIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 48 48">
@@ -19,6 +21,7 @@ const GoogleIcon = () => (
 );
 
 const RegisterScreen = ({ navigation }) => {
+  const { colors, isDarkMode } = useTheme();
   const [role, setRole] = useState('BUYER');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -64,16 +67,17 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color="#ffffff" size={24} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.glass }]}>
+          <ArrowLeft color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Register</CustomText>
+        <CustomText variant="h2" style={{ color: colors.foreground }}>Register</CustomText>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -100,14 +104,14 @@ const RegisterScreen = ({ navigation }) => {
               >AMO Market</SvgText>
             </Svg>
           </View>
-          <CustomText variant="h2" style={{ marginBottom: 12, marginTop: 12 }}>Join AMO</CustomText>
-          <CustomText variant="subtitle" style={styles.subtitle}>
+          <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 12, marginTop: 12 }}>Join AMO</CustomText>
+          <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted }]}>
             Create an account to start selling and buying premium products.
           </CustomText>
 
           {/* Role Selection */}
           <View style={styles.roleContainer}>
-            <CustomText style={styles.roleLabel}>I WANT TO</CustomText>
+            <CustomText style={[styles.roleLabel, { color: colors.muted }]}>I WANT TO</CustomText>
             <View style={styles.roleGrid}>
               {[
                 { id: 'BUYER', icon: ShoppingBag, label: 'Buy' },
@@ -119,13 +123,15 @@ const RegisterScreen = ({ navigation }) => {
                   onPress={() => setRole(item.id)}
                   style={[
                     styles.roleItem,
-                    role === item.id && styles.activeRoleItem
+                    { backgroundColor: colors.glass, borderColor: colors.border },
+                    role === item.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }
                   ]}
                 >
-                  <item.icon size={24} color={role === item.id ? '#e67e22' : '#94a3b8'} />
+                  <item.icon size={24} color={role === item.id ? colors.primary : colors.muted} />
                   <CustomText style={[
-                    styles.roleItemText,
-                    role === item.id && styles.activeRoleItemText
+                     styles.roleItemText,
+                     { color: colors.muted },
+                     role === item.id && { color: colors.primary }
                   ]}>
                     {item.label}
                   </CustomText>
@@ -158,9 +164,9 @@ const RegisterScreen = ({ navigation }) => {
 
             {role === 'AGENT' && (
               <View style={styles.agentFields}>
-                <View style={styles.agentInfoBox}>
-                  <CustomText style={styles.agentInfoTitle}>Agent Location Details</CustomText>
-                  <CustomText style={styles.agentInfoText}>Agents handle local deliveries. Please select your exact location.</CustomText>
+                <View style={[styles.agentInfoBox, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '20' }]}>
+                  <CustomText style={[styles.agentInfoTitle, { color: colors.primary }]}>Agent Location Details</CustomText>
+                  <CustomText style={[styles.agentInfoText, { color: colors.muted }]}>Agents handle local deliveries. Please select your exact location.</CustomText>
                 </View>
                 <CustomInput label="Province" placeholder="Enter Province" value={province} onChangeText={setProvince} />
                 <CustomInput label="District" placeholder="Enter District" value={district} onChangeText={setDistrict} />
@@ -180,13 +186,13 @@ const RegisterScreen = ({ navigation }) => {
             />
 
             <View style={styles.separator}>
-              <View style={styles.line} />
-              <CustomText style={styles.separatorText}>OR</CustomText>
-              <View style={styles.line} />
+              <View style={[styles.line, { backgroundColor: colors.border }]} />
+              <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
+              <View style={[styles.line, { backgroundColor: colors.border }]} />
             </View>
 
             <TouchableOpacity 
-              style={styles.googleButton}
+              style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }]}
               onPress={() => Alert.alert('Google Sign-In', 'Google Sign-In reached! Configuration needed for full experience.')}
               activeOpacity={0.8}
             >
@@ -199,8 +205,8 @@ const RegisterScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('Login')}
             style={styles.link}
           >
-            <CustomText style={styles.linkText}>
-              Already have an account? <CustomText style={{ color: '#e67e22' }}>Login</CustomText>
+            <CustomText style={[styles.linkText, { color: colors.muted }]}>
+              Already have an account? <CustomText style={{ color: colors.primary }}>Login</CustomText>
             </CustomText>
           </TouchableOpacity>
         </View>
@@ -213,7 +219,6 @@ const RegisterScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
   },
   header: {
     flexDirection: 'row',
@@ -224,7 +229,6 @@ const styles = StyleSheet.create({
     marginRight: 16,
     padding: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   content: {
     padding: 24,
@@ -241,7 +245,6 @@ const styles = StyleSheet.create({
   roleLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#94a3b8',
     textAlign: 'center',
     letterSpacing: 2,
     marginBottom: 16,
@@ -257,21 +260,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  activeRoleItem: {
-    borderColor: '#e67e22',
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
   },
   roleItemText: {
     marginTop: 8,
     fontSize: 12,
     fontWeight: '700',
-    color: '#94a3b8',
-  },
-  activeRoleItemText: {
-    color: '#e67e22',
   },
   form: {
     width: '100%',
@@ -281,21 +274,17 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   agentInfoBox: {
-    backgroundColor: 'rgba(249, 115, 22, 0.05)',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.1)',
     marginBottom: 20,
   },
   agentInfoTitle: {
-    color: '#e67e22',
     fontSize: 14,
     fontWeight: '800',
     marginBottom: 4,
   },
   agentInfoText: {
-    color: '#94a3b8',
     fontSize: 12,
     lineHeight: 18,
   },
@@ -303,22 +292,6 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     marginBottom: 48,
-    color: '#94a3b8',
-  },
-  placeholderForm: {
-    width: '100%',
-    height: 200,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  placeholderText: {
-    color: '#94a3b8',
-    fontStyle: 'italic',
   },
   button: {
     width: '100%',
@@ -327,7 +300,6 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   linkText: {
-    color: '#94a3b8',
     fontSize: 14,
   },
   separator: {
@@ -338,10 +310,8 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   separatorText: {
-    color: '#64748b',
     fontSize: 12,
     fontWeight: '800',
     marginHorizontal: 16,

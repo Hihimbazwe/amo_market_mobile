@@ -20,6 +20,7 @@ import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { chatService } from '../../api/chatService';
+import PresenceDot from '../../components/PresenceDot';
 
 // Try to get whichever drawer context is available
 import { BuyerDrawerContext } from '../../context/BuyerDrawerContext';
@@ -91,6 +92,11 @@ const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
             {item.participantInitials}
           </CustomText>
         </View>
+        {item.isOnline && (
+          <View style={styles.onlineDotWrapper}>
+            <PresenceDot size={12} borderSize={2} borderColor={colors.background} />
+          </View>
+        )}
       </View>
 
         <View style={styles.convBody}>
@@ -624,15 +630,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   avatarText: { fontSize: 18, fontWeight: '800' },
-  onlineDot: {
+  onlineDotWrapper: {
     position: 'absolute',
-    bottom: 3,
-    right: 3,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#10b981',
-    borderWidth: 3,
+    bottom: 0,
+    right: 0,
   },
   convBody: { 
     flex: 1,

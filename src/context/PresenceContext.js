@@ -10,6 +10,16 @@ export const PresenceProvider = ({ children }) => {
   const { user } = useAuth();
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
+  const listeners = useRef(new Set());
+
+  const addListener = (cb) => {
+    listeners.current.add(cb);
+    return () => listeners.current.delete(cb);
+  };
+
+  const emit = (event) => {
+    listeners.current.forEach(cb => cb(event));
+  };
 
   const connect = (userId) => {
     if (socketRef.current) return;
@@ -29,7 +39,10 @@ export const PresenceProvider = ({ children }) => {
     };
 
     ws.onmessage = (e) => {
-      // Handle server events if needed
+      try {
+        const data = JSON.parse(e.data);
+        emit(data);
+      } catch (err) {}
     };
 
     ws.onerror = (e) => {
@@ -60,6 +73,26 @@ export const PresenceProvider = ({ children }) => {
     if (reconnectTimerRef.current) {
       clearInterval(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
+    }
+  };
+
+  const sendTyping = (conversationId, recipientId) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'TYPING',
+        conversationId,
+        recipientId
+      }));
+    }
+  };
+
+  const sendStopTyping = (conversationId, recipientId) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'STOP_TYPING',
+        conversationId,
+        recipientId
+      }));
     }
   };
 
@@ -95,7 +128,12 @@ export const PresenceProvider = ({ children }) => {
   }, [user?.id]);
 
   return (
-    <PresenceContext.Provider value={{ isConnected: !!socketRef.current }}>
+    <PresenceContext.Provider value={{ 
+      isConnected: !!socketRef.current,
+      sendTyping,
+      sendStopTyping,
+      addListener
+    }}>
       {children}
     </PresenceContext.Provider>
   );

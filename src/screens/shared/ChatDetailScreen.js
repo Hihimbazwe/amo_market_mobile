@@ -24,6 +24,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { chatService } from '../../api/chatService';
 import { useNotifications } from '../../context/NotificationContext';
+import { usePresence } from '../../context/PresenceContext';
+import PresenceDot from '../../components/PresenceDot';
 
 function formatLastSeen(timestamp) {
   if (!timestamp) return '';
@@ -289,29 +291,32 @@ export default function ChatDetailScreen() {
   const [replyingTo, setReplyingTo] = useState(null);
   const listRef = useRef(null);
   const inputRef = useRef(null);
-  const heartbeatAnim = useRef(new Animated.Value(1)).current;
+  const { addListener, sendTyping, sendStopTyping } = usePresence();
+  const typingTimerRef = useRef(null);
 
-  // Heartbeat pulsing animation
+  // Listen for real-time WebSocket events
   useEffect(() => {
-    if (isOnline && !isHidden) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(heartbeatAnim, {
-            toValue: 1.25,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(heartbeatAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      heartbeatAnim.setValue(1);
-    }
-  }, [isOnline, isHidden]);
+    if (!conversation?.id || !user?.id) return;
+    
+    return addListener((event) => {
+      // Typing events for this conversation
+      if (event.conversationId === conversation.id && event.userId === conversation.participantId) {
+        if (event.type === 'USER_TYPING') {
+          setTyping(true);
+        } else if (event.type === 'USER_STOPPED_TYPING') {
+          setTyping(false);
+        }
+      }
+      
+      // Online/Offline status could also be handled here if server broadcasts USER_ONLINE
+      if (event.type === 'USER_ONLINE' && event.userId === conversation.participantId) {
+        setIsOnline(true);
+      }
+      if (event.type === 'USER_OFFLINE' && event.userId === conversation.participantId) {
+        setIsOnline(false);
+      }
+    });
+  }, [conversation?.id, conversation?.participantId, user?.id, addListener]);
 
   // Typing dots animation for header
   const [typingDots, setTypingDots] = useState('');
@@ -647,18 +652,9 @@ export default function ChatDetailScreen() {
             {conversation?.participantInitials || '??'}
           </CustomText>
           {isOnline && !isHidden && (
-            <Animated.View 
-              style={[
-                styles.onlineDotHeader, 
-                { 
-                  transform: [{ scale: heartbeatAnim }],
-                  shadowColor: '#22c55e',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.5,
-                  shadowRadius: 4,
-                }
-              ]} 
-            />
+            <View style={styles.onlineDotHeaderWrapper}>
+              <PresenceDot size={12} borderSize={2} borderColor={colors.background} />
+            </View>
           )}
         </View>
 
@@ -818,8 +814,18 @@ export default function ChatDetailScreen() {
                 value={input}
                 onChangeText={(txt) => {
                   setInput(txt);
+                  
+                  // Live typing via WebSocket
                   if (conversation?.id && !conversation.id.startsWith('new-') && user?.id) {
-                    chatService.sendTyping(conversation.id, user.id);
+                    sendTyping(conversation.id, conversation.participantId);
+                    
+                    // Clear existing timer
+                    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+                    
+                    // Set timeout to stop typing
+                    typingTimerRef.current = setTimeout(() => {
+                      sendStopTyping(conversation.id, conversation.participantId);
+                    }, 2000);
                   }
                 }}
                 placeholder="Type a message..."
@@ -961,16 +967,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   headerAvatarText: { fontSize: 14, fontWeight: '900' },
-  onlineDotHeader: {
+  onlineDotHeaderWrapper: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: '#22c55e',
-    borderWidth: 2,
-    borderColor: '#030712',
+    bottom: -1,
+    right: -1,
   },
   headerInfo: { flex: 1 },
   headerName: { fontSize: 16, fontWeight: '700' },

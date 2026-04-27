@@ -7,6 +7,7 @@ import CustomButton from '../components/CustomButton';
 import CustomInput from '../components/CustomInput';
 import { authService } from '../api/authService';
 import { useTheme } from '../context/ThemeContext';
+import { StatusBar } from 'react-native';
 
 const ResetPasswordScreen = ({ route, navigation }) => {
   const { token: initialToken } = route.params || {};
@@ -14,7 +15,7 @@ const ResetPasswordScreen = ({ route, navigation }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
 
   useEffect(() => {
     if (initialToken) setToken(initialToken);
@@ -53,6 +54,7 @@ const ResetPasswordScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -61,7 +63,7 @@ const ResetPasswordScreen = ({ route, navigation }) => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.glass }]}>
             <ArrowLeft color={colors.foreground} size={24} />
           </TouchableOpacity>
-          <CustomText variant="h2">New Password</CustomText>
+          <CustomText variant="h2" style={{ color: colors.foreground }}>New Password</CustomText>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -70,7 +72,7 @@ const ResetPasswordScreen = ({ route, navigation }) => {
               <View style={[styles.iconContainer, { backgroundColor: colors.glass }]}>
                 <Lock color={colors.primary} size={40} />
               </View>
-              <CustomText variant="h2" style={{ marginBottom: 12, marginTop: 24 }}>Reset Password</CustomText>
+              <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 12, marginTop: 24 }}>Reset Password</CustomText>
               <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted }]}>
                 Please enter your new password below to regain access to your account.
               </CustomText>

@@ -156,21 +156,29 @@ const ProductDetailScreen = ({ route, navigation }) => {
         <View style={styles.imageContainer}>
           {hasImages ? (
             <>
-              <ScrollView
+              <FlatList
+                data={media}
                 horizontal
                 pagingEnabled
+                nestedScrollEnabled={true}
                 showsHorizontalScrollIndicator={false}
+                snapToInterval={width}
+                decelerationRate="fast"
+                keyExtractor={(item, index) => item.id || index.toString()}
                 onMomentumScrollEnd={(e) => {
                   const offset = e.nativeEvent.contentOffset.x;
                   setActiveImageIndex(Math.round(offset / width));
                 }}
-              >
-                {media.map((item, index) => (
-                  <View key={item.id || index} style={styles.carouselItem}>
-                    {renderMediaItem({ item })}
+                renderItem={({ item }) => (
+                  <View style={styles.carouselItem}>
+                    <Image 
+                      source={{ uri: item.url }} 
+                      style={styles.carouselImage} 
+                      resizeMode="cover"
+                    />
                   </View>
-                ))}
-              </ScrollView>
+                )}
+              />
               {media.length > 1 && (
                 <View style={styles.pagination}>
                   {media.map((_, i) => (

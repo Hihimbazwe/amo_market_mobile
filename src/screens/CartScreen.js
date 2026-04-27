@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Alert
 } from 'react-native';
-import { ShoppingBag, Trash2, Plus, Minus, ArrowRight, ChevronLeft } from 'lucide-react-native';
+import { ShoppingBag, Trash2, Plus, Minus, ArrowRight, ChevronLeft, CheckSquare, Square } from 'lucide-react-native';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
 import { useCart } from '../context/CartContext';
@@ -19,7 +19,38 @@ import { Colors as StaticColors } from '../theme/colors';
 import {Text} from 'react-native';
 const CartScreen = ({ navigation }) => {
   const { cartItems, cartTotal, loading, updateQuantity, removeFromCart, clearCart } = useCart();
-  const { colors, isDark } = useTheme();
+  const { colors, isDarkMode } = useTheme();
+
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
+
+  // Initialize selected items with all cart items when loaded
+  React.useEffect(() => {
+    if (cartItems.length > 0 && selectedItemIds.length === 0) {
+      setSelectedItemIds(cartItems.map(item => item.id));
+    }
+  }, [cartItems]);
+
+  const toggleSelection = (itemId) => {
+    if (selectedItemIds.includes(itemId)) {
+      setSelectedItemIds(selectedItemIds.filter(id => id !== itemId));
+    } else {
+      setSelectedItemIds([...selectedItemIds, itemId]);
+    }
+  };
+
+  const selectedCartTotal = React.useMemo(() => {
+    return cartItems
+      .filter(item => selectedItemIds.includes(item.id))
+      .reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+  }, [cartItems, selectedItemIds]);
+
+  const handleCheckout = () => {
+    if (selectedItemIds.length === 0) {
+      Alert.alert('No Items Selected', 'Please select at least one item to proceed to checkout.');
+      return;
+    }
+    navigation.navigate('Checkout', { selectedItemIds });
+  };
 
   const handleRemoveItem = (productId) => {
     Alert.alert(
@@ -46,7 +77,18 @@ const CartScreen = ({ navigation }) => {
     const imageUrl = product.media?.[0]?.url || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=200&q=80';
 
     return (
-      <View style={[styles.cartItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.cartItem, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+        <TouchableOpacity 
+          style={styles.checkboxContainer}
+          onPress={() => toggleSelection(item.id)}
+        >
+          {selectedItemIds.includes(item.id) ? (
+            <CheckSquare size={24} color={colors.primary} />
+          ) : (
+            <Square size={24} color={colors.muted} />
+          )}
+        </TouchableOpacity>
+        
         <Image source={{ uri: imageUrl }} style={styles.productImage} />
         
         <View style={styles.itemInfo}>
@@ -59,14 +101,14 @@ const CartScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          <CustomText style={styles.categoryText}>{product.category}</CustomText>
+          <CustomText style={[styles.categoryText, { color: colors.muted }]}>{product.category}</CustomText>
           
           <View style={styles.itemFooter}>
             <CustomText style={[styles.priceText, { color: colors.primary }]}>
               Rwf {product.price.toLocaleString()}
             </CustomText>
             
-            <View style={[styles.qtyControl, { backgroundColor: colors.glass }]}>
+            <View style={[styles.qtyControl, { backgroundColor: colors.glass, borderColor: colors.border, borderWidth: 1 }]}>
               <TouchableOpacity 
                 style={styles.qtyBtn} 
                 onPress={() => handleUpdateQty(product.id, item.quantity, -1)}
@@ -91,7 +133,7 @@ const CartScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F97316" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -99,11 +141,16 @@ const CartScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <CustomText variant="h2" style={[styles.headerTitle, { color: colors.foreground }]}>My Cart</CustomText>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: colors.glass }]}>
+            <ChevronLeft size={24} color={colors.foreground} />
+          </TouchableOpacity>
+          <CustomText variant="h2" style={[styles.headerTitle, { color: colors.foreground }]}>My Cart</CustomText>
+        </View>
         {cartItems.length > 0 && (
           <TouchableOpacity onPress={() => {
             Alert.alert("Clear Cart", "Are you sure you want to remove all items?", [
@@ -127,7 +174,7 @@ const CartScreen = ({ navigation }) => {
 
           <View style={styles.textContainer}>
             <CustomText variant="h2" style={[styles.title, { color: colors.foreground }]}>Your cart is empty</CustomText>
-            <CustomText style={styles.subtitle}>
+            <CustomText style={[styles.subtitle, { color: colors.muted }]}>
               Looks like you haven't added anything to your cart yet. 
               Browse our marketplace to find amazing products!
             </CustomText>
@@ -152,27 +199,27 @@ const CartScreen = ({ navigation }) => {
           />
           
           {/* Summary Section */}
-          <View style={[styles.summaryBox, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+          <View style={[styles.summaryBox, { backgroundColor: colors.glass, borderTopColor: colors.border }]}>
             <View style={styles.summaryRow}>
-              <CustomText style={styles.summaryLabel}>Subtotal</CustomText>
-              <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>Rwf {cartTotal.toLocaleString()}</CustomText>
+              <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Subtotal ({selectedItemIds.length} items)</CustomText>
+              <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
             </View>
             <View style={styles.summaryRow}>
-              <CustomText style={styles.summaryLabel}>Delivery</CustomText>
-              <CustomText style={styles.freeText}>Calculated at checkout</CustomText>
+              <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Delivery</CustomText>
+              <CustomText style={[styles.freeText, { color: colors.muted }]}>Calculated at checkout</CustomText>
             </View>
             
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             
             <View style={styles.totalRow}>
               <CustomText variant="h3" style={{ color: colors.foreground }}>Total</CustomText>
-              <CustomText variant="h2" style={{ color: colors.primary }}>Rwf {cartTotal.toLocaleString()}</CustomText>
+              <CustomText variant="h2" style={{ color: colors.primary }}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
             </View>
             
             <CustomButton 
               title="Proceed to Checkout"
               style={styles.checkoutBtn}
-              onPress={() => navigation.navigate('Checkout')}
+              onPress={handleCheckout}
             />
           </View>
         </>
@@ -189,12 +236,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
   headerTitle: {
     fontWeight: '800',
+    marginLeft: 12,
+  },
+  backBtn: {
+    padding: 8,
+    borderRadius: 12,
   },
   clearText: {
     color: '#EF4444',
@@ -243,7 +295,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     textAlign: 'center',
-    color: '#94A3B8',
     lineHeight: 22,
     fontSize: 14,
   },
@@ -261,6 +312,11 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
+    alignItems: 'center',
+  },
+  checkboxContainer: {
+    marginRight: 12,
+    padding: 4,
   },
   productImage: {
     width: 90,
@@ -289,7 +345,6 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 12,
-    color: '#94A3B8',
     marginTop: -4,
   },
   itemFooter: {
@@ -331,7 +386,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   summaryLabel: {
-    color: '#94A3B8',
     fontSize: 14,
   },
   summaryValue: {
@@ -339,7 +393,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   freeText: {
-    color: '#94A3B8',
     fontSize: 13,
     fontStyle: 'italic',
   },

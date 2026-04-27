@@ -110,6 +110,41 @@ export const sellerService = {
     }
   },
 
+  getCouriers: async (userId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/couriers`, {
+        method: 'GET',
+        headers: buildHeaders(userId),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to fetch couriers (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('getCouriers error:', error);
+      throw error;
+    }
+  },
+
+  assignCourier: async (userId, orderId, courierId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/assign-courier`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ courierId })
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to assign courier (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('assignCourier error:', error);
+      throw error;
+    }
+  },
+
   assignAgent: async (userId, orderId, agentId) => {
     try {
       const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/assign-agent`, {
