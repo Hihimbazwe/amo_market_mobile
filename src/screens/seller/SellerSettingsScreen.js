@@ -11,6 +11,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
 import { chatService } from '../../api/chatService';
+import { useTranslation } from 'react-i18next';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -29,7 +30,7 @@ const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 
         thumbColor="white"
       />
     ) : (
-      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: colors.primary }]}>CHANGE</CustomText></TouchableOpacity>
+      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: colors.primary }]}>{t('common:change').toUpperCase()}</CustomText></TouchableOpacity>
     )}
   </View>
 );
@@ -38,6 +39,7 @@ const SellerSettingsScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { isDarkMode, colors, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
   const [notifs, setNotifs] = useState(true);
   const [marketing, setMarketing] = useState(false);
@@ -58,7 +60,7 @@ const SellerSettingsScreen = () => {
     setHideAvailability(newValue);
     const res = await chatService.updatePrivacySettings(user.id, { hideAvailability: newValue });
     if (res.error) {
-      Alert.alert('Error', `Failed to update privacy settings: ${res.details || res.error}`);
+      Alert.alert(t('error'), `${t('failedToUpdatePrivacy')}: ${res.details || res.error}`);
       setHideAvailability(!newValue);
     }
   };
@@ -71,22 +73,22 @@ const SellerSettingsScreen = () => {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('error'), t('fillAllFields'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+      Alert.alert(t('error'), t('passwordsDoNotMatch'));
       return;
     }
     if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert(t('error'), t('passwordLengthError'));
       return;
     }
 
     setUpdating(true);
     try {
       await authService.changePassword(user.id, currentPassword, newPassword);
-      Alert.alert('Success', 'Password updated successfully. Please log in again.');
+      Alert.alert(t('success'), t('passwordChangedSuccess'));
       setShowPasswordModal(false);
       setCurrentPassword('');
       setNewPassword('');
@@ -97,7 +99,7 @@ const SellerSettingsScreen = () => {
         logout();
       }, 1000);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update password');
+      Alert.alert(t('error'), error.message || t('failedToUpdatePassword'));
     } finally {
       setUpdating(false);
     }
@@ -109,21 +111,21 @@ const SellerSettingsScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Settings</CustomText>
+        <CustomText variant="h2">{t('settings')}</CustomText>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
 
         {/* ACCOUNT */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>ACCOUNT</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('account')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('SellerProfile')} activeOpacity={0.7}>
               <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
                 <User color={colors.muted} size={20} />
               </View>
               <View style={{ flex: 1, marginLeft: 16 }}>
-                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>My Profile</CustomText>
-                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>Edit your seller profile</CustomText>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('myProfile')}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{t('editSellerProfile')}</CustomText>
               </View>
               <ChevronRight color={colors.muted} size={18} />
             </TouchableOpacity>
@@ -132,26 +134,26 @@ const SellerSettingsScreen = () => {
 
         {/* PREFERENCES */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>PREFERENCES</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('preferences')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Bell} title="Order Notifications" subtitle="Alerts for new orders & shipments" value={notifs} onValueChange={setNotifs} colors={colors} />
+            <SettingRow icon={Bell} title={t('orderNotifications')} subtitle={t('orderNotificationsDesc')} value={notifs} onValueChange={setNotifs} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Moon} title="Dark Mode" subtitle="Easier on the eyes" value={isDarkMode} onValueChange={toggleTheme} colors={colors} />
+            <SettingRow icon={Moon} title={t('darkMode')} subtitle={t('darkModeDesc')} value={isDarkMode} onValueChange={toggleTheme} colors={colors} />
           </View>
         </View>
 
         {/* SECURITY */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>SECURITY</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('security')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Lock} title="Password" subtitle="Secure your account" type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
+            <SettingRow icon={Lock} title={t('password')} subtitle={t('secureAccount')} type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Shield} title="Two-Factor Auth" subtitle="Enhance store security" value={marketing} onValueChange={setMarketing} colors={colors} />
+            <SettingRow icon={Shield} title={t('twoFactorAuth')} subtitle={t('enhanceSecurity')} value={marketing} onValueChange={setMarketing} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow 
               icon={Shield} 
-              title="Hide Availability" 
-              subtitle="Hide online status and last seen" 
+              title={t('hideAvailability')} 
+              subtitle={t('hideAvailabilityDesc')} 
               value={hideAvailability} 
               onValueChange={toggleAvailability} 
               colors={colors} 
@@ -161,14 +163,14 @@ const SellerSettingsScreen = () => {
 
         {/* STORE */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>STORE</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('store')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Globe} title="Marketplace Visibility" subtitle="Show products to buyers" value={true} onValueChange={() => {}} colors={colors} />
+            <SettingRow icon={Globe} title={t('marketplaceVisibility')} subtitle={t('showProductsToBuyers')} value={true} onValueChange={() => {}} colors={colors} />
           </View>
         </View>
 
         <TouchableOpacity style={styles.deleteBtn}>
-          <CustomText style={styles.deleteText}>DEACTIVATE SELLER ACCOUNT</CustomText>
+          <CustomText style={styles.deleteText}>{t('deactivateAccount')}</CustomText>
         </TouchableOpacity>
 
       </ScrollView>
@@ -186,7 +188,7 @@ const SellerSettingsScreen = () => {
           >
             <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={styles.modalHeader}>
-                <CustomText variant="h2">Change Password</CustomText>
+                <CustomText variant="h2">{t('changePassword')}</CustomText>
                 <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
                   <XCircle color={colors.muted} size={24} />
                 </TouchableOpacity>
@@ -197,24 +199,24 @@ const SellerSettingsScreen = () => {
                 showsVerticalScrollIndicator={false}
               >
                 <CustomInput
-                  label="Current Password"
-                  placeholder="Enter current password"
+                  label={t('currentPassword')}
+                  placeholder={t('enterCurrentPassword')}
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   secureTextEntry
                 />
                 <View style={{ height: 16 }} />
                 <CustomInput
-                  label="New Password"
-                  placeholder="Enter new password"
+                  label={t('newPassword')}
+                  placeholder={t('enterNewPassword')}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry
                 />
                 <View style={{ height: 16 }} />
                 <CustomInput
-                  label="Confirm New Password"
-                  placeholder="Confirm new password"
+                  label={t('confirmNewPassword')}
+                  placeholder={t('confirmNewPassword')}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
@@ -223,7 +225,7 @@ const SellerSettingsScreen = () => {
                 <View style={{ height: 32 }} />
                 
                 <CustomButton
-                  title="Update Password"
+                  title={t('updatePassword')}
                   onPress={handleChangePassword}
                   loading={updating}
                 />

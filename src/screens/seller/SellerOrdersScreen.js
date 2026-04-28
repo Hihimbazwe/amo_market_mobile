@@ -8,12 +8,14 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import NotificationIcon from '../../components/NotificationIcon';
 
 const SellerOrdersScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
   const [filter, setFilter] = useState('ALL');
   const [orders, setOrders] = useState([]);
@@ -87,7 +89,7 @@ const SellerOrdersScreen = () => {
       const data = await sellerService.getAgents(user.id);
       setAgents(data);
     } catch (err) {
-      Alert.alert('Error', 'Failed to fetch agents');
+      Alert.alert(t('error'), t('failedToFetchAgents'));
       setShowAgentModal(false);
     } finally {
       setLoadingAgents(false);
@@ -98,11 +100,11 @@ const SellerOrdersScreen = () => {
     try {
       // we use selectedAgentId or null to assign/remove
       await sellerService.assignAgent(user.id, targetOrderId, selectedAgentId || null);
-      Alert.alert('Success', selectedAgentId ? 'Agent assigned successfully' : 'Agent handling removed');
+      Alert.alert(t('success'), selectedAgentId ? t('agentAssigned') : t('agentRemoved'));
       setShowAgentModal(false);
       fetchOrdersAndReplacements();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to assign agent');
+      Alert.alert(t('error'), err.message || t('failedToAssignAgent'));
     }
   };
 
@@ -115,7 +117,7 @@ const SellerOrdersScreen = () => {
       const data = await sellerService.getCouriers(user.id);
       setCouriers(data);
     } catch (err) {
-      Alert.alert('Error', 'Failed to fetch couriers');
+      Alert.alert(t('error'), t('failedToFetchCouriers'));
       setShowCourierModal(false);
     } finally {
       setLoadingCouriers(false);
@@ -124,31 +126,31 @@ const SellerOrdersScreen = () => {
 
   const submitAssignCourier = async () => {
     if (!selectedCourierId) {
-      Alert.alert('Selection Required', 'Please select a courier to assign.');
+      Alert.alert(t('selectionRequired'), t('selectCourierToAssign'));
       return;
     }
     try {
       await sellerService.assignCourier(user.id, targetOrderId, selectedCourierId);
-      Alert.alert('Success', 'Courier assigned successfully');
+      Alert.alert(t('success'), t('courierAssigned'));
       setShowCourierModal(false);
       fetchOrdersAndReplacements();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to assign courier');
+      Alert.alert(t('error'), err.message || t('failedToAssignCourier'));
     }
   };
 
   const handleShipOrder = (orderId) => {
-    Alert.alert('Ship Order', 'Are you sure this order is packed and ready to ship?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('shipOrder'), t('shipOrderConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Ship',
+        text: t('ship'),
         onPress: async () => {
           try {
             await sellerService.shipOrder(user.id, orderId);
-            Alert.alert('Success', 'Order marked as shipped');
+            Alert.alert(t('success'), t('orderMarkedShipped'));
             fetchOrdersAndReplacements();
           } catch (err) {
-            Alert.alert('Error', err.message || 'Failed to ship order');
+            Alert.alert(t('error'), err.message || t('failedToShipOrder'));
           }
         }
       }
@@ -160,7 +162,7 @@ const SellerOrdersScreen = () => {
   const formatPrice = (val) => 'Rwf ' + (val || 0).toLocaleString();
 
   const renderOrderItem = ({ item }) => {
-    const orderTitle = item.items && item.items.length > 0 && item.items[0].product ? item.items[0].product.title : 'Order Items';
+    const orderTitle = item.items && item.items.length > 0 && item.items[0].product ? item.items[0].product.title : t('orderItems');
     const dateStr = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     
     return (
@@ -173,7 +175,7 @@ const SellerOrdersScreen = () => {
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColors[item.status]?.bg || colors.glass }]}>
             <CustomText style={[styles.statusText, { color: statusColors[item.status]?.text || colors.muted }]}>
-              {item.status}
+              {t(item.status?.toLowerCase())}
             </CustomText>
           </View>
         </View>
@@ -181,16 +183,16 @@ const SellerOrdersScreen = () => {
         <View style={[styles.orderBody, { borderBottomColor: colors.border }]}>
           <View style={styles.orderInfoRow}>
             <User color={colors.muted} size={14} />
-            <CustomText style={styles.orderInfoText}>{item.recipientName || 'Unknown Buyer'}</CustomText>
+            <CustomText style={styles.orderInfoText}>{item.recipientName || t('unknownBuyer')}</CustomText>
           </View>
           <View style={styles.orderInfoRow}>
             <ShoppingBag color={colors.muted} size={14} />
-            <CustomText style={styles.orderInfoText}>{item.items.length} item{item.items.length > 1 ? 's' : ''}</CustomText>
+            <CustomText style={styles.orderInfoText}>{t('itemsCount', { count: item.items.length })}</CustomText>
           </View>
           {item.agent && (
              <View style={styles.orderInfoRow}>
                <UserCheck color={colors.primary} size={14} />
-               <CustomText style={[styles.orderInfoText, { color: colors.primary }]}>Agent: {item.agent.user?.name || 'Assigned'}</CustomText>
+               <CustomText style={[styles.orderInfoText, { color: colors.primary }]}>{t('agent')}: {item.agent.user?.name || t('assigned')}</CustomText>
              </View>
           )}
         </View>
@@ -218,7 +220,7 @@ const SellerOrdersScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2" style={{ flex: 1 }}>Orders</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>{t('orders')}</CustomText>
         <NotificationIcon />
       </View>
 
@@ -238,23 +240,34 @@ const SellerOrdersScreen = () => {
             )}
           </View>
           <View style={{ flex: 1 }}>
-            <CustomText style={[styles.replacementsTitle, { color: colors.foreground }]}>Replacement Requests</CustomText>
-            <CustomText style={[styles.replacementsSub, { color: colors.muted }]}>Manage customer RMAs & replacements</CustomText>
+            <CustomText style={[styles.replacementsTitle, { color: colors.foreground }]}>{t('replacementRequests')}</CustomText>
+            <CustomText style={[styles.replacementsSub, { color: colors.muted }]}>{t('manageRMA')}</CustomText>
           </View>
           <ChevronRight color={colors.muted} size={18} />
         </TouchableOpacity>
       </View>
       
-      <View style={[styles.filterSection, { borderBottomColor: colors.border }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+      <View style={styles.topFilterSection}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.pillsScrollContent}
+          style={styles.pillsRow}
+        >
           {['ALL', 'PENDING', 'PROCESSING', 'PAID', 'SHIPPED', 'DELIVERED'].map((f) => (
             <TouchableOpacity 
               key={f} 
               onPress={() => setFilter(f)}
-              style={[styles.filterTab, { backgroundColor: colors.glass }, filter === f && styles.filterTabActive]}
+              style={[
+                styles.filterPill, 
+                filter === f && { backgroundColor: colors.primary }
+              ]}
             >
-              <CustomText style={[styles.filterTabText, { color: colors.muted }, filter === f && styles.filterTabTextActive]}>
-                {f}
+              <CustomText style={[
+                styles.pillText, 
+                { color: filter === f ? '#fff' : colors.muted }
+              ]}>
+                {f === 'ALL' ? t('all') : t(f.toLowerCase())}
               </CustomText>
             </TouchableOpacity>
           ))}
@@ -278,7 +291,7 @@ const SellerOrdersScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <ShoppingBag color={colors.isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} size={64} />
-              <CustomText style={[styles.emptyText, { color: colors.muted }]}>No {filter !== 'ALL' ? filter : ''} orders found.</CustomText>
+              <CustomText style={[styles.emptyText, { color: colors.muted }]}>{t('noOrdersFoundWithFilter', { filter: filter !== 'ALL' ? t(filter.toLowerCase()) : '' })}</CustomText>
             </View>
           }
         />
@@ -302,7 +315,7 @@ const SellerOrdersScreen = () => {
                         }}
                       >
                         <Truck size={18} color="#10B981" />
-                        <CustomText style={styles.actionMenuText}>Ship Order</CustomText>
+                        <CustomText style={styles.actionMenuText}>{t('shipOrder')}</CustomText>
                       </TouchableOpacity>
                     )}
 
@@ -316,7 +329,7 @@ const SellerOrdersScreen = () => {
                         }}
                       >
                         <UserCheck size={18} color={colors.primary} />
-                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.agent ? 'Change Agent' : 'Assign Agent'}</CustomText>
+                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.agent ? t('changeAgent') : t('assignAgent')}</CustomText>
                       </TouchableOpacity>
                     )}
 
@@ -330,7 +343,7 @@ const SellerOrdersScreen = () => {
                         }}
                       >
                         <Truck size={18} color={colors.primary} />
-                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.Courier ? 'Change Courier' : 'Assign Courier'}</CustomText>
+                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.Courier ? t('changeCourier') : t('assignCourier')}</CustomText>
                       </TouchableOpacity>
                     )}
                   </>
@@ -347,8 +360,8 @@ const SellerOrdersScreen = () => {
           <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '70%' }]}>
             <View style={styles.modalHeader}>
               <View>
-                <CustomText variant="h2">Assign Delivery Agent</CustomText>
-                {targetOrderId && <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>Order #{targetOrderId.slice(-8).toUpperCase()}</CustomText>}
+                <CustomText variant="h2">{t('assignDeliveryAgent')}</CustomText>
+                {targetOrderId && <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>{t('order')} #{targetOrderId.slice(-8).toUpperCase()}</CustomText>}
               </View>
               <TouchableOpacity onPress={() => setShowAgentModal(false)} style={styles.closeBtn}>
                 <X color={colors.muted} size={24} />
@@ -361,7 +374,7 @@ const SellerOrdersScreen = () => {
               </View>
             ) : agents.length === 0 ? (
               <View style={{ padding: 40, alignItems: 'center' }}>
-                <CustomText style={{ color: colors.muted }}>No active delivery agents found.</CustomText>
+                <CustomText style={{ color: colors.muted }}>{t('noAgentsFound')}</CustomText>
               </View>
             ) : (
               <ScrollView style={{ flex: 1, paddingRight: 4 }}>
@@ -370,10 +383,10 @@ const SellerOrdersScreen = () => {
                   onPress={() => setSelectedAgentId('')}
                 >
                   <View style={[styles.radioOuter, selectedAgentId === '' ? styles.radioOuterSelected : styles.radioOuterUnselected]} />
-                  <CustomText style={{ fontWeight: 'bold', fontSize: 13, color: colors.foreground }}>No agent (handle manually)</CustomText>
+                  <CustomText style={{ fontWeight: 'bold', fontSize: 13, color: colors.foreground }}>{t('noAgentManual')}</CustomText>
                 </TouchableOpacity>
 
-                {agents.filter(a => a.verified).length > 0 && <CustomText style={styles.sectionHeading}>VERIFIED AGENTS</CustomText>}
+                {agents.filter(a => a.verified).length > 0 && <CustomText style={styles.sectionHeading}>{t('verifiedAgents')}</CustomText>}
                 {agents.filter(a => a.verified).map((agent) => (
                    <TouchableOpacity
                      key={agent.id}
@@ -388,9 +401,9 @@ const SellerOrdersScreen = () => {
 
                      <View style={{ flex: 1 }}>
                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                         <CustomText style={{ fontWeight: 'bold', fontSize: 13, color: colors.foreground }} numberOfLines={1}>{agent.user?.name || 'Agent'}</CustomText>
+                         <CustomText style={{ fontWeight: 'bold', fontSize: 13, color: colors.foreground }} numberOfLines={1}>{agent.user?.name || t('agent')}</CustomText>
                          <View style={styles.verifiedBadge}>
-                           <CustomText style={styles.verifiedText}>VERIFIED</CustomText>
+                           <CustomText style={styles.verifiedText}>{t('verified')}</CustomText>
                          </View>
                        </View>
                        
@@ -414,7 +427,7 @@ const SellerOrdersScreen = () => {
                    </TouchableOpacity>
                 ))}
 
-                {agents.filter(a => !a.verified).length > 0 && <CustomText style={[styles.sectionHeading, { color: colors.muted }]}>OTHER AGENTS</CustomText>}
+                {agents.filter(a => !a.verified).length > 0 && <CustomText style={[styles.sectionHeading, { color: colors.muted }]}>{t('otherAgents')}</CustomText>}
                 {agents.filter(a => !a.verified).map((agent) => (
                    <TouchableOpacity
                      key={agent.id}
@@ -448,11 +461,11 @@ const SellerOrdersScreen = () => {
             {!loadingAgents && (
               <View style={styles.modalFooter}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAgentModal(false)}>
-                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>Cancel</CustomText>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>{t('cancel')}</CustomText>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.submitAssignBtn, { backgroundColor: colors.primary }]} onPress={submitAssignAgent}>
                   <UserCheck size={16} color="white" />
-                  <CustomText style={{ fontWeight: 'bold', color: 'white' }}>{selectedAgentId ? 'Assign Agent' : 'Remove Agent'}</CustomText>
+                  <CustomText style={{ fontWeight: 'bold', color: 'white' }}>{selectedAgentId ? t('assignAgent') : t('removeAgent')}</CustomText>
                 </TouchableOpacity>
               </View>
             )}
@@ -466,8 +479,8 @@ const SellerOrdersScreen = () => {
           <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '70%' }]}>
             <View style={styles.modalHeader}>
               <View>
-                <CustomText variant="h2">Assign Courier</CustomText>
-                {targetOrderId && <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>Order #{targetOrderId.slice(-8).toUpperCase()}</CustomText>}
+                <CustomText variant="h2">{t('assignCourier')}</CustomText>
+                {targetOrderId && <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>{t('order')} #{targetOrderId.slice(-8).toUpperCase()}</CustomText>}
               </View>
               <TouchableOpacity onPress={() => setShowCourierModal(false)} style={styles.closeBtn}>
                 <X color={colors.muted} size={24} />
@@ -480,7 +493,7 @@ const SellerOrdersScreen = () => {
               </View>
             ) : couriers.length === 0 ? (
               <View style={{ padding: 40, alignItems: 'center' }}>
-                <CustomText style={{ color: colors.muted }}>No active couriers found.</CustomText>
+                <CustomText style={{ color: colors.muted }}>{t('noCouriersFound')}</CustomText>
               </View>
             ) : (
               <ScrollView style={{ flex: 1, paddingRight: 4 }}>
@@ -515,7 +528,7 @@ const SellerOrdersScreen = () => {
             {!loadingCouriers && (
               <View style={styles.modalFooter}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCourierModal(false)}>
-                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>Cancel</CustomText>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>{t('cancel')}</CustomText>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.submitAssignBtn, { backgroundColor: colors.primary }, !selectedCourierId && { opacity: 0.5 }]} 
@@ -523,7 +536,7 @@ const SellerOrdersScreen = () => {
                   disabled={!selectedCourierId}
                 >
                   <Truck size={16} color="white" />
-                  <CustomText style={{ fontWeight: 'bold', color: 'white' }}>Assign Courier</CustomText>
+                  <CustomText style={{ fontWeight: 'bold', color: 'white' }}>{t('assignCourier')}</CustomText>
                 </TouchableOpacity>
               </View>
             )}
@@ -542,12 +555,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
-  filterSection: { paddingVertical: 12, borderBottomWidth: 1 },
-  filterScroll: { paddingHorizontal: 16, gap: 8 },
-  filterTab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  filterTabActive: { backgroundColor: '#F97316' },
-  filterTabText: { fontSize: 12, fontWeight: 'bold' },
-  filterTabTextActive: { color: 'white' },
+  topFilterSection: {
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+  },
+  pillsRow: { 
+    marginVertical: 4,
+  },
+  pillsScrollContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+    paddingVertical: 8,
+  },
+  filterPill: { 
+    paddingHorizontal: 18, 
+    paddingVertical: 8, 
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  pillText: { 
+    fontSize: 14, 
+    fontWeight: '700' 
+  },
   listContent: { padding: 16, paddingBottom: 100 },
   orderCard: {
     borderRadius: 16, padding: 16, borderWidth: 1,

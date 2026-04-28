@@ -12,6 +12,23 @@ const buildHeaders = (userId) => ({
   'x-user-id': userId
 });
 
+const handleResponse = async (response, errorMsg) => {
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    if (text.trim().startsWith('<!DOCTYPE')) {
+      data = { error: 'Server Error (500). Please try again later.' };
+    } else {
+      data = { error: text || errorMsg };
+    }
+  }
+
+  if (!response.ok) throw new Error(data.error || errorMsg);
+  return data;
+};
+
 export const disputeService = {
   getDisputes: async (userId) => {
     try {
@@ -19,9 +36,7 @@ export const disputeService = {
         method: 'GET',
         headers: buildHeaders(userId),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to fetch disputes');
-      return data;
+      return await handleResponse(response, 'Failed to fetch disputes');
     } catch (error) {
       console.error('getDisputes error:', error);
       throw error;
@@ -35,9 +50,7 @@ export const disputeService = {
         headers: buildHeaders(userId),
         body: JSON.stringify(disputeData),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to create dispute');
-      return data;
+      return await handleResponse(response, 'Failed to create dispute');
     } catch (error) {
       console.error('createDispute error:', error);
       throw error;

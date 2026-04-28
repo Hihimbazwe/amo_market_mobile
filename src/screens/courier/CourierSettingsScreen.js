@@ -11,8 +11,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
 import { chatService } from '../../api/chatService';
+import { useTranslation } from 'react-i18next';
 
-const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
+const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors, t }) => (
   <View style={styles.settingRow}>
     <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
       <Icon color="#f97316" size={20} />
@@ -29,7 +30,7 @@ const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 
         thumbColor={value ? '#f97316' : '#fff'}
       />
     ) : (
-      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: '#f97316' }]}>CHANGE</CustomText></TouchableOpacity>
+      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: '#f97316' }]}>{t('change')}</CustomText></TouchableOpacity>
     )}
   </View>
 );
@@ -39,6 +40,7 @@ export default function CourierSettingsScreen() {
   const { isDarkMode, colors, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const navigation = useNavigation();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [notifs, setNotifs] = useState(true);
   const [hideAvailability, setHideAvailability] = useState(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
@@ -57,7 +59,7 @@ export default function CourierSettingsScreen() {
     setHideAvailability(newValue);
     const res = await chatService.updatePrivacySettings(user.id, { hideAvailability: newValue });
     if (res.error) {
-      Alert.alert('Error', `Failed to update privacy settings: ${res.details || res.error}`);
+      Alert.alert(t('error'), `${t('failedToUpdatePrivacy')}: ${res.details || res.error}`);
       setHideAvailability(!newValue);
     }
   };
@@ -70,27 +72,27 @@ export default function CourierSettingsScreen() {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('error'), t('fillAllFields'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+      Alert.alert(t('error'), t('passwordsDoNotMatch'));
       return;
     }
     if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert(t('error'), t('passwordTooShort'));
       return;
     }
 
     setUpdating(true);
     try {
       await authService.changePassword(user.id, currentPassword, newPassword);
-      Alert.alert('Success', 'Password updated successfully. Please log in again.');
+      Alert.alert(t('success'), t('passwordUpdatedLogout'));
       setShowPasswordModal(false);
       logout();
       navigation.navigate('Home');
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update password');
+      Alert.alert(t('error'), error.message || t('failedToUpdatePassword'));
     } finally {
       setUpdating(false);
     }
@@ -102,21 +104,21 @@ export default function CourierSettingsScreen() {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Settings color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Courier Settings</CustomText>
+        <CustomText variant="h2">{t('courierSettings')}</CustomText>
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* ACCOUNT */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>ACCOUNT</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('ACCOUNT')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('CourierProfile')} activeOpacity={0.7}>
               <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
                 <User color="#f97316" size={20} />
               </View>
               <View style={{ flex: 1, marginLeft: 16 }}>
-                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>My Profile</CustomText>
-                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>Edit your delivery profile</CustomText>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('profile')}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{t('editDeliveryProfile')}</CustomText>
               </View>
               <ChevronRight color={colors.muted} size={18} />
             </TouchableOpacity>
@@ -125,43 +127,44 @@ export default function CourierSettingsScreen() {
 
         {/* PREFERENCES */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>PREFERENCES</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('PREFERENCES')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Bell} title="Delivery Alerts" subtitle="Notifications for new assignments" value={notifs} onValueChange={setNotifs} colors={colors} />
+            <SettingRow icon={Bell} title={t('deliveryAlerts')} subtitle={t('deliveryAlertsDesc')} value={notifs} onValueChange={setNotifs} colors={colors} t={t} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Moon} title="Dark Mode" subtitle="Easier on the eyes" value={isDarkMode} onValueChange={toggleTheme} colors={colors} />
+            <SettingRow icon={Moon} title={t('darkMode')} subtitle={t('easierOnEyes')} value={isDarkMode} onValueChange={toggleTheme} colors={colors} t={t} />
           </View>
         </View>
 
         {/* SECURITY & PRIVACY */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>SECURITY & PRIVACY</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('SECURITY & PRIVACY')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Lock} title="Password" subtitle="Update your account security" type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
+            <SettingRow icon={Lock} title={t('password')} subtitle={t('updateSecurity')} type="link" onPress={() => setShowPasswordModal(true)} colors={colors} t={t} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow 
               icon={Shield} 
-              title="Hide Availability" 
-              subtitle="Hide online status from dispatch" 
+              title={t('hideAvailability')} 
+              subtitle={t('hideAvailabilityDesc')} 
               value={hideAvailability} 
               onValueChange={toggleAvailability} 
               colors={colors} 
+              t={t}
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Navigation} title="Live Tracking" subtitle="Allow sharing location while active" value={true} onValueChange={() => {}} colors={colors} />
+            <SettingRow icon={Navigation} title={t('liveTracking')} subtitle={t('allowLiveLocationSharing')} value={true} onValueChange={() => {}} colors={colors} t={t} />
           </View>
         </View>
 
         <TouchableOpacity 
           style={styles.logoutBtn}
           onPress={() => {
-            Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Sign Out', style: 'destructive', onPress: () => { logout(); navigation.navigate('Home'); } },
+            Alert.alert(t('logoutConfirmTitle'), t('logoutConfirmDesc'), [
+              { text: t('cancel'), style: 'cancel' },
+              { text: t('logoutConfirmTitle'), style: 'destructive', onPress: () => { logout(); navigation.navigate('Home'); } },
             ]);
           }}
         >
-          <CustomText style={styles.logoutText}>SIGN OUT</CustomText>
+          <CustomText style={styles.logoutText}>{t('signOut')}</CustomText>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -180,7 +183,7 @@ export default function CourierSettingsScreen() {
           >
             <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={styles.modalHeader}>
-                <CustomText variant="h2">Change Password</CustomText>
+                <CustomText variant="h2">{t('changePassword')}</CustomText>
                 <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
                   <XCircle color={colors.muted} size={24} />
                 </TouchableOpacity>
@@ -191,24 +194,24 @@ export default function CourierSettingsScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 <CustomInput
-                  label="Current Password"
-                  placeholder="Enter current password"
+                  label={t('currentPassword')}
+                  placeholder={t('enterCurrentPassword')}
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   secureTextEntry
                 />
                 <View style={{ height: 16 }} />
                 <CustomInput
-                  label="New Password"
-                  placeholder="Enter new password"
+                  label={t('newPassword')}
+                  placeholder={t('enterNewPassword')}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry
                 />
                 <View style={{ height: 16 }} />
                 <CustomInput
-                  label="Confirm New Password"
-                  placeholder="Confirm new password"
+                  label={t('confirmNewPassword')}
+                  placeholder={t('confirmNewPasswordPlaceholder')}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
@@ -217,7 +220,7 @@ export default function CourierSettingsScreen() {
                 <View style={{ height: 32 }} />
                 
                 <CustomButton
-                  title="Update Password"
+                  title={t('updatePassword')}
                   onPress={handleChangePassword}
                   loading={updating}
                 />

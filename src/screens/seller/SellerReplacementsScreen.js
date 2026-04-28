@@ -9,11 +9,13 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { sellerService } from '../../api/sellerService';
 import NotificationIcon from '../../components/NotificationIcon';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const SellerReplacementsScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [replacements, setReplacements] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -43,10 +45,10 @@ const SellerReplacementsScreen = () => {
   const handleUpdateStatus = async (id, status) => {
     try {
       await sellerService.updateReplacementStatus(user.id, id, status);
-      Alert.alert('Success', `Replacement ${status.toLowerCase()} successfully.`);
+      Alert.alert(t('success'), t('replacementStatusUpdated', { status: t(status.toLowerCase()).toLowerCase() }));
       fetchReplacements();
     } catch (error) {
-       Alert.alert('Error', error.message || 'Failed to update status');
+       Alert.alert(t('error'), error.message || t('failedToUpdateStatus'));
     }
   };
 
@@ -63,33 +65,33 @@ const SellerReplacementsScreen = () => {
           </View>
           <View style={[styles.statusBadge, { backgroundColor: item.status === 'PENDING' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)' }]}>
             <CustomText style={[styles.statusText, { color: item.status === 'PENDING' ? '#F97316' : '#10B981' }]}>
-              {item.status}
+              {t(item.status?.toLowerCase())}
             </CustomText>
           </View>
         </View>
         
         <View style={[styles.cardBody, { backgroundColor: colors.glass }]}>
           <View style={styles.infoRow}>
-            <CustomText style={styles.label}>Order:</CustomText>
+            <CustomText style={styles.label}>{t('orderLabel')}</CustomText>
             <CustomText style={[styles.value, { color: colors.foreground }]}>#{item.orderId.slice(-8).toUpperCase()}</CustomText>
           </View>
           <View style={styles.infoRow}>
-            <CustomText style={styles.label}>Reason:</CustomText>
+            <CustomText style={styles.label}>{t('reasonLabel')}</CustomText>
             <CustomText style={[styles.value, { color: colors.foreground }]}>{item.reason}</CustomText>
           </View>
           {item.description ? (
             <View style={[styles.infoRow, { flexDirection: 'column', gap: 4 }]}>
-              <CustomText style={styles.label}>Description:</CustomText>
+              <CustomText style={styles.label}>{t('descriptionLabel')}</CustomText>
               <CustomText style={[styles.value, { color: colors.foreground, fontWeight: 'normal' }]}>{item.description}</CustomText>
             </View>
           ) : null}
           <View style={styles.infoRow}>
-            <CustomText style={styles.label}>Date:</CustomText>
+            <CustomText style={styles.label}>{t('dateLabel')}</CustomText>
             <CustomText style={[styles.value, { color: colors.foreground }]}>{dateStr}</CustomText>
           </View>
           {item.evidence && item.evidence.length > 0 ? (
             <View style={[styles.infoRow, { flexDirection: 'column', gap: 8, marginTop: 4 }]}>
-              <CustomText style={styles.label}>Evidence:</CustomText>
+              <CustomText style={styles.label}>{t('evidenceLabel')}</CustomText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {item.evidence.map((img, idx) => (
                   <Image key={idx} source={{ uri: img }} style={styles.evidenceThumbnail} />
@@ -106,14 +108,14 @@ const SellerReplacementsScreen = () => {
               onPress={() => handleUpdateStatus(item.id, 'APPROVED')}
             >
               <CheckCircle color="white" size={14} />
-              <CustomText style={styles.actionBtnText}>Approve</CustomText>
+              <CustomText style={styles.actionBtnText}>{t('approve')}</CustomText>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.actionBtn, styles.rejectBtn]}
               onPress={() => handleUpdateStatus(item.id, 'REJECTED')}
             >
               <XCircle color="#EF4444" size={14} />
-              <CustomText style={[styles.actionBtnText, { color: '#EF4444' }]}>Reject</CustomText>
+              <CustomText style={[styles.actionBtnText, { color: '#EF4444' }]}>{t('reject')}</CustomText>
             </TouchableOpacity>
           </View>
         )}
@@ -127,7 +129,7 @@ const SellerReplacementsScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2" style={{ flex: 1 }}>Replacements</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>{t('replacements')}</CustomText>
         <NotificationIcon />
       </View>
       
@@ -147,13 +149,13 @@ const SellerReplacementsScreen = () => {
           ListHeaderComponent={
             <View style={[styles.headerBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <RefreshCcw color={colors.primary} size={24} />
-              <CustomText style={styles.headerDesc}>Manage buyer replacement requests and defective items.</CustomText>
+              <CustomText style={styles.headerDesc}>{t('replacementsDesc')}</CustomText>
             </View>
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Package color={colors.isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} size={64} />
-              <CustomText style={styles.emptyText}>No replacement requests yet.</CustomText>
+              <CustomText style={styles.emptyText}>{t('noReplacementsYet')}</CustomText>
             </View>
           }
         />

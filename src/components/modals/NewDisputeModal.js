@@ -26,6 +26,7 @@ import {
 import { useTheme } from '../../context/ThemeContext';
 import CustomText from '../CustomText';
 import CustomButton from '../CustomButton';
+import { useLanguage } from '../../context/LanguageContext';
 import * as ImagePicker from 'expo-image-picker';
 import { disputeService } from '../../api/disputeService';
 import { useAuth } from '../../context/AuthContext';
@@ -34,18 +35,19 @@ import { orderService } from '../../api/orderService';
 const { width } = Dimensions.get('window');
 const THUMB_SIZE = Math.floor((width - 48 - 24 - 24) / 3); // 3 items per row with gutters
 
-const DISPUTE_REASONS = [
-  { label: 'Item received is not as described', value: 'not-as-described' },
-  { label: 'Item arrived damaged/broken', value: 'damaged' },
-  { label: 'Parts or items are missing', value: 'missing' },
-  { label: 'Order never arrived', value: 'never-arrived' },
-  { label: 'Item is counterfeit/fake', value: 'counterfeit' },
-  { label: 'Received the wrong item entirely', value: 'wrong-item' },
+const getDisputeReasons = (t) => [
+  { label: t('notAsDescribed'), value: 'not-as-described' },
+  { label: t('arrivedDamaged'), value: 'damaged' },
+  { label: t('missingParts'), value: 'missing' },
+  { label: t('neverArrived'), value: 'never-arrived' },
+  { label: t('counterfeit'), value: 'counterfeit' },
+  { label: t('wrongItem'), value: 'wrong-item' },
 ];
 
 const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [reason, setReason] = useState('');
   const [description, setDescription] = useState('');
   const [evidence, setEvidence] = useState([]);
@@ -103,10 +105,10 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
 
   const handleSubmit = async () => {
     const targetOrderId = selectedOrderId;
-    if (!targetOrderId) return Alert.alert('Missing Order', 'Please select the order you want to dispute.');
-    if (!reason) return Alert.alert('Missing Reason', 'Please select a reason for the dispute.');
-    if (!description.trim()) return Alert.alert('Missing Description', 'Please describe the issue.');
-    if (evidence.length === 0) return Alert.alert('Missing Evidence', 'Please upload at least one photo as evidence.');
+    if (!targetOrderId) return Alert.alert(t('missingOrder'), t('selectOrderDispute'));
+    if (!reason) return Alert.alert(t('missingReason'), t('selectReasonDispute'));
+    if (!description.trim()) return Alert.alert(t('missingDescription'), t('describeIssue'));
+    if (evidence.length === 0) return Alert.alert(t('missingEvidence'), t('uploadPhotoEvidence'));
 
     const uid = user?.id || userId;
 
@@ -119,11 +121,11 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
         evidence: evidence.map(e => e.base64),
       });
       
-      Alert.alert('Success', 'Dispute filed successfully! Our team will review the case.');
+      Alert.alert(t('success'), t('disputeFiledSuccessfully'));
       onSuccess?.();
       handleClose();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to submit dispute');
+      Alert.alert(t('error'), error.message || 'Failed to submit dispute');
     } finally {
       setLoading(false);
     }
@@ -141,7 +143,7 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
             <View style={[styles.header, { borderBottomColor: colors.glassBorder }]}>
               <View style={styles.headerTitleContainer}>
                 <AlertTriangle size={24} color={colors.error} />
-                <CustomText variant="h2" style={{ marginLeft: 12 }}>Open Case</CustomText>
+                <CustomText variant="h2" style={{ marginLeft: 12 }}>{t('openCase')}</CustomText>
               </View>
               <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
                 <X color={colors.muted} size={24} />
@@ -161,20 +163,20 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
                     <Package color={colors.primary} size={20} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
-                    <CustomText style={{ fontSize: 10, fontWeight: 'bold', color: colors.muted, textTransform: 'uppercase' }}>Target Order</CustomText>
+                    <CustomText style={{ fontSize: 10, fontWeight: 'bold', color: colors.muted, textTransform: 'uppercase' }}>{t('targetOrder')}</CustomText>
                     <CustomText style={{ fontWeight: 'bold' }}>
                       {orders.find(o => o.id === orderId)?.items?.[0]?.product?.title ||
                         orders.find(o => o.id === orderId)?.items?.[0]?.product?.name ||
-                        `Order · ${orderId?.slice(-6).toUpperCase()}`}
+                        `${t('order')} · ${orderId?.slice(-6).toUpperCase()}`}
                     </CustomText>
                   </View>
                   <View style={[styles.badge, { backgroundColor: `${colors.error}15`, borderColor: `${colors.error}30` }]}>
-                    <CustomText style={{ fontSize: 8, fontWeight: 'black', color: colors.error }}>72H WINDOW ACTIVE</CustomText>
+                    <CustomText style={{ fontSize: 8, fontWeight: 'black', color: colors.error }}>{t('windowActive')}</CustomText>
                   </View>
                 </View>
               ) : (
                 <View style={styles.inputSection}>
-                  <CustomText style={styles.label}>SELECT ORDER *</CustomText>
+                  <CustomText style={styles.label}>{t('selectOrder')}</CustomText>
                   <TouchableOpacity
                     style={[styles.dropdown, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
                     onPress={() => setShowOrderDropdown(!showOrderDropdown)}
@@ -183,8 +185,8 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
                       {selectedOrderId
                         ? (orders.find(o => o.id === selectedOrderId)?.items?.[0]?.product?.title ||
                            orders.find(o => o.id === selectedOrderId)?.items?.[0]?.product?.name ||
-                           `Order · ${selectedOrderId.slice(-6).toUpperCase()}`)
-                        : loadingOrders ? 'Loading orders...' : 'Select an order'}
+                           `${t('order')} · ${selectedOrderId.slice(-6).toUpperCase()}`)
+                        : loadingOrders ? t('loadingOrders') : t('selectAnOrder')}
                     </CustomText>
                     <ChevronDown color={colors.muted} size={18} />
                   </TouchableOpacity>
@@ -192,9 +194,9 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
                   {showOrderDropdown && (
                     <View style={[styles.dropdownList, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
                       {orders.length === 0 ? (
-                        <CustomText style={{ color: colors.muted, padding: 14 }}>No orders found.</CustomText>
+                        <CustomText style={{ color: colors.muted, padding: 14 }}>{t('noOrdersFound')}</CustomText>
                       ) : orders.map((o) => {
-                        const productTitle = o.items?.[0]?.product?.title || o.items?.[0]?.product?.name || `Order · ${o.id.slice(-6).toUpperCase()}`;
+                        const productTitle = o.items?.[0]?.product?.title || o.items?.[0]?.product?.name || `${t('order')} · ${o.id.slice(-6).toUpperCase()}`;
                         return (
                           <TouchableOpacity
                             key={o.id}
@@ -205,7 +207,7 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
                             }}
                           >
                             <CustomText style={{ color: colors.foreground, fontWeight: 'bold' }}>{productTitle}</CustomText>
-                            <CustomText style={{ color: colors.muted, fontSize: 12 }}>{o.status} · Rwf {o.total?.toLocaleString()}</CustomText>
+                            <CustomText style={{ color: colors.muted, fontSize: 12 }}>{t(o.status.toLowerCase()) || o.status} · Rwf {o.total?.toLocaleString()}</CustomText>
                           </TouchableOpacity>
                         );
                       })}
@@ -216,20 +218,20 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
 
               {/* Reason Dropdown */}
               <View style={styles.inputSection}>
-                <CustomText style={styles.label}>REASON FOR DISPUTE *</CustomText>
+                <CustomText style={styles.label}>{t('reasonForDispute')}</CustomText>
                 <TouchableOpacity 
                   style={[styles.dropdown, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
                   onPress={() => setShowReasonDropdown(!showReasonDropdown)}
                 >
                   <CustomText style={{ color: reason ? colors.foreground : colors.muted }}>
-                    {reason ? DISPUTE_REASONS.find(r => r.value === reason)?.label : 'Select a reason'}
+                    {reason ? getDisputeReasons(t).find(r => r.value === reason)?.label : t('selectAReason')}
                   </CustomText>
                   <ChevronDown color={colors.muted} size={18} />
                 </TouchableOpacity>
                 
                 {showReasonDropdown && (
                   <View style={[styles.dropdownList, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
-                    {DISPUTE_REASONS.map((r) => (
+                    {getDisputeReasons(t).map((r) => (
                       <TouchableOpacity 
                         key={r.value} 
                         style={styles.dropdownItem}
@@ -247,11 +249,11 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
 
               {/* Description */}
               <View style={styles.inputSection}>
-                <CustomText style={styles.label}>TELL US MORE *</CustomText>
+                <CustomText style={styles.label}>{t('tellUsMore')}</CustomText>
                 <TextInput
                   multiline
                   numberOfLines={5}
-                  placeholder="Describe the issue in detail. The more info you provide, the faster we can resolve it."
+                  placeholder={t('explainIssue')}
                   placeholderTextColor={colors.muted}
                   style={[styles.textarea, { backgroundColor: colors.glass, borderColor: colors.glassBorder, color: colors.foreground }]}
                   value={description}
@@ -261,7 +263,7 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
 
               {/* Evidence */}
               <View style={styles.inputSection}>
-                <CustomText style={styles.label}>UPLOAD EVIDENCE (PHOTOS) *</CustomText>
+                <CustomText style={styles.label}>{t('uploadEvidence')}</CustomText>
                 <View style={styles.evidenceGrid}>
                   {evidence.map((item, index) => (
                     <View key={index} style={[styles.evidenceItem]}>
@@ -281,7 +283,7 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
                       onPress={pickImage}
                     >
                       <Upload color={colors.muted} size={24} />
-                      <CustomText style={{ fontSize: 10, color: colors.muted, fontWeight: 'bold', marginTop: 4 }}>ADD</CustomText>
+                      <CustomText style={{ fontSize: 10, color: colors.muted, fontWeight: 'bold', marginTop: 4 }}>{t('add')}</CustomText>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -290,12 +292,12 @@ const NewDisputeModal = ({ visible, onClose, orderId, userId, onSuccess }) => {
               <View style={[styles.warningBox, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}20` }]}>
                 <ShieldAlert color={colors.error} size={18} />
                 <CustomText style={[styles.warningText, { color: colors.error }]}>
-                  <CustomText style={{ fontWeight: 'bold' }}>Honesty Policy:</CustomText> Filing false disputes is a violation of our Terms of Service and may result in permanent account suspension.
+                  <CustomText style={{ fontWeight: 'bold' }}>{t('honestyPolicy')}</CustomText> {t('honestyPolicyText')}
                 </CustomText>
               </View>
 
               <CustomButton 
-                title="Submit Dispute Request" 
+                title={t('submitDisputeRequest')} 
                 onPress={handleSubmit} 
                 loading={loading}
                 disabled={loading}

@@ -44,9 +44,11 @@ export const authService = {
         data = JSON.parse(responseText);
       } catch (e) {
         if (responseText?.includes('<html') || responseText?.includes('<!DOCTYPE')) {
+          console.error('[DEBUG] HTML response detected:', responseText.slice(0, 200));
           throw new Error('Server error: Invalid response format.');
         }
         if (!response.ok) throw new Error(responseText || 'Login failed');
+        console.error('[DEBUG] JSON parse error on response:', responseText.slice(0, 200));
         throw new Error('Invalid server response');
       }
 
@@ -79,9 +81,11 @@ export const authService = {
         data = JSON.parse(responseText);
       } catch (e) {
         if (responseText?.includes('<html') || responseText?.includes('<!DOCTYPE')) {
+          console.error('[DEBUG] HTML response detected:', responseText.slice(0, 200));
           throw new Error('Server error: Invalid response format.');
         }
         if (!response.ok) throw new Error(responseText || 'Registration failed');
+        console.error('[DEBUG] JSON parse error on response:', responseText.slice(0, 200));
         throw new Error('Invalid server response');
       }
 

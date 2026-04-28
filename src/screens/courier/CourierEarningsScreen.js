@@ -10,12 +10,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { courierService } from '../../api/courierService';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 const PERIODS = ['week', 'month', 'all'];
 
 export default function CourierEarningsScreen({ navigation }) {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState({ totalEarned: 0, pendingPayout: 0, totalDeliveries: 0, thisMonth: 0 });
   const [loading, setLoading] = useState(true);
@@ -42,10 +44,10 @@ export default function CourierEarningsScreen({ navigation }) {
   useFocusEffect(useCallback(() => { fetchEarnings(); }, [fetchEarnings]));
 
   const stats = [
-    { label: 'Total Earned', value: `Rwf ${summary.totalEarned.toLocaleString()}`, icon: TrendingUp, color: '#22c55e' },
-    { label: 'Pending Payout', value: `Rwf ${summary.pendingPayout.toLocaleString()}`, icon: Wallet, color: '#eab308' },
-    { label: 'This Month', value: `Rwf ${summary.thisMonth.toLocaleString()}`, icon: Calendar, color: '#f97316' },
-    { label: 'Deliveries', value: String(summary.totalDeliveries), icon: CheckCircle, color: '#f97316' },
+    { label: t('totalEarned'), value: `Rwf ${summary.totalEarned.toLocaleString()}`, icon: TrendingUp, color: '#22c55e' },
+    { label: t('pendingPayout'), value: `Rwf ${summary.pendingPayout.toLocaleString()}`, icon: Wallet, color: '#eab308' },
+    { label: t('thisMonth'), value: `Rwf ${summary.thisMonth.toLocaleString()}`, icon: Calendar, color: '#f97316' },
+    { label: t('deliveries'), value: String(summary.totalDeliveries), icon: CheckCircle, color: '#f97316' },
   ];
 
   return (
@@ -57,8 +59,8 @@ export default function CourierEarningsScreen({ navigation }) {
           <ChevronLeft color={colors.foreground} size={22} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <CustomText style={[styles.title, { color: colors.foreground }]}>Earnings</CustomText>
-          <CustomText style={{ fontSize: 12, color: colors.muted }}>Track your delivery commissions</CustomText>
+          <CustomText style={[styles.title, { color: colors.foreground }]}>{t('earnings')}</CustomText>
+          <CustomText style={{ fontSize: 12, color: colors.muted }}>{t('trackCommissions')}</CustomText>
         </View>
       </View>
 
@@ -93,13 +95,13 @@ export default function CourierEarningsScreen({ navigation }) {
                   style={[styles.chip, { borderColor: period === p ? '#f97316' : colors.border, backgroundColor: period === p ? 'rgba(249,115,22,0.12)' : colors.glass }]}
                 >
                   <CustomText style={{ fontSize: 12, fontWeight: '700', color: period === p ? '#f97316' : colors.muted }}>
-                    {p === 'all' ? 'All Time' : `This ${p.charAt(0).toUpperCase() + p.slice(1)}`}
+                    {p === 'all' ? t('allTime') : t('thisPeriod', { period: p })}
                   </CustomText>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Delivery History</CustomText>
+            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('deliveryHistory')}</CustomText>
 
             {loading && <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 32 }} />}
           </View>
@@ -115,7 +117,7 @@ export default function CourierEarningsScreen({ navigation }) {
                   borderColor: item.status === 'PAID' ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)' }
               ]}>
                 <CustomText style={{ fontSize: 10, fontWeight: '700', color: item.status === 'PAID' ? '#22c55e' : '#eab308' }}>
-                  {item.status}
+                  {t(item.status?.toLowerCase())}
                 </CustomText>
               </View>
             </View>
@@ -129,8 +131,8 @@ export default function CourierEarningsScreen({ navigation }) {
         ListEmptyComponent={() => !loading && (
           <View style={styles.emptyBox}>
             <Package color={colors.muted} size={40} />
-            <CustomText style={{ color: colors.foreground, fontWeight: '800', marginTop: 12 }}>No earnings yet</CustomText>
-            <CustomText style={{ color: colors.muted, fontSize: 13 }}>Complete deliveries to earn commissions</CustomText>
+            <CustomText style={{ color: colors.foreground, fontWeight: '800', marginTop: 12 }}>{t('noEarningsYet')}</CustomText>
+            <CustomText style={{ color: colors.muted, fontSize: 13 }}>{t('completeDeliveriesEarn')}</CustomText>
           </View>
         )}
       />

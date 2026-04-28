@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import { BuyerDrawerContext } from '../context/BuyerDrawerContext';
 import CustomText from '../components/CustomText';
 import { Sun, Moon } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { 
@@ -44,6 +45,7 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const { logout, user } = useAuth();
   const { isDarkMode, colors, toggleTheme } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
 
   useEffect(() => {
     if (visible) {
@@ -62,14 +64,14 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   if (!visible && opacityAnim._value === 0) return null;
 
   const routes = [
-    { name: 'Dashboard', icon: Home },
-    { name: 'Orders', icon: ShoppingBag },
-    { name: 'Profile', icon: UserIcon },
-    { name: 'Wishlist', icon: Heart },
-    { name: 'Wallet', icon: Wallet },
-    { name: 'Disputes', icon: AlertCircle },
-    { name: 'Replacements', icon: RefreshCcw },
-    { name: 'Settings', icon: Settings },
+    { name: 'Dashboard', label: t('dashboard'), icon: Home },
+    { name: 'Orders', label: t('orders'), icon: ShoppingBag },
+    { name: 'Profile', label: t('profile'), icon: UserIcon },
+    { name: 'Wishlist', label: t('wishlist'), icon: Heart },
+    { name: 'Wallet', label: t('wallet'), icon: Wallet },
+    { name: 'Disputes', label: t('disputes'), icon: AlertCircle },
+    { name: 'Replacements', label: t('replacements'), icon: RefreshCcw },
+    { name: 'Settings', label: t('settings'), icon: Settings },
   ];
 
   return (
@@ -125,7 +127,7 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
               </View>
               <View style={{ flex: 1 }}>
                 <CustomText style={{ color: colors.foreground, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
-                  {user?.name || 'Buyer'}
+                  {user?.name || t('buyer')}
                 </CustomText>
               </View>
             </View>
@@ -149,7 +151,7 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
                   }}
                 >
                   <IconComponent color={colors.muted} size={20} />
-                  <CustomText style={[styles.drawerItemText, { color: colors.foreground }]}>{route.name}</CustomText>
+                  <CustomText style={[styles.drawerItemText, { color: colors.foreground }]}>{route.label}</CustomText>
                 </TouchableOpacity>
               );
             })}
@@ -157,10 +159,10 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
 
           <TouchableOpacity 
             onPress={() => {
-              Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-                { text: 'Cancel', style: 'cancel' },
+              Alert.alert(t('logoutConfirmTitle'), t('logoutConfirmDesc'), [
+                { text: t('cancel'), style: 'cancel' },
                 { 
-                  text: 'Sign Out', 
+                  text: t('logoutConfirmTitle'), 
                   style: 'destructive', 
                   onPress: () => {
                     onClose();
@@ -173,7 +175,7 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
             style={[styles.logoutButton, { borderColor: '#ff4444' }]}
           >
             <LogOut color="#ff4444" size={20} />
-            <CustomText style={{ color: '#ff4444', marginLeft: 12, fontWeight: 'bold' }}>Sign Out</CustomText>
+            <CustomText style={{ color: '#ff4444', marginLeft: 12, fontWeight: 'bold' }}>{t('signOut')}</CustomText>
           </TouchableOpacity>
         </Animated.View>
       </View>

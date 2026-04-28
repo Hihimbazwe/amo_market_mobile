@@ -9,12 +9,14 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 
 const SellerProfileScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user, login } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
 
   const [profile, setProfile] = useState(null);
   const [name, setName] = useState('');
@@ -50,7 +52,7 @@ const SellerProfileScreen = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (!name.trim()) return Alert.alert('Error', 'Name cannot be empty.');
+    if (!name.trim()) return Alert.alert(t('error'), t('nameEmptyError'));
     
     setSaving(true);
     try {
@@ -63,10 +65,10 @@ const SellerProfileScreen = () => {
       if (updated.user) {
         login({ ...user, name: updated.user.name, storeName: updated.storeName });
       }
-      Alert.alert('Success', 'Seller profile updated successfully!');
+      Alert.alert(t('success'), t('sellerProfileUpdated'));
       fetchProfile();
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to update profile.');
+      Alert.alert(t('error'), e.message || t('failedToUpdateProfile'));
     } finally {
       setSaving(false);
     }
@@ -78,7 +80,7 @@ const SellerProfileScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Seller Profile</CustomText>
+        <CustomText variant="h2">{t('sellerProfile')}</CustomText>
       </View>
       <ScrollView 
         contentContainerStyle={styles.content}
@@ -97,41 +99,41 @@ const SellerProfileScreen = () => {
                   <Camera color="white" size={16} />
                 </View>
               </TouchableOpacity>
-              <CustomText variant="h2" style={{ marginTop: 16 }}>{name || 'Seller Name'}</CustomText>
+              <CustomText variant="h2" style={{ marginTop: 16 }}>{name || t('sellerName')}</CustomText>
               <CustomText style={{ color: colors.muted }}>{user?.email || 'seller@example.com'}</CustomText>
               <View style={styles.roleBadge}>
-                 <CustomText style={styles.roleText}>{profile?.membershipType || 'OFFICIAL'} SELLER</CustomText>
+                 <CustomText style={styles.roleText}>{t((profile?.membershipType || 'official').toLowerCase())} {t('sellerRole')}</CustomText>
               </View>
             </View>
 
             <View style={styles.formSection}>
               <CustomInput 
-                label="Full Name" 
+                label={t('fullName')} 
                 value={name} 
                 onChangeText={setName} 
-                placeholder="Enter your full name" 
+                placeholder={t('enterFullName')} 
               />
               <CustomInput 
-                label="Store Name" 
+                label={t('storeName')} 
                 value={storeName} 
                 onChangeText={setStoreName} 
-                placeholder="e.g. Amo Electronics" 
+                placeholder={t('storeNamePlaceholder')} 
               />
               <CustomInput 
-                label="Phone Number" 
+                label={t('phoneNumber')} 
                 value={phone} 
                 onChangeText={setPhone} 
-                placeholder="e.g. +250 78x xxx xxx" 
+                placeholder={t('phonePlaceholder')} 
                 keyboardType="phone-pad"
               />
               <CustomInput 
-                label="Email Address" 
+                label={t('emailAddress')} 
                 value={user?.email || 'seller@example.com'} 
                 editable={false} 
               />
               
               <CustomButton 
-                title={saving ? "Saving..." : "Save Profile"} 
+                title={saving ? t('saving') : t('saveProfile')} 
                 style={styles.saveButton} 
                 onPress={handleSaveProfile} 
                 disabled={saving}

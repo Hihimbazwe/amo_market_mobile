@@ -11,11 +11,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { BuyerDrawerContext as DrawerContext } from '../../context/BuyerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
+import { useTranslation } from 'react-i18next';
 
 const BuyerProfileScreen = () => {
   const { toggleDrawer } = React.useContext(DrawerContext);
   const { colors } = useTheme();
   const { user, login } = useAuth();
+  const { t, i18n } = useTranslation(['dashboard', 'common']);
+  const language = i18n.language;
   const navigation = useNavigation();
 
   const [name, setName] = useState(user?.name || '');
@@ -29,15 +32,15 @@ const BuyerProfileScreen = () => {
   const accentColor = '#f97316'; // Web's buyer orange
 
   const handleSaveProfile = async () => {
-    if (!name.trim()) return Alert.alert('Error', 'Name cannot be empty.');
+    if (!name.trim()) return Alert.alert(t('error'), t('nameEmpty'));
     
     setLoading(true);
     try {
       const response = await authService.updateProfile(user.id, { name });
       login({ ...user, name: response.user?.name || name });
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert(t('success'), t('profileUpdated'));
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to update profile.');
+      Alert.alert(t('error'), e.message || t('failedToSave'));
     } finally {
       setLoading(false);
     }
@@ -49,13 +52,13 @@ const BuyerProfileScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: colors.glass }]}>
           <ArrowLeft color={colors.foreground} size={20} />
         </TouchableOpacity>
-        <CustomText variant="h2">My Profile</CustomText>
+        <CustomText variant="h2">{t('profile')}</CustomText>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.introSection}>
-          <CustomText style={{ fontSize: 24, fontWeight: '900', color: colors.foreground }}>My Profile</CustomText>
-          <CustomText style={{ color: colors.muted, marginTop: 4 }}>View and update your account information.</CustomText>
+          <CustomText style={{ fontSize: 24, fontWeight: '900', color: colors.foreground }}>{t('profile')}</CustomText>
+          <CustomText style={{ color: colors.muted, marginTop: 4 }}>{t('updateInfo')}</CustomText>
         </View>
 
         {/* Avatar Card */}
@@ -76,7 +79,7 @@ const BuyerProfileScreen = () => {
               <CustomText style={[styles.profileEmail, { color: colors.muted }]}>{user?.email}</CustomText>
               <View style={[styles.roleBadge, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
                 <Shield color={accentColor} size={11} />
-                <CustomText style={[styles.roleText, { color: accentColor }]}>BUYER</CustomText>
+                <CustomText style={[styles.roleText, { color: accentColor }]}>{t('buyer')}</CustomText>
               </View>
             </View>
           </View>
@@ -84,17 +87,17 @@ const BuyerProfileScreen = () => {
 
         {/* Account Information */}
         <View style={[styles.glassCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>ACCOUNT INFORMATION</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('accountInformation')}</CustomText>
           <View style={styles.formGrid}>
             <CustomInput 
-              label="Full Name" 
+              label={t('fullName')} 
               leftIcon={User}
               value={name} 
               onChangeText={setName} 
-              placeholder="Enter your full name" 
+              placeholder={t('enterFullName')} 
             />
             <CustomInput 
-              label="Email Address" 
+              label={t('emailAddress')} 
               leftIcon={Mail}
               value={user?.email || ''} 
               editable={false} 
@@ -103,7 +106,7 @@ const BuyerProfileScreen = () => {
 
           <View style={[styles.actionSection, { borderTopColor: colors.border }]}>
             <CustomButton 
-              title={loading ? "Saving..." : "Save Changes"} 
+              title={loading ? t('saving') : t('saveChanges')} 
               onPress={handleSaveProfile} 
               disabled={loading}
               style={{ backgroundColor: accentColor }}
@@ -113,15 +116,15 @@ const BuyerProfileScreen = () => {
 
         {/* Account Meta */}
         <View style={[styles.glassCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>ACCOUNT META</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('accountMeta')}</CustomText>
           <View style={styles.metaRow}>
             <View style={[styles.metaIcon, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
               <Calendar color={accentColor} size={15} />
             </View>
             <View>
-              <CustomText style={[styles.metaLabel, { color: colors.muted }]}>MEMBER SINCE</CustomText>
+              <CustomText style={[styles.metaLabel, { color: colors.muted }]}>{t('memberSince')}</CustomText>
               <CustomText style={[styles.metaValue, { color: colors.foreground }]}>
-                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'April 20, 2026'}
+                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString(language === 'rw' ? 'rw-RW' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'April 20, 2026'}
               </CustomText>
             </View>
           </View>

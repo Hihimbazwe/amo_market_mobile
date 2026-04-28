@@ -12,6 +12,7 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, RefreshControl } from 'react-native';
 import {Text} from 'react-native';
 // Mock data removed
@@ -25,6 +26,7 @@ export default function SellerWithdrawScreen() {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [amount, setAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState('MOBILE_MONEY');
   const [wallet, setWallet] = useState(null);
@@ -57,11 +59,11 @@ export default function SellerWithdrawScreen() {
   const handleWithdraw = async () => {
     const numAmount = Number(amount);
     if (!amount || isNaN(numAmount) || numAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid withdrawal amount.');
+      Alert.alert(t('invalidAmount'), t('enterValidAmount'));
       return;
     }
     if (wallet && numAmount > wallet.balance) {
-      Alert.alert('Insufficient Balance', 'You cannot withdraw more than your available balance.');
+      Alert.alert(t('insufficientBalance'), t('cannotExceedBalance'));
       return;
     }
     
@@ -73,11 +75,11 @@ export default function SellerWithdrawScreen() {
         selectedMethod, 
         selectedMethod === 'MOBILE_MONEY' ? 'MTN MoMo Payout' : 'Bank Payout'
       );
-      Alert.alert('Request Submitted', 'Your withdrawal request has been submitted and is processing.');
+      Alert.alert(t('requestSubmitted'), t('withdrawalSubmittedSuccess'));
       setAmount('');
       fetchWallet();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to submit withdrawal');
+      Alert.alert(t('error'), error.message || t('failedToSubmitWithdrawal'));
     } finally {
       setSubmitting(false);
     }
@@ -91,7 +93,7 @@ export default function SellerWithdrawScreen() {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Withdraw Funds</CustomText>
+        <CustomText variant="h2">{t('withdrawFunds')}</CustomText>
       </View>
 
       <ScrollView 
@@ -109,16 +111,16 @@ export default function SellerWithdrawScreen() {
           <>
             {/* Balance Card */}
             <View style={styles.balanceCard}>
-              <CustomText style={styles.balanceLabel}>AVAILABLE BALANCE</CustomText>
+              <CustomText style={styles.balanceLabel}>{t('availableBalance')}</CustomText>
               <CustomText style={styles.balanceAmount}>{formatPrice(wallet?.balance)}</CustomText>
               <View style={styles.balanceMeta}>
-                <CustomText style={styles.balanceMetaText}>Pending: {formatPrice(wallet?.pendingEscrow || 0)}</CustomText>
+                <CustomText style={styles.balanceMetaText}>{t('pendingEscrow', { amount: formatPrice(wallet?.pendingEscrow || 0) })}</CustomText>
               </View>
             </View>
 
         {/* Amount Input */}
         <View style={styles.inputSection}>
-          <CustomText style={styles.sectionLabel}>WITHDRAWAL AMOUNT</CustomText>
+          <CustomText style={styles.sectionLabel}>{t('withdrawalAmount')}</CustomText>
           <View style={[styles.amountInputRow, { backgroundColor: colors.glass, borderColor: colors.border }]}>
             <CustomText style={styles.currencyPrefix}>Rwf</CustomText>
             <TextInput
@@ -145,7 +147,7 @@ export default function SellerWithdrawScreen() {
 
         {/* Payout Method */}
         <View style={styles.section}>
-          <CustomText style={styles.sectionLabel}>PAYOUT METHOD</CustomText>
+          <CustomText style={styles.sectionLabel}>{t('payoutMethod')}</CustomText>
           {METHODS.map((m) => {
             const Icon = m.icon;
             const selected = selectedMethod === m.id;
@@ -171,7 +173,7 @@ export default function SellerWithdrawScreen() {
         </View>
 
         <CustomButton
-          title="Submit Withdrawal"
+          title={t('submitWithdrawal')}
           loading={submitting}
           onPress={handleWithdraw}
           style={styles.submitBtn}
@@ -181,12 +183,12 @@ export default function SellerWithdrawScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Clock color={colors.primary} size={18} />
-            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Withdrawals</CustomText>
+            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('recentWithdrawals')}</CustomText>
           </View>
           <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {(!wallet?.withdrawals || wallet.withdrawals.length === 0) ? (
               <View style={{ padding: 20, alignItems: 'center' }}>
-                <CustomText style={{ color: colors.muted }}>No withdrawal history.</CustomText>
+                <CustomText style={{ color: colors.muted }}>{t('noWithdrawalHistory')}</CustomText>
               </View>
             ) : (
               wallet.withdrawals.map((item, index) => (
@@ -199,7 +201,7 @@ export default function SellerWithdrawScreen() {
                     <CustomText style={styles.historyAmount}>- {formatPrice(item.amount)}</CustomText>
                     <View style={[styles.statusBadge, { backgroundColor: item.status === 'COMPLETED' ? 'rgba(16,185,129,0.1)' : 'rgba(249,115,22,0.1)' }]}>
                       <CustomText style={[styles.statusText, { color: item.status === 'COMPLETED' ? '#10B981' : '#F97316' }]}>
-                        {item.status}
+                        {t(item.status?.toLowerCase())}
                       </CustomText>
                     </View>
                   </View>

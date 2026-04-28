@@ -23,6 +23,7 @@ import { productService } from '../api/productService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const provinces = ["All Provinces", "Kigali", "East", "North", "South", "West"];
 const provinceDistricts = {
@@ -35,13 +36,13 @@ const provinceDistricts = {
 };
 const categories = ["All Categories", "Electronics", "Fashion", "Home & Living", "Sports", "Beauty", "Books", "Vehicles"];
 
-const FilterModal = ({ visible, onClose, filters, setFilters, colors }) => {
+const FilterModal = ({ visible, onClose, filters, setFilters, colors, t }) => {
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.modalHeader}>
-            <CustomText variant="h2">Filters</CustomText>
+            <CustomText variant="h2">{t('filters')}</CustomText>
             <TouchableOpacity onPress={onClose}>
               <X color={colors.foreground} size={24} />
             </TouchableOpacity>
@@ -49,9 +50,9 @@ const FilterModal = ({ visible, onClose, filters, setFilters, colors }) => {
 
           <ScrollView style={styles.modalBody}>
             <View style={styles.filterSection}>
-              <CustomText variant="subtitle" style={[styles.filterLabel, { color: colors.muted }]}>PROVINCE</CustomText>
+              <CustomText variant="subtitle" style={[styles.filterLabel, { color: colors.muted }]}>{t('province')}</CustomText>
               <View style={[styles.pickerContainer, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                <CustomText>{filters.province}</CustomText>
+                <CustomText>{filters.province === "All Provinces" ? t('allProvinces') : filters.province}</CustomText>
                 <ChevronDown color={colors.muted} size={20} />
               </View>
               {/* Note: Simplified UI for choosing */}
@@ -62,14 +63,14 @@ const FilterModal = ({ visible, onClose, filters, setFilters, colors }) => {
                     onPress={() => setFilters({ ...filters, province: p, district: "All Districts" })}
                     style={[styles.chip, { backgroundColor: colors.glass, borderColor: colors.border }, filters.province === p && { backgroundColor: colors.primary, borderColor: colors.primary }]}
                   >
-                    <CustomText style={[filters.province === p && { color: '#ffffff', fontWeight: 'bold' }]}>{p}</CustomText>
+                    <CustomText style={[filters.province === p && { color: '#ffffff', fontWeight: 'bold' }]}>{p === "All Provinces" ? t('allProvinces') : p}</CustomText>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
 
             <View style={styles.filterSection}>
-              <CustomText variant="subtitle" style={[styles.filterLabel, { color: colors.muted }]}>DISTRICT</CustomText>
+              <CustomText variant="subtitle" style={[styles.filterLabel, { color: colors.muted }]}>{t('district')}</CustomText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
                 {(provinceDistricts[filters.province] || ["All Districts"]).map(d => (
                   <TouchableOpacity 
@@ -77,14 +78,14 @@ const FilterModal = ({ visible, onClose, filters, setFilters, colors }) => {
                     onPress={() => setFilters({ ...filters, district: d })}
                     style={[styles.chip, { backgroundColor: colors.glass, borderColor: colors.border }, filters.district === d && { backgroundColor: colors.primary, borderColor: colors.primary }]}
                   >
-                    <CustomText style={[filters.district === d && { color: '#ffffff', fontWeight: 'bold' }]}>{d}</CustomText>
+                    <CustomText style={[filters.district === d && { color: '#ffffff', fontWeight: 'bold' }]}>{d === "All Districts" ? t('allDistricts') : d}</CustomText>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
 
             <View style={styles.filterSection}>
-              <CustomText variant="subtitle" style={[styles.filterLabel, { color: colors.muted }]}>CATEGORY</CustomText>
+              <CustomText variant="subtitle" style={[styles.filterLabel, { color: colors.muted }]}>{t('category')}</CustomText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
                 {categories.map(c => (
                   <TouchableOpacity 
@@ -92,18 +93,18 @@ const FilterModal = ({ visible, onClose, filters, setFilters, colors }) => {
                     onPress={() => setFilters({ ...filters, category: c })}
                     style={[styles.chip, { backgroundColor: colors.glass, borderColor: colors.border }, filters.category === c && { backgroundColor: colors.primary, borderColor: colors.primary }]}
                   >
-                    <CustomText style={[filters.category === c && { color: '#ffffff', fontWeight: 'bold' }]}>{c}</CustomText>
+                    <CustomText style={[filters.category === c && { color: '#ffffff', fontWeight: 'bold' }]}>{c === "All Categories" ? t('allCategories') : t(c.toLowerCase())}</CustomText>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
 
             <View style={styles.filterSection}>
-              <CustomText variant="subtitle" style={[styles.filterLabel, { color: colors.muted }]}>PRICE RANGE (UP TO)</CustomText>
+              <CustomText variant="subtitle" style={[styles.filterLabel, { color: colors.muted }]}>{t('priceRange')}</CustomText>
               <TextInput 
                 style={[styles.priceInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.foreground }]}
                 keyboardType="numeric"
-                placeholder="Maximum Price"
+                placeholder={t('maxPrice')}
                 placeholderTextColor={colors.muted}
                 value={filters.maxPrice.toString()}
                 onChangeText={(text) => setFilters({ ...filters, maxPrice: text.replace(/[^0-9]/g, '') })}
@@ -113,7 +114,7 @@ const FilterModal = ({ visible, onClose, filters, setFilters, colors }) => {
 
           <View style={styles.modalFooter}>
             <CustomButton 
-              title="Apply Filters" 
+              title={t('applyFilters')} 
               onPress={onClose}
               style={{ flex: 1 }}
             />
@@ -126,6 +127,7 @@ const FilterModal = ({ visible, onClose, filters, setFilters, colors }) => {
 
 const MarketplaceScreen = ({ navigation, route }) => {
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [search, setSearch] = useState(route.params?.search || '');
   const [filtersOpen, setFiltersOpen] = useState(false);
   
@@ -220,7 +222,7 @@ const MarketplaceScreen = ({ navigation, route }) => {
           <Search color={colors.muted} size={20} style={styles.searchIcon} />
           <TextInput 
             style={[styles.input, { color: colors.foreground }]}
-            placeholder="Search marketplace..."
+            placeholder={t('searchMarketplace')}
             placeholderTextColor={colors.muted}
             value={search}
             onChangeText={setSearch}
@@ -246,13 +248,14 @@ const MarketplaceScreen = ({ navigation, route }) => {
         filters={filters}
         setFilters={setFilters}
         colors={colors}
+        t={t}
       />
 
       {/* Product List */}
       {loading && filteredProducts.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <CustomText style={{ marginTop: 12, color: colors.muted }}>Loading products...</CustomText>
+          <CustomText style={{ marginTop: 12, color: colors.muted }}>{t('loading')}...</CustomText>
         </View>
       ) : (
         <FlatList 
@@ -276,14 +279,14 @@ const MarketplaceScreen = ({ navigation, route }) => {
           ListHeaderComponent={() => (
             <View style={styles.listHeader}>
               <CustomText variant="subtitle" style={{ color: colors.foreground }}>
-                {filters.category !== "All Categories" ? `${filters.category} in ` : ""}
-                {filters.province !== "All Provinces" ? `${filters.province}` : "Marketplace"}
+                {filters.category !== "All Categories" ? `${t(filters.category.toLowerCase())} in ` : ""}
+                {filters.province !== "All Provinces" ? `${filters.province}` : t('dashboard')}
               </CustomText>
             </View>
           )}
           ListEmptyComponent={() => !loading && (
             <View style={styles.loadingContainer}>
-              <CustomText style={{ color: colors.muted }}>No products found matching your criteria.</CustomText>
+              <CustomText style={{ color: colors.muted }}>{t('noMarketplaceResults')}</CustomText>
             </View>
           )}
         />

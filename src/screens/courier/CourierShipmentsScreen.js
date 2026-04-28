@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { courierService } from '../../api/courierService';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '@env';
+import { useTranslation } from 'react-i18next';
 
 const STATUS_COLORS = {
   PENDING: '#eab308',
@@ -29,6 +30,7 @@ const FILTERS = ['ALL', 'PENDING', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED'
 export default function CourierShipmentsScreen({ navigation }) {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const { t } = useTranslation(['dashboard', 'common']);
   
   const [shipments, setShipments] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -69,11 +71,11 @@ export default function CourierShipmentsScreen({ navigation }) {
     setConfirmingStatus(true);
     try {
       await courierService.updateStatus(user.id, shipmentId, status);
-      Alert.alert('Success', `Status updated to ${status.replace(/_/g, ' ')}`);
+      Alert.alert(t('success'), `${t('statusUpdatedTo')} ${t(status.toLowerCase())}`);
       fetchData(true);
       setActionModalVisible(false);
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to update status');
+      Alert.alert(t('error'), e.message || t('failedToUpdateStatus'));
     } finally {
       setConfirmingStatus(false);
     }
@@ -84,11 +86,11 @@ export default function CourierShipmentsScreen({ navigation }) {
     setAssigningAgent(true);
     try {
       await courierService.assignAgent(user.id, selectedShipment.id, selectedAgentId);
-      Alert.alert('Success', 'Agent assigned successfully');
+      Alert.alert(t('success'), t('agentAssigned'));
       setAgentModalVisible(false);
       fetchData(true);
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to assign agent');
+      Alert.alert(t('error'), e.message || t('failedToAssignAgent'));
     } finally {
       setAssigningAgent(false);
     }
@@ -96,12 +98,12 @@ export default function CourierShipmentsScreen({ navigation }) {
 
   const handleMarkDelivered = (shipment) => {
     Alert.alert(
-      'Confirm Delivery',
-      `Mark order #${shipment.orderId?.slice(-8).toUpperCase()} as delivered?`,
+      t('confirmDelivery'),
+      t('markDeliveredConfirm', { orderId: shipment.orderId?.slice(-8).toUpperCase() }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Confirm',
+          text: t('confirm'),
           onPress: async () => {
             try {
               const res = await fetch(`${API_BASE_URL}/api/courier/shipments/${shipment.id}/deliver`, {
@@ -109,13 +111,13 @@ export default function CourierShipmentsScreen({ navigation }) {
                 headers: { 'Content-Type': 'application/json', 'x-user-id': user.id, 'ngrok-skip-browser-warning': 'true' },
               });
               if (res.ok) {
-                Alert.alert('✅ Done', 'Shipment marked as delivered.');
+                Alert.alert(`✅ ${t('ready')}`, t('shipmentDeliveredSuccess'));
                 fetchData(true);
               } else {
-                Alert.alert('Error', 'Failed to update shipment status.');
+                Alert.alert(t('error'), t('failedToUpdateStatus'));
               }
             } catch (e) {
-              Alert.alert('Error', 'Network error.');
+              Alert.alert(t('error'), t('networkError'));
             }
           },
         },
@@ -135,7 +137,7 @@ export default function CourierShipmentsScreen({ navigation }) {
           <CustomText style={[styles.ref, { color: colors.muted }]}>#{item.orderId?.slice(-8).toUpperCase()}</CustomText>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={[styles.badge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
-              <CustomText style={[styles.badgeText, { color: statusColor }]}>{item.status?.replace(/_/g, ' ')}</CustomText>
+              <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(item.status?.toLowerCase())}</CustomText>
             </View>
             <TouchableOpacity 
               onPress={() => {
@@ -170,7 +172,7 @@ export default function CourierShipmentsScreen({ navigation }) {
             activeOpacity={0.8}
           >
             <CheckCircle2 color="#fff" size={16} />
-            <CustomText style={styles.deliverBtnText}>Mark as Delivered</CustomText>
+            <CustomText style={styles.deliverBtnText}>{t('markAsDelivered')}</CustomText>
           </TouchableOpacity>
         )}
       </View>
@@ -185,34 +187,35 @@ export default function CourierShipmentsScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: colors.glass }]}>
           <ChevronLeft color={colors.foreground} size={22} />
         </TouchableOpacity>
-        <CustomText style={[styles.title, { color: colors.foreground }]}>My Shipments</CustomText>
+        <CustomText style={[styles.title, { color: colors.foreground }]}>{t('myShipments')}</CustomText>
       </View>
 
       {/* Filter chips */}
-      <View>
-        <FlatList
-          data={FILTERS}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={f => f}
-          contentContainerStyle={styles.filterBar}
-          renderItem={({ item: f }) => (
+      <View style={styles.topFilterSection}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.pillsScrollContent}
+          style={styles.pillsRow}
+        >
+          {FILTERS.map((f) => (
             <TouchableOpacity
+              key={f}
               onPress={() => setFilter(f)}
               style={[
-                styles.chip,
-                { 
-                  borderColor: filter === f ? '#f97316' : colors.border, 
-                  backgroundColor: filter === f ? 'rgba(249,115,22,0.12)' : colors.card 
-                }
+                styles.filterPill,
+                filter === f && { backgroundColor: colors.primary }
               ]}
             >
-              <CustomText style={{ fontSize: 12, fontWeight: '700', color: filter === f ? '#f97316' : colors.muted }}>
-                {f.replace(/_/g, ' ')}
+              <CustomText style={[
+                styles.pillText,
+                { color: filter === f ? '#fff' : colors.muted }
+              ]}>
+                {t(f.toLowerCase())}
               </CustomText>
             </TouchableOpacity>
-          )}
-        />
+          ))}
+        </ScrollView>
       </View>
 
       {loading && !refreshing ? (
@@ -227,8 +230,8 @@ export default function CourierShipmentsScreen({ navigation }) {
           ListEmptyComponent={() => (
             <View style={styles.emptyBox}>
               <Package color={colors.muted} size={40} />
-              <CustomText style={{ color: colors.foreground, fontWeight: '800', marginTop: 12 }}>No shipments</CustomText>
-              <CustomText style={{ color: colors.muted, fontSize: 13 }}>No shipments match this filter</CustomText>
+              <CustomText style={{ color: colors.foreground, fontWeight: '800', marginTop: 12 }}>{t('noShipments')}</CustomText>
+              <CustomText style={{ color: colors.muted, fontSize: 13 }}>{t('noShipmentsFilter')}</CustomText>
             </View>
           )}
         />
@@ -247,7 +250,7 @@ export default function CourierShipmentsScreen({ navigation }) {
                       onPress={() => handleUpdateStatus(selectedShipment.id, 'IN_TRANSIT')}
                     >
                       <Truck size={18} color="#A855F7" />
-                      <CustomText style={styles.menuItemText}>Mark as In Transit</CustomText>
+                      <CustomText style={styles.menuItemText}>{t('markAsInTransit')}</CustomText>
                     </TouchableOpacity>
 
                     <TouchableOpacity 
@@ -255,7 +258,7 @@ export default function CourierShipmentsScreen({ navigation }) {
                       onPress={() => handleUpdateStatus(selectedShipment.id, 'OUT_FOR_DELIVERY')}
                     >
                       <Truck size={18} color="#F97316" />
-                      <CustomText style={styles.menuItemText}>Out for Delivery</CustomText>
+                      <CustomText style={styles.menuItemText}>{t('outForDelivery')}</CustomText>
                     </TouchableOpacity>
 
                     <TouchableOpacity 
@@ -266,7 +269,7 @@ export default function CourierShipmentsScreen({ navigation }) {
                       }}
                     >
                       <UserPlus size={18} color="#3B82F6" />
-                      <CustomText style={styles.menuItemText}>Assign Delivery Agent</CustomText>
+                      <CustomText style={styles.menuItemText}>{t('assignDeliveryAgent')}</CustomText>
                     </TouchableOpacity>
                   </>
                 )}
@@ -281,7 +284,7 @@ export default function CourierShipmentsScreen({ navigation }) {
         <View style={styles.slideModalOverlay}>
           <View style={[styles.slideModalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
-              <CustomText variant="h2">Select Delivery Agent</CustomText>
+              <CustomText variant="h2">{t('selectDeliveryAgent')}</CustomText>
               <TouchableOpacity onPress={() => setAgentModalVisible(false)}><X size={24} color={colors.muted} /></TouchableOpacity>
             </View>
             
@@ -312,7 +315,7 @@ export default function CourierShipmentsScreen({ navigation }) {
               onPress={handleAssignAgent}
               disabled={assigningAgent || !selectedAgentId}
             >
-              {assigningAgent ? <ActivityIndicator size="small" color="white" /> : <CustomText style={styles.submitBtnText}>Assign Agent</CustomText>}
+              {assigningAgent ? <ActivityIndicator size="small" color="white" /> : <CustomText style={styles.submitBtnText}>{t('assignAgent')}</CustomText>}
             </TouchableOpacity>
           </View>
         </View>
@@ -326,8 +329,28 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, borderBottomWidth: 1 },
   backBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 18, fontWeight: '900' },
-  filterBar: { paddingHorizontal: 16, height: 60, alignItems: 'center', gap: 8 },
-  chip: { paddingHorizontal: 16, height: 36, borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  topFilterSection: {
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+  },
+  pillsRow: { 
+    marginVertical: 4,
+  },
+  pillsScrollContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+    paddingVertical: 8,
+  },
+  filterPill: { 
+    paddingHorizontal: 18, 
+    paddingVertical: 8, 
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  pillText: { 
+    fontSize: 14, 
+    fontWeight: '700' 
+  },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { padding: 16, gap: 12 },
   card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 8 },

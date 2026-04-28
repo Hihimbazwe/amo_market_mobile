@@ -7,12 +7,14 @@ import CustomText from '../../components/CustomText';
 import { AgentDrawerContext } from '../../context/AgentDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { agentService } from '../../api/agentService';
 
 const AgentDashboardScreen = () => {
   const { toggleDrawer } = React.useContext(AgentDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
   const firstName = user?.name?.split(' ')[0] || 'Agent';
 
@@ -49,9 +51,9 @@ const AgentDashboardScreen = () => {
       // In a real app, we'd use Expo Location here. For now, we mock the coordinates.
       // But we call the service which hits the real backend.
       await agentService.updateLocation(-1.9441, 30.0619); // Example Kigali coordinates
-      Alert.alert('Location Shared', 'Your current location has been updated for tracking.');
+      Alert.alert(t('locationSharedTitle'), t('locationUpdatedTracking'));
     } catch (error) {
-      Alert.alert('Error', 'Failed to share location');
+      Alert.alert(t('error'), t('failedToShareLocation'));
     } finally {
       setGpsActive(false);
     }
@@ -62,10 +64,10 @@ const AgentDashboardScreen = () => {
   const totalRevenue = orders.reduce((s, o) => s + (o.totalAmount || 0), 0);
 
   const stats = [
-    { label: "Active Orders", value: String(activeOrders), icon: Package, color: "#F97316" },
-    { label: "Completed", value: String(completedOrders), icon: CheckCircle, color: "#10B981" },
-    { label: "Total Revenue", value: `Rwf ${totalRevenue.toLocaleString()}`, icon: Wallet, color: "#3B82F6" },
-    { label: "Rating", value: profile?.rating ? `${profile.rating.toFixed(1)}/5` : "—", icon: Star, color: "#EAB308" },
+    { label: t("activeOrdersAgent"), value: String(activeOrders), icon: Package, color: "#F97316" },
+    { label: t("completed"), value: String(completedOrders), icon: CheckCircle, color: "#10B981" },
+    { label: t("totalRevenue"), value: `Rwf ${totalRevenue.toLocaleString()}`, icon: Wallet, color: "#3B82F6" },
+    { label: t("rating"), value: profile?.rating ? `${profile.rating.toFixed(1)}/5` : "—", icon: Star, color: "#EAB308" },
   ];
 
   const formatPrice = (price) => 'Rwf ' + (price || 0).toLocaleString();
@@ -76,7 +78,7 @@ const AgentDashboardScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Agent Dashboard</CustomText>
+        <CustomText variant="h2">{t('agentDashboard')}</CustomText>
         <TouchableOpacity onPress={loadData} style={[styles.refreshButton, { backgroundColor: colors.glass }]}>
           <RefreshCw color={colors.primary} size={20} className={loading ? "animate-spin" : ""} />
         </TouchableOpacity>
@@ -88,10 +90,10 @@ const AgentDashboardScreen = () => {
         <View style={styles.welcomeSection}>
           <View flex={1}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <CustomText variant="h2">Welcome, {firstName}!</CustomText>
+              <CustomText variant="h2">{t('agentWelcome', { name: firstName })}</CustomText>
               {profile?.verified && <ShieldCheck color={colors.primary} size={18} />}
             </View>
-            <CustomText style={{ color: colors.muted, marginTop: 4 }}>Ready for some deliveries today?</CustomText>
+            <CustomText style={{ color: colors.muted, marginTop: 4 }}>{t('agentReadyDeliveries')}</CustomText>
           </View>
           <TouchableOpacity 
             onPress={handleShareLocation}
@@ -100,7 +102,7 @@ const AgentDashboardScreen = () => {
           >
             <Navigation color={gpsActive ? "#10B981" : colors.muted} size={18} />
             <CustomText style={{ color: gpsActive ? "#10B981" : colors.muted, fontSize: 12, fontWeight: 'bold' }}>
-              {gpsActive ? 'Sharing...' : 'GPS'}
+              {gpsActive ? t('sharing') : t('gps')}
             </CustomText>
           </TouchableOpacity>
         </View>
@@ -134,8 +136,8 @@ const AgentDashboardScreen = () => {
                   <ShieldCheck size={24} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>Get Verified</CustomText>
-                  <CustomText style={{ color: colors.muted, fontSize: 11 }}>Enable priority delivery assignments.</CustomText>
+                  <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>{t('getVerified')}</CustomText>
+                  <CustomText style={{ color: colors.muted, fontSize: 11 }}>{t('getVerifiedDesc')}</CustomText>
                 </View>
                 <ArrowUpRight color={colors.primary} size={18} />
               </TouchableOpacity>
@@ -148,37 +150,37 @@ const AgentDashboardScreen = () => {
                  onPress={() => navigation.navigate('DeliveryRequests')}
                >
                  <Truck color="#F97316" size={24} />
-                 <CustomText style={[styles.qActionText, { color: colors.foreground }]}>Requests</CustomText>
+                 <CustomText style={[styles.qActionText, { color: colors.foreground }]}>{t('requests')}</CustomText>
                </TouchableOpacity>
                <TouchableOpacity 
                  style={[styles.qAction, { backgroundColor: colors.card, borderColor: colors.border }]}
                  onPress={() => navigation.navigate('AgentOrders')}
                >
                  <Package color="#3B82F6" size={24} />
-                 <CustomText style={[styles.qActionText, { color: colors.foreground }]}>My Deliveries</CustomText>
+                 <CustomText style={[styles.qActionText, { color: colors.foreground }]}>{t('myDeliveries')}</CustomText>
                </TouchableOpacity>
                <TouchableOpacity 
                  style={[styles.qAction, { backgroundColor: colors.card, borderColor: colors.border }]}
                  onPress={() => navigation.navigate('AgentCoverage')}
                >
                  <MapPin color="#10B981" size={24} />
-                 <CustomText style={[styles.qActionText, { color: colors.foreground }]}>Coverage</CustomText>
+                 <CustomText style={[styles.qActionText, { color: colors.foreground }]}>{t('coverage')}</CustomText>
                </TouchableOpacity>
             </View>
 
             {/* Recent Orders */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <CustomText style={styles.sectionTitle}>Recent Deliveries</CustomText>
+                <CustomText style={styles.sectionTitle}>{t('recentDeliveries')}</CustomText>
                 <TouchableOpacity onPress={() => navigation.navigate('AgentOrders')}>
-                  <CustomText style={[styles.seeAllText, { color: colors.primary }]}>VIEW ALL</CustomText>
+                  <CustomText style={[styles.seeAllText, { color: colors.primary }]}>{t('viewAll')}</CustomText>
                 </TouchableOpacity>
               </View>
               
               {orders.length === 0 ? (
                 <View style={[styles.emptyRecent, { backgroundColor: colors.glass }]}>
                   <Package color={colors.muted} size={32} />
-                  <CustomText style={{ color: colors.muted, marginTop: 12, fontSize: 13 }}>No recent deliveries.</CustomText>
+                  <CustomText style={{ color: colors.muted, marginTop: 12, fontSize: 13 }}>{t('noRecentDeliveries')}</CustomText>
                 </View>
               ) : (
                 orders.slice(0, 5).map((order) => (

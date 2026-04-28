@@ -12,11 +12,13 @@ import { replacementService } from '../../api/replacementService';
 import { orderService } from '../../api/orderService';
 import { useRoute } from '@react-navigation/native';
 import NotificationIcon from '../../components/NotificationIcon';
+import { useLanguage } from '../../context/LanguageContext';
 
 const BuyerReplacementsScreen = () => {
   const { toggleDrawer } = React.useContext(DrawerContext);
   const { colors, isDarkMode } = useTheme();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const route = useRoute();
 
   const [replacements, setReplacements] = useState([]);
@@ -33,11 +35,11 @@ const BuyerReplacementsScreen = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const REASONS = [
-    'Damaged Item',
-    'Wrong Item Received',
-    'Defective Product',
-    'Missing Parts',
-    'Other'
+    t('damagedItem'),
+    t('wrongItemReceived'),
+    t('defectiveProduct'),
+    t('missingParts'),
+    t('other')
   ];
 
   const fetchReplacements = async () => {
@@ -64,7 +66,7 @@ const BuyerReplacementsScreen = () => {
 
   const handleOpenModal = async (initialOrderId = null) => {
     if (!user) {
-      Alert.alert('Login Required', 'Please login to request a replacement.');
+      Alert.alert(t('loginRequired'), t('pleaseLoginReplacement'));
       return;
     }
     setModalVisible(true);
@@ -83,7 +85,7 @@ const BuyerReplacementsScreen = () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant media library permissions to upload evidence.');
+        Alert.alert(t('warning'), 'Please grant media library permissions to upload evidence.');
         return;
       }
 
@@ -102,7 +104,7 @@ const BuyerReplacementsScreen = () => {
       }
     } catch (error) {
       console.error('Pick image error:', error);
-      Alert.alert('Error', 'Failed to open image library: ' + error.message);
+      Alert.alert(t('error'), 'Failed to open image library: ' + error.message);
     }
   };
 
@@ -118,18 +120,18 @@ const BuyerReplacementsScreen = () => {
 
   const handleSubmitRequest = async () => {
     if (!selectedOrderId) {
-      Alert.alert('Selection Required', 'Please select an order to replace.');
+      Alert.alert(t('selectionRequired'), t('selectOrderToReplace'));
       return;
     }
     if (!reason.trim()) {
-      Alert.alert('Reason Required', 'Please provide a reason for the replacement.');
+      Alert.alert(t('reasonRequired'), t('provideReasonReplacement'));
       return;
     }
 
     setSubmitting(true);
     try {
       await replacementService.requestReplacement(user.id, selectedOrderId, reason, description, evidence);
-      Alert.alert('Success', 'Replacement request submitted successfully.');
+      Alert.alert(t('success'), t('replacementSubmitted'));
       setModalVisible(false);
       setSelectedOrderId(null);
       setReason('');
@@ -137,7 +139,7 @@ const BuyerReplacementsScreen = () => {
       setEvidence([]);
       fetchReplacements();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to submit replacement request.');
+      Alert.alert(t('error'), error.message || 'Failed to submit replacement request.');
     } finally {
       setSubmitting(false);
     }
@@ -155,24 +157,24 @@ const BuyerReplacementsScreen = () => {
              <CustomText style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>Order #{item.orderId.slice(-6).toUpperCase()}</CustomText>
            </View>
            <View style={[styles.statusBadge, { backgroundColor: item.status === 'PENDING' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)' }]}>
-             <CustomText style={[styles.statusText, { color: item.status === 'PENDING' ? '#F97316' : '#10B981' }]}>
-               {item.status}
-             </CustomText>
+              <CustomText style={[styles.statusText, { color: item.status === 'PENDING' ? '#F97316' : '#10B981' }]}>
+                {t(item.status.toLowerCase()) || item.status}
+              </CustomText>
            </View>
         </View>
 
         <View style={styles.cardBody}>
-          <CustomText style={[styles.reasonLabel, { color: colors.muted }]}>Reason:</CustomText>
+          <CustomText style={[styles.reasonLabel, { color: colors.muted }]}>{t('reason')}:</CustomText>
           <CustomText style={[styles.reasonText, { color: colors.foreground }]}>{item.reason}</CustomText>
           {item.description ? (
             <View style={{ marginTop: 8 }}>
-              <CustomText style={[styles.reasonLabel, { color: colors.muted }]}>Description:</CustomText>
+              <CustomText style={[styles.reasonLabel, { color: colors.muted }]}>{t('description')}:</CustomText>
               <CustomText style={[styles.reasonText, { color: colors.foreground }]}>{item.description}</CustomText>
             </View>
           ) : null}
           {item.evidence && item.evidence.length > 0 ? (
             <View style={{ marginTop: 12 }}>
-              <CustomText style={[styles.reasonLabel, { color: colors.muted, marginBottom: 8 }]}>Evidence:</CustomText>
+              <CustomText style={[styles.reasonLabel, { color: colors.muted, marginBottom: 8 }]}>{t('evidencePhotos')}:</CustomText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {item.evidence.map((img, idx) => (
                   <Image key={idx} source={{ uri: img }} style={styles.evidenceThumbnail} />
@@ -218,13 +220,13 @@ const BuyerReplacementsScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2" style={{ flex: 1 }}>Replacements</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>{t('replacements')}</CustomText>
         <NotificationIcon />
       </View>
       
       <View style={styles.topSection}>
-        <CustomText variant="subtitle" style={{ color: colors.muted }}>Manage Requests</CustomText>
-        <CustomButton title="Request New" onPress={handleOpenModal} style={{ paddingHorizontal: 16 }} />
+        <CustomText variant="subtitle" style={{ color: colors.muted }}>{t('manageRequests')}</CustomText>
+        <CustomButton title={t('requestNew')} onPress={handleOpenModal} style={{ paddingHorizontal: 16 }} />
       </View>
 
       {loading && replacements.length === 0 ? (
@@ -243,7 +245,7 @@ const BuyerReplacementsScreen = () => {
             <View style={styles.emptyState}>
               <RefreshCcw color={colors.muted} size={48} />
               <CustomText variant="subtitle" style={{ marginTop: 16, textAlign: 'center' }}>
-                You don't have any pending replacement requests.
+                {t('noReplacements')}
               </CustomText>
             </View>
           }
@@ -258,18 +260,18 @@ const BuyerReplacementsScreen = () => {
         >
           <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.glassBorder }]}>
             <View style={styles.modalHeader}>
-              <CustomText variant="h3">Request Replacement</CustomText>
+              <CustomText variant="h3">{t('requestReplacement')}</CustomText>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.glass }]}>
                 <X color={colors.foreground} size={20} />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-              <CustomText style={[styles.inputLabel, { color: colors.foreground }]}>Select Eligible Order</CustomText>
+              <CustomText style={[styles.inputLabel, { color: colors.foreground }]}>{t('selectEligibleOrder')}</CustomText>
               
               {orders.length === 0 ? (
                  <CustomText style={{ color: colors.muted, fontStyle: 'italic', marginBottom: 16 }}>
-                   No eligible orders found. Only delivered orders can be replaced.
+                   {t('noEligibleOrders')}
                  </CustomText>
               ) : (
                  <FlatList
@@ -281,7 +283,7 @@ const BuyerReplacementsScreen = () => {
                  />
               )}
 
-              <CustomText style={[styles.inputLabel, { color: colors.foreground }]}>Select Reason</CustomText>
+              <CustomText style={[styles.inputLabel, { color: colors.foreground }]}>{t('selectReason')}</CustomText>
               <View style={styles.reasonsContainer}>
                 {REASONS.map((r) => (
                   <TouchableOpacity
@@ -297,10 +299,10 @@ const BuyerReplacementsScreen = () => {
                 ))}
               </View>
 
-              <CustomText style={[styles.inputLabel, { color: colors.foreground }]}>Additional Information</CustomText>
+              <CustomText style={[styles.inputLabel, { color: colors.foreground }]}>{t('additionalInformation')}</CustomText>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.glass, color: colors.foreground, borderColor: colors.glassBorder, minHeight: 100 }]}
-                placeholder="Explain the issue in detail..."
+                placeholder={t('explainIssue')}
                 placeholderTextColor={colors.muted}
                 multiline
                 numberOfLines={4}
@@ -308,11 +310,11 @@ const BuyerReplacementsScreen = () => {
                 onChangeText={setDescription}
               />
 
-              <CustomText style={[styles.inputLabel, { color: colors.foreground }]}>Evidence (Photos)</CustomText>
+              <CustomText style={[styles.inputLabel, { color: colors.foreground }]}>{t('evidencePhotos')}</CustomText>
               <View style={styles.evidenceContainer}>
                 <TouchableOpacity style={[styles.addImageBtn, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]} onPress={pickImage}>
                   <Camera color={colors.primary} size={24} />
-                  <CustomText style={{ color: colors.primary, fontSize: 12, marginTop: 4 }}>Add Photo</CustomText>
+                  <CustomText style={{ color: colors.primary, fontSize: 12, marginTop: 4 }}>{t('addPhoto')}</CustomText>
                 </TouchableOpacity>
                 {evidence.map((img, idx) => (
                   <View key={idx} style={styles.imagePreviewWrapper}>
@@ -325,7 +327,7 @@ const BuyerReplacementsScreen = () => {
               </View>
 
               <CustomButton 
-                title="Submit Request" 
+                title={t('submitRequest')} 
                 onPress={handleSubmitRequest} 
                 loading={submitting} 
                 style={{ marginTop: 16 }} 

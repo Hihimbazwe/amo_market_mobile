@@ -7,11 +7,13 @@ import { BuyerDrawerContext as DrawerContext } from '../../context/BuyerDrawerCo
 import { useTheme } from '../../context/ThemeContext';
 import { useWishlist } from '../../context/WishlistContext';
 import ProductCard from '../../components/ProductCard';
+import { useLanguage } from '../../context/LanguageContext';
 
 const BuyerWishlistScreen = ({ navigation }) => {
   const { toggleDrawer } = React.useContext(DrawerContext);
   const { colors } = useTheme();
   const { wishlistItems, loading } = useWishlist();
+  const { t } = useLanguage();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -19,18 +21,18 @@ const BuyerWishlistScreen = ({ navigation }) => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">My Wishlist</CustomText>
+        <CustomText variant="h2">{t('wishlist')}</CustomText>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         {loading && wishlistItems.length === 0 ? (
           <View style={styles.emptyState}>
              <Heart color={colors.muted} size={48} />
-             <CustomText variant="subtitle" style={{ marginTop: 16 }}>Loading wishlist...</CustomText>
+             <CustomText variant="subtitle" style={{ marginTop: 16 }}>{t('loadingWishlist')}</CustomText>
           </View>
         ) : wishlistItems.length === 0 ? (
           <View style={styles.emptyState}>
             <Heart color={colors.muted} size={48} />
-            <CustomText variant="subtitle" style={{ marginTop: 16, color: colors.muted }}>Your wishlist is empty.</CustomText>
+            <CustomText variant="subtitle" style={{ marginTop: 16, color: colors.muted }}>{t('wishlistEmpty')}</CustomText>
           </View>
         ) : (
           <View style={styles.productGrid}>

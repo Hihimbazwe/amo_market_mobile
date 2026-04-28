@@ -9,6 +9,7 @@ import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCourierDrawer } from '../../context/CourierDrawerContext';
+import { useTranslation } from 'react-i18next';
 import { courierService } from '../../api/courierService';
 import * as Location from 'expo-location';
 
@@ -25,6 +26,7 @@ export default function CourierDashboardScreen({ navigation }) {
   const { colors } = useTheme();
   const { user } = useAuth();
   const { toggleDrawer } = useCourierDrawer();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,16 +51,16 @@ export default function CourierDashboardScreen({ navigation }) {
   const handleShareLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission denied', 'Location access is required to share your location.');
+      Alert.alert(t('locationPermissionDenied'), t('locationAccessRequired'));
       return;
     }
     setSharingLocation(true);
     try {
       const loc = await Location.getCurrentPositionAsync({});
       await courierService.shareLocation(user.id, loc.coords.latitude, loc.coords.longitude);
-      Alert.alert('✅ Success', 'Your location has been shared.');
+      Alert.alert('✅ ' + t('success'), t('locationShared'));
     } catch (e) {
-      Alert.alert('Error', 'Failed to share location.');
+      Alert.alert(t('error'), t('failedToShareLocation'));
     } finally {
       setSharingLocation(false);
     }
@@ -70,10 +72,10 @@ export default function CourierDashboardScreen({ navigation }) {
   const earnings = shipments.filter(s => s.status === 'DELIVERED').reduce((sum, s) => sum + ((s.amount || 0) * 0.1), 0);
 
   const stats = [
-    { label: 'Active', value: String(active), icon: Truck, color: '#f97316' },
-    { label: 'Delivered', value: String(delivered), icon: CheckCircle, color: '#22c55e' },
-    { label: 'Failed', value: String(failed), icon: AlertCircle, color: '#ef4444' },
-    { label: 'Est. Earnings', value: `Rwf ${earnings.toLocaleString()}`, icon: Wallet, color: '#f97316' },
+    { label: t('active'), value: String(active), icon: Truck, color: '#f97316' },
+    { label: t('delivered'), value: String(delivered), icon: CheckCircle, color: '#22c55e' },
+    { label: t('failed'), value: String(failed), icon: AlertCircle, color: '#ef4444' },
+    { label: t('estEarnings'), value: `Rwf ${earnings.toLocaleString()}`, icon: Wallet, color: '#f97316' },
   ];
 
   const firstName = user?.name?.split(' ')[0] || 'Courier';
@@ -90,7 +92,7 @@ export default function CourierDashboardScreen({ navigation }) {
           </View>
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>
-           <CustomText style={{ fontSize: 12, color: colors.muted }}>Welcome back, {firstName}</CustomText>
+           <CustomText style={{ fontSize: 12, color: colors.muted }}>{t('courierWelcome', { name: firstName })}</CustomText>
         </View>
         <TouchableOpacity
           onPress={handleShareLocation}
@@ -132,12 +134,12 @@ export default function CourierDashboardScreen({ navigation }) {
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</CustomText>
+          <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('quickActions')}</CustomText>
           <View style={styles.actionsRow}>
             {[
-              { label: 'My Shipments', screen: 'CourierShipments', icon: Package },
-              { label: 'Earnings', screen: 'CourierEarnings', icon: Wallet },
-              { label: 'Profile', screen: 'CourierProfile', icon: MapPin },
+              { label: t('myShipments'), screen: 'CourierShipments', icon: Package },
+              { label: t('earnings'), screen: 'CourierEarnings', icon: Wallet },
+              { label: t('profile'), screen: 'CourierProfile', icon: MapPin },
             ].map(a => {
               const Icon = a.icon;
               return (
@@ -160,17 +162,17 @@ export default function CourierDashboardScreen({ navigation }) {
         {/* Recent Shipments */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Shipments</CustomText>
+            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('recentShipments')}</CustomText>
             <TouchableOpacity onPress={() => navigation.navigate('CourierShipments')}>
-              <CustomText style={{ color: '#f97316', fontSize: 12, fontWeight: '700' }}>View all →</CustomText>
+              <CustomText style={{ color: '#f97316', fontSize: 12, fontWeight: '700' }}>{t('viewAllArrow')}</CustomText>
             </TouchableOpacity>
           </View>
 
           {!loading && shipments.length === 0 && (
             <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Package color={colors.muted} size={36} />
-              <CustomText style={[styles.emptyTitle, { color: colors.foreground }]}>No shipments yet</CustomText>
-              <CustomText style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>Shipments assigned to you will appear here</CustomText>
+              <CustomText style={[styles.emptyTitle, { color: colors.foreground }]}>{t('noShipmentsYet')}</CustomText>
+              <CustomText style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>{t('assignedShipmentsAppear')}</CustomText>
             </View>
           )}
 
@@ -192,7 +194,7 @@ export default function CourierDashboardScreen({ navigation }) {
                     <CustomText style={[styles.shipmentName, { color: colors.foreground }]}>{s.recipientName}</CustomText>
                     <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
                       <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                      <CustomText style={[styles.statusText, { color: statusColor }]}>{s.status?.replace(/_/g, ' ')}</CustomText>
+                      <CustomText style={[styles.statusText, { color: statusColor }]}>{t(s.status?.toLowerCase())}</CustomText>
                     </View>
                   </View>
                   

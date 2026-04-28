@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const AuthContext = createContext();
 
@@ -7,6 +8,9 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  const { expoPushToken } = usePushNotifications();
+
 
   useEffect(() => {
     // Load persisted user data on startup

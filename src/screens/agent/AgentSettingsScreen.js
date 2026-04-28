@@ -10,6 +10,7 @@ import { AgentDrawerContext } from '../../context/AgentDrawerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
+import { useTranslation } from 'react-i18next';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -28,7 +29,7 @@ const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 
         thumbColor="white"
       />
     ) : (
-      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: colors.primary }]}>CHANGE</CustomText></TouchableOpacity>
+      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: colors.primary }]}>{t('change')}</CustomText></TouchableOpacity>
     )}
   </View>
 );
@@ -37,6 +38,7 @@ const AgentSettingsScreen = () => {
   const { toggleDrawer } = React.useContext(AgentDrawerContext);
   const { isDarkMode, colors, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
   const [notifs, setNotifs] = useState(true);
   const [autoAccept, setAutoAccept] = useState(false);
@@ -48,21 +50,21 @@ const AgentSettingsScreen = () => {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('error'), t('fillAllFields'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+      Alert.alert(t('error'), t('passwordsDoNotMatch'));
       return;
     }
     setUpdating(true);
     try {
       await authService.changePassword(user.id, currentPassword, newPassword);
-      Alert.alert('Success', 'Password updated successfully. Please log in again.');
+      Alert.alert(t('success'), t('passwordUpdatedSuccess'));
       setShowPasswordModal(false);
       setTimeout(() => logout(), 1000);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update password');
+      Alert.alert(t('error'), error.message || t('failedToUpdatePassword'));
     } finally {
       setUpdating(false);
     }
@@ -74,21 +76,21 @@ const AgentSettingsScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Settings</CustomText>
+        <CustomText variant="h2">{t('settings')}</CustomText>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* ACCOUNT */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>ACCOUNT</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('ACCOUNT')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('AgentProfile')} activeOpacity={0.7}>
               <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
                 <User color={colors.muted} size={20} />
               </View>
               <View style={{ flex: 1, marginLeft: 16 }}>
-                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>My Profile</CustomText>
-                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>Edit delivery profile & info</CustomText>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('profile')}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{t('editDeliveryProfileInfo')}</CustomText>
               </View>
               <ChevronRight color={colors.muted} size={18} />
             </TouchableOpacity>
@@ -97,28 +99,28 @@ const AgentSettingsScreen = () => {
 
         {/* DELIVERY PREFERENCES */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>DELIVERY</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('delivery')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Bell} title="Delivery Alerts" subtitle="New delivery request notifications" value={notifs} onValueChange={setNotifs} colors={colors} />
+            <SettingRow icon={Bell} title={t('deliveryAlerts')} subtitle={t('newDeliveryRequestNotifs')} value={notifs} onValueChange={setNotifs} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Settings} title="Auto-Accept" subtitle="Automatically accept matching requests" value={autoAccept} onValueChange={setAutoAccept} colors={colors} />
+            <SettingRow icon={Settings} title={t('autoAccept')} subtitle={t('autoAcceptDesc')} value={autoAccept} onValueChange={setAutoAccept} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Moon} title="Dark Mode" subtitle="Switch theme preference" value={isDarkMode} onValueChange={toggleTheme} colors={colors} />
+            <SettingRow icon={Moon} title={t('darkMode')} subtitle={t('switchThemePref')} value={isDarkMode} onValueChange={toggleTheme} colors={colors} />
           </View>
         </View>
 
         {/* SECURITY */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>SECURITY</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('security')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Lock} title="Password" subtitle="Update your password" type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
+            <SettingRow icon={Lock} title={t('password')} subtitle={t('updateYourPassword')} type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Shield} title="Live Tracking" subtitle="Allow live location sharing" value={true} onValueChange={() => {}} colors={colors} />
+            <SettingRow icon={Shield} title={t('liveTracking')} subtitle={t('allowLiveLocationSharing')} value={true} onValueChange={() => {}} colors={colors} />
           </View>
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <CustomText style={styles.logoutText}>SIGN OUT</CustomText>
+          <CustomText style={styles.logoutText}>{t('signOut')}</CustomText>
         </TouchableOpacity>
       </ScrollView>
 
@@ -127,17 +129,17 @@ const AgentSettingsScreen = () => {
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
             <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={styles.modalHeader}>
-                <CustomText variant="h2">Change Password</CustomText>
+                <CustomText variant="h2">{t('changePassword')}</CustomText>
                 <TouchableOpacity onPress={() => setShowPasswordModal(false)}><XCircle color={colors.muted} size={24} /></TouchableOpacity>
               </View>
               <ScrollView style={styles.modalBody}>
-                <CustomInput label="Current Password" placeholder="••••••••" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry />
+                <CustomInput label={t('currentPassword')} placeholder="••••••••" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry />
                 <View style={{ height: 16 }} />
-                <CustomInput label="New Password" placeholder="••••••••" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
+                <CustomInput label={t('newPassword')} placeholder="••••••••" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
                 <View style={{ height: 16 }} />
-                <CustomInput label="Confirm New Password" placeholder="••••••••" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+                <CustomInput label={t('confirmNewPassword')} placeholder="••••••••" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
                 <View style={{ height: 32 }} />
-                <CustomButton title="Update Password" onPress={handleChangePassword} loading={updating} />
+                <CustomButton title={t('updatePassword')} onPress={handleChangePassword} loading={updating} />
               </ScrollView>
             </View>
           </KeyboardAvoidingView>

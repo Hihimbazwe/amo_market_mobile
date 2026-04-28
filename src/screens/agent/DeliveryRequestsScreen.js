@@ -10,11 +10,13 @@ import { useTheme } from '../../context/ThemeContext';
 import { AgentDrawerContext } from '../../context/AgentDrawerContext';
 import { agentService } from '../../api/agentService';
 import { Menu } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 const DeliveryRequestsScreen = () => {
     const { toggleDrawer } = React.useContext(AgentDrawerContext);
     const { colors, isDarkMode } = useTheme();
     const navigation = useNavigation();
+    const { t } = useTranslation(['dashboard', 'common']);
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionId, setActionId] = useState(null);
@@ -39,12 +41,12 @@ const DeliveryRequestsScreen = () => {
         setActionId(orderId);
         try {
             await agentService.handleDeliveryAction(orderId, action, note);
-            Alert.alert('Success', `Delivery ${action === 'accept' ? 'accepted' : 'rejected'}`);
+            Alert.alert(t('success'), action === 'accept' ? t('deliveryAccepted') : t('deliveryRejected'));
             setNote('');
             setExpanded(null);
             load();
         } catch (error) {
-            Alert.alert('Error', error.message || 'Failed to process action');
+            Alert.alert(t('error'), error.message || t('failedToProcessAction'));
         } finally {
             setActionId(null);
         }
@@ -62,10 +64,10 @@ const DeliveryRequestsScreen = () => {
                     <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                             <CustomText style={{ fontSize: 10, fontWeight: 'bold', color: colors.muted }}>#{order.id.slice(-8).toUpperCase()}</CustomText>
-                            {type === 'pending' && <View style={styles.newBadge}><CustomText style={styles.newBadgeText}>NEW</CustomText></View>}
+                            {type === 'pending' && <View style={styles.newBadge}><CustomText style={styles.newBadgeText}>{t('new')}</CustomText></View>}
                         </View>
                         <CustomText style={{ fontWeight: 'bold', color: colors.foreground }} numberOfLines={1}>
-                            {order.items?.[0]?.product?.title || 'Order'}
+                            {order.items?.[0]?.product?.title || t('order')}
                         </CustomText>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
                             <View style={styles.infoItem}><MapPin size={10} color={colors.muted} /><CustomText style={styles.infoText}>{order.address}</CustomText></View>
@@ -90,7 +92,7 @@ const DeliveryRequestsScreen = () => {
                         {type === 'pending' && (
                             <View style={{ marginTop: 16 }}>
                                 <CustomInput 
-                                    placeholder="Add a note (optional)"
+                                    placeholder={t('addNoteOptional')}
                                     value={note}
                                     onChangeText={setNote}
                                 />
@@ -101,7 +103,7 @@ const DeliveryRequestsScreen = () => {
                                         style={[styles.btn, { backgroundColor: '#10B981' }]}
                                     >
                                         <CheckCircle2 color="white" size={16} />
-                                        <CustomText style={styles.btnText}>Accept</CustomText>
+                                        <CustomText style={styles.btnText}>{t('accept')}</CustomText>
                                     </TouchableOpacity>
                                     <TouchableOpacity 
                                         onPress={() => handleAction(order.id, 'reject')}
@@ -109,7 +111,7 @@ const DeliveryRequestsScreen = () => {
                                         style={[styles.btn, { backgroundColor: 'transparent', borderColor: '#EF4444', borderWidth: 1 }]}
                                     >
                                         <XCircle color="#EF4444" size={16} />
-                                        <CustomText style={[styles.btnText, { color: '#EF4444' }]}>Reject</CustomText>
+                                        <CustomText style={[styles.btnText, { color: '#EF4444' }]}>{t('reject')}</CustomText>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -126,7 +128,7 @@ const DeliveryRequestsScreen = () => {
                 <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
                     <Menu color={colors.foreground} size={24} />
                 </TouchableOpacity>
-                <CustomText variant="h2">Delivery Requests</CustomText>
+                <CustomText variant="h2">{t('deliveryRequests')}</CustomText>
             </View>
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -136,14 +138,14 @@ const DeliveryRequestsScreen = () => {
                     <>
                         {pending.length > 0 && (
                             <View style={styles.section}>
-                                <CustomText style={styles.sectionTitle}>NEW REQUESTS ({pending.length})</CustomText>
+                                <CustomText style={styles.sectionTitle}>{t('newRequestsCount', { count: pending.length })}</CustomText>
                                 {pending.map(o => renderOrderCard(o, 'pending'))}
                             </View>
                         )}
 
                         {active.length > 0 && (
                             <View style={styles.section}>
-                                <CustomText style={[styles.sectionTitle, { color: '#3B82F6' }]}>ACTIVE DELIVERIES ({active.length})</CustomText>
+                                <CustomText style={[styles.sectionTitle, { color: '#3B82F6' }]}>{t('activeDeliveriesCount', { count: active.length })}</CustomText>
                                 {active.map(o => renderOrderCard(o, 'active'))}
                             </View>
                         )}
@@ -151,7 +153,7 @@ const DeliveryRequestsScreen = () => {
                         {orders.length === 0 && (
                             <View style={styles.empty}>
                                 <Truck size={48} color={colors.muted} strokeWidth={1} />
-                                <CustomText style={{ color: colors.muted, marginTop: 12 }}>No delivery requests</CustomText>
+                                <CustomText style={{ color: colors.muted, marginTop: 12 }}>{t('noDeliveryRequests')}</CustomText>
                             </View>
                         )}
                     </>

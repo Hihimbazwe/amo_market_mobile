@@ -10,10 +10,12 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { courierService } from '../../api/courierService';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 export default function CourierProfileScreen({ navigation }) {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,19 +45,19 @@ export default function CourierProfileScreen({ navigation }) {
     setSaving(true);
     try {
       await courierService.updateProfile(user.id, form);
-      Alert.alert('✅ Saved', 'Your profile has been updated.');
+      Alert.alert(`✅ ${t('saved')}`, t('profileUpdatedDesc'));
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to save profile.');
+      Alert.alert(t('error'), e.message || t('failedToSave'));
     } finally {
       setSaving(false);
     }
   };
 
   const fields = [
-    { key: 'phone', label: 'Phone Number', icon: Phone, placeholder: '+250 7XX XXX XXX', keyboardType: 'phone-pad' },
-    { key: 'vehicleType', label: 'Vehicle Type', icon: Truck, placeholder: 'e.g. Motorcycle, Bicycle, Car' },
-    { key: 'licensePlate', label: 'License Plate', icon: Truck, placeholder: 'e.g. RAC 123A' },
-    { key: 'bio', label: 'Bio / Notes', icon: User, placeholder: 'Short description about yourself', multiline: true },
+    { key: 'phone', label: t('phone'), icon: Phone, placeholder: '+250 7XX XXX XXX', keyboardType: 'phone-pad' },
+    { key: 'vehicleType', label: t('vehicleType'), icon: Truck, placeholder: t('vehiclePlaceholder') },
+    { key: 'licensePlate', label: t('licensePlate'), icon: Truck, placeholder: t('licensePlaceholder') },
+    { key: 'bio', label: t('bioNotes'), icon: User, placeholder: t('bioPlaceholder'), multiline: true },
   ];
 
   return (
@@ -66,7 +68,7 @@ export default function CourierProfileScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: colors.glass }]}>
           <ChevronLeft color={colors.foreground} size={22} />
         </TouchableOpacity>
-        <CustomText style={[styles.title, { color: colors.foreground }]}>My Profile</CustomText>
+        <CustomText style={[styles.title, { color: colors.foreground }]}>{t('profile')}</CustomText>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -76,11 +78,11 @@ export default function CourierProfileScreen({ navigation }) {
             <CustomText style={styles.avatarInitial}>{user?.name?.[0]?.toUpperCase() || 'C'}</CustomText>
           </View>
           <View style={{ flex: 1 }}>
-            <CustomText style={[styles.userName, { color: colors.foreground }]}>{user?.name || 'Courier'}</CustomText>
+            <CustomText style={[styles.userName, { color: colors.foreground }]}>{user?.name || t('courier')}</CustomText>
             <CustomText style={{ fontSize: 12, color: colors.muted }}>{user?.email}</CustomText>
             <View style={[styles.roleBadge, { backgroundColor: 'rgba(249,115,22,0.12)', borderColor: 'rgba(249,115,22,0.3)' }]}>
               <Truck color="#f97316" size={11} />
-              <CustomText style={{ fontSize: 10, fontWeight: '800', color: '#f97316', textTransform: 'uppercase', letterSpacing: 0.5 }}>Courier</CustomText>
+              <CustomText style={{ fontSize: 10, fontWeight: '800', color: '#f97316', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('courier')}</CustomText>
             </View>
           </View>
         </View>
@@ -94,14 +96,14 @@ export default function CourierProfileScreen({ navigation }) {
               <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.infoRow}>
                   <MapPin color="#f97316" size={16} />
-                  <CustomText style={[styles.infoLabel, { color: colors.muted }]}>Coverage Area</CustomText>
+                  <CustomText style={[styles.infoLabel, { color: colors.muted }]}>{t('coverage')}</CustomText>
                 </View>
                 <CustomText style={[styles.infoValue, { color: colors.foreground }]}>{profile.coverageArea}</CustomText>
               </View>
             )}
 
             {/* Editable fields */}
-            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Edit Details</CustomText>
+            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('editDetails')}</CustomText>
             {fields.map(f => {
               const Icon = f.icon;
               return (
@@ -130,7 +132,7 @@ export default function CourierProfileScreen({ navigation }) {
               activeOpacity={0.85}
             >
               {saving ? <ActivityIndicator size="small" color="#fff" /> : <Save color="#fff" size={18} />}
-              <CustomText style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</CustomText>
+              <CustomText style={styles.saveBtnText}>{saving ? t('saving') : t('saveChanges')}</CustomText>
             </TouchableOpacity>
           </>
         )}

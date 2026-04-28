@@ -8,11 +8,13 @@ import { useTheme } from '../../context/ThemeContext';
 import { AgentDrawerContext } from '../../context/AgentDrawerContext';
 import { agentService } from '../../api/agentService';
 import { Menu } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 const AgentOrdersScreen = () => {
     const { toggleDrawer } = React.useContext(AgentDrawerContext);
     const { colors } = useTheme();
     const navigation = useNavigation();
+    const { t, i18n } = useTranslation(['dashboard', 'common']);
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -36,9 +38,9 @@ const AgentOrdersScreen = () => {
                 <Truck color={colors.primary} size={20} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-                <CustomText style={{ fontWeight: 'bold', color: colors.foreground }}>{item.items?.[0]?.product?.title || 'Order'}</CustomText>
+                <CustomText style={{ fontWeight: 'bold', color: colors.foreground }}>{item.items?.[0]?.product?.title || t('order')}</CustomText>
                 <CustomText style={{ color: colors.muted, fontSize: 11 }}>{item.recipientName}</CustomText>
-                <CustomText style={{ color: colors.muted, fontSize: 10, marginTop: 4 }}>{new Date(item.createdAt).toLocaleDateString()}</CustomText>
+                <CustomText style={{ color: colors.muted, fontSize: 10, marginTop: 4 }}>{new Date(item.createdAt).toLocaleDateString(i18n.language === 'rw' ? 'rw-RW' : 'en-US')}</CustomText>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
                 <CustomText style={{ fontWeight: 'bold', color: colors.foreground }}>Rwf {item.totalAmount.toLocaleString()}</CustomText>
@@ -55,7 +57,7 @@ const AgentOrdersScreen = () => {
                 <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
                     <Menu color={colors.foreground} size={24} />
                 </TouchableOpacity>
-                <CustomText variant="h2">My Deliveries</CustomText>
+                <CustomText variant="h2">{t('myDeliveries')}</CustomText>
             </View>
             {loading ? (
                 <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
@@ -68,7 +70,7 @@ const AgentOrdersScreen = () => {
                     ListEmptyComponent={
                         <View style={styles.empty}>
                             <Package size={48} color={colors.muted} />
-                            <CustomText style={{ color: colors.muted, marginTop: 12 }}>No deliveries yet</CustomText>
+                            <CustomText style={{ color: colors.muted, marginTop: 12 }}>{t('noDeliveriesYet')}</CustomText>
                         </View>
                     }
                 />

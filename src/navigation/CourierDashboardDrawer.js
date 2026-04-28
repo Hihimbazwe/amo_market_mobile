@@ -20,6 +20,7 @@ import {
   User as UserIcon,
   Truck,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import CourierDashboardScreen from '../screens/courier/CourierDashboardScreen';
 import CourierShipmentsScreen from '../screens/courier/CourierShipmentsScreen';
@@ -32,18 +33,19 @@ const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
 // Exactly mirrors the web COURIER sidebar items
-const NAV_ITEMS = [
-  { name: 'Dashboard',   icon: LayoutDashboard, screen: 'CourierDashboard' },
-  { name: 'Shipments',   icon: Package,         screen: 'CourierShipments' },
-  { name: 'Earnings',    icon: Wallet,           screen: 'CourierEarnings'  },
-  { name: 'My Profile',  icon: UserIcon,         screen: 'CourierProfile'   },
-  { name: 'Settings',    icon: Settings,         screen: 'CourierSettings'  },
+const NAV_ITEMS = (t) => [
+  { name: t('dashboard'),   icon: LayoutDashboard, screen: 'CourierDashboard' },
+  { name: t('shipments'),   icon: Package,         screen: 'CourierShipments' },
+  { name: t('earnings'),    icon: Wallet,           screen: 'CourierEarnings'  },
+  { name: t('profile'),  icon: UserIcon,         screen: 'CourierProfile'   },
+  { name: t('settings'),    icon: Settings,         screen: 'CourierSettings'  },
 ];
 
 // ─── Slide-in Drawer ──────────────────────────────────────────────────────────
 const CustomDrawer = ({ visible, onClose, navigation, activeScreen, setActiveScreen }) => {
   const { colors } = useTheme();
   const { logout, user } = useAuth();
+  const { t } = useTranslation(['dashboard', 'common']);
   const slideAnim = useRef(new Animated.Value(-width * 0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const [shouldRender, setShouldRender] = useState(false);
@@ -73,10 +75,10 @@ const CustomDrawer = ({ visible, onClose, navigation, activeScreen, setActiveScr
   };
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('logoutConfirmTitle'), t('logoutConfirmDesc'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: t('logoutConfirmTitle'),
         style: 'destructive',
         onPress: () => { onClose(); logout(); if (navigation && navigation.navigate) navigation.navigate('Home'); },
       },
@@ -131,9 +133,9 @@ const CustomDrawer = ({ visible, onClose, navigation, activeScreen, setActiveScr
               </View>
               <View style={{ flex: 1 }}>
                 <CustomText style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
-                  {user?.name || 'Courier'}
+                  {user?.name || t('courier')}
                 </CustomText>
-                <CustomText style={styles.userRole}>Verified Courier</CustomText>
+                <CustomText style={styles.userRole}>{t('verifiedCourier')}</CustomText>
               </View>
             </View>
           </View>
@@ -141,7 +143,7 @@ const CustomDrawer = ({ visible, onClose, navigation, activeScreen, setActiveScr
           {/* Navigation */}
           <ScrollView style={styles.navContent} showsVerticalScrollIndicator={false}>
 
-            {NAV_ITEMS.map((item) => {
+            {NAV_ITEMS(t).map((item) => {
               const Icon = item.icon;
               const isActive = activeScreen === item.screen;
               return (
@@ -180,7 +182,7 @@ const CustomDrawer = ({ visible, onClose, navigation, activeScreen, setActiveScr
               activeOpacity={0.8}
             >
               <LogOut color="#EF4444" size={18} />
-              <CustomText style={styles.logoutText}>Sign Out</CustomText>
+              <CustomText style={styles.logoutText}>{t('signOut')}</CustomText>
             </TouchableOpacity>
           </View>
         </Animated.View>

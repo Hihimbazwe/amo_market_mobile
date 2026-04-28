@@ -48,6 +48,7 @@ import NotificationIcon from '../components/NotificationIcon';
 import { productService } from '../api/productService';
 import { useTheme } from '../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -70,6 +71,7 @@ const trendingSearches = ["iPhone 15", "Nike sneakers", "MacBook Pro", "Gaming c
 
 const HomeScreen = ({ navigation }) => {
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [liveProducts, setLiveProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,7 +130,7 @@ const HomeScreen = ({ navigation }) => {
             <View style={[styles.searchInputWrapperOverlay, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
               <TextInput
                 style={[styles.searchInputOverlay, { color: colors.foreground }]}
-                placeholder="Search products, categories..."
+                placeholder={t('searchPlaceholder')}
                 placeholderTextColor={colors.muted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -147,7 +149,7 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.searchSection}>
                 <View style={styles.searchSectionHeader}>
                   <TrendingUp size={14} color={colors.muted} />
-                  <CustomText style={[styles.searchSectionTitle, { color: colors.muted }]}>TRENDING SEARCHES</CustomText>
+                  <CustomText style={[styles.searchSectionTitle, { color: colors.muted }]}>{t('trendingSearches')}</CustomText>
                 </View>
                 <View style={styles.trendingGrid}>
                   {trendingSearches.map((t, idx) => (
@@ -173,7 +175,7 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.searchSection}>
                 <View style={styles.searchSectionHeader}>
                   <Tag size={14} color={colors.muted} />
-                  <CustomText style={[styles.searchSectionTitle, { color: colors.muted }]}>BROWSE CATEGORIES</CustomText>
+                  <CustomText style={[styles.searchSectionTitle, { color: colors.muted }]}>{t('browseCategories')}</CustomText>
                 </View>
                 <View style={styles.searchCategoriesGrid}>
                   {categories.map((cat, index) => (
@@ -203,7 +205,7 @@ const HomeScreen = ({ navigation }) => {
                   onPress={handleSearchSubmit}
                 >
                   <Search size={18} color={colors.muted} style={{ marginRight: 12 }} />
-                  <CustomText style={[styles.searchResultText, { color: colors.foreground }]}>Search for "{searchQuery}"</CustomText>
+                  <CustomText style={[styles.searchResultText, { color: colors.foreground }]}>{t('searchFor', { query: searchQuery })}</CustomText>
                   <ArrowUpRight size={16} color={colors.primary} />
                 </TouchableOpacity>
               </View>
@@ -270,13 +272,13 @@ const HomeScreen = ({ navigation }) => {
           >
             <View style={styles.heroOverlay}>
               <CustomText variant="h1" style={styles.heroTitle}>
-                Discover the Future of Shopping
+                {t('heroTitle')}
               </CustomText>
               <CustomText variant="subtitle" style={styles.heroSubtitle}>
-                Premium products from verified Rwanda sellers.
+                {t('heroSubtitle')}
               </CustomText>
               <CustomButton 
-                title="Shop Now" 
+                title={t('shopNow')} 
                 style={styles.heroButton}
                 onPress={() => navigation.navigate('Market')} 
               />
@@ -287,9 +289,9 @@ const HomeScreen = ({ navigation }) => {
         {/* Categories Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <CustomText variant="h2">Popular Categories</CustomText>
+            <CustomText variant="h2">{t('popularCategories')}</CustomText>
             <TouchableOpacity onPress={() => navigation.navigate('Market')}>
-              <CustomText variant="subtitle" style={{ color: colors.primary }}>View all</CustomText>
+              <CustomText variant="subtitle" style={{ color: colors.primary }}>{t('viewAll')}</CustomText>
             </TouchableOpacity>
           </View>
           <View style={styles.categoriesGrid}>
@@ -313,10 +315,10 @@ const HomeScreen = ({ navigation }) => {
           contentContainerStyle={styles.trustBarContent}
         >
           {[
-            { icon: ShieldCheck, title: "Buyer Protection" },
-            { icon: Truck, title: "Verified Couriers" },
-            { icon: Headphones, title: "24/7 Support" },
-            { icon: Star, title: "Verified Sellers" }
+            { icon: ShieldCheck, title: t('buyerProtection') },
+            { icon: Truck, title: t('verifiedCouriers') },
+            { icon: Headphones, title: t('support247') },
+            { icon: Star, title: t('verifiedSellers') }
           ].map((item, index) => (
             <View key={index} style={[styles.trustItem, { backgroundColor: colors.primary + '10' }]}>
               <View style={styles.trustIconContainer}>
@@ -330,9 +332,9 @@ const HomeScreen = ({ navigation }) => {
         {/* Featured Products */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <CustomText variant="h2">Featured Products</CustomText>
+            <CustomText variant="h2">{t('featuredProducts')}</CustomText>
             <TouchableOpacity onPress={() => navigation.navigate('Market')}>
-              <CustomText variant="subtitle" style={{ color: colors.primary }}>See all</CustomText>
+              <CustomText variant="subtitle" style={{ color: colors.primary }}>{t('seeAll')}</CustomText>
             </TouchableOpacity>
           </View>
           <View style={styles.productsGrid}>
@@ -352,16 +354,16 @@ const HomeScreen = ({ navigation }) => {
         <View style={[styles.section, { marginBottom: 32 }]}>
           <GlassContainer style={styles.proBanner}>
             <View style={styles.proBadge}>
-              <CustomText style={styles.proBadgeText}>⭐ PRO SELLER</CustomText>
+              <CustomText style={styles.proBadgeText}>⭐ {t('proSeller')}</CustomText>
             </View>
             <CustomText variant="h2" style={{ color: '#ffffff', marginTop: 12 }}>
-              Unlock Premium Features
+              {t('unlockPremium')}
             </CustomText>
             <CustomText variant="subtitle" style={{ color: 'rgba(255,255,255,0.7)', marginTop: 8 }}>
-              Boost your visibility and sales with Pro.
+              {t('boostVisibility')}
             </CustomText>
             <CustomButton 
-              title="Get Started" 
+              title={t('getStarted')} 
               variant="secondary"
               style={{ marginTop: 24, width: 160 }}
               onPress={() => {}}

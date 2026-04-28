@@ -9,6 +9,7 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import NotificationIcon from '../../components/NotificationIcon';
+import { useTranslation } from 'react-i18next';
 
 // Mock disputes removed
 
@@ -16,6 +17,7 @@ const SellerDisputesScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [disputes, setDisputes] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -55,12 +57,12 @@ const SellerDisputesScreen = () => {
             <CustomText style={[styles.idText, { color: colors.primary }]}>#{item.id.slice(-6).toUpperCase()}</CustomText>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: item.status === 'OPEN' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)' }]}>
-            <CustomText style={[styles.statusText, { color: item.status === 'OPEN' ? '#EF4444' : '#10B981' }]}>{item.status}</CustomText>
+            <CustomText style={[styles.statusText, { color: item.status === 'OPEN' ? '#EF4444' : '#10B981' }]}>{t(item.status?.toLowerCase())}</CustomText>
           </View>
         </View>
         
         <CustomText style={[styles.titleText, { color: colors.foreground }]}>{title}</CustomText>
-        <CustomText style={styles.orderId}>Order #{item.orderId.slice(-8).toUpperCase()}</CustomText>
+        <CustomText style={styles.orderId}>{t('common:order')} #{item.orderId.slice(-8).toUpperCase()}</CustomText>
         
         <View style={[styles.messageBox, { backgroundColor: colors.glass }]}>
           <MessageSquare color={colors.muted} size={12} />
@@ -70,7 +72,7 @@ const SellerDisputesScreen = () => {
         <View style={styles.cardFooter}>
           <CustomText style={styles.dateText}>{dateStr}</CustomText>
           <View style={styles.detailsBtn}>
-            <CustomText style={[styles.detailsText, { color: colors.primary }]}>VIEW DISPUTE</CustomText>
+            <CustomText style={[styles.detailsText, { color: colors.primary }]}>{t('viewDispute')}</CustomText>
             <ChevronRight color={colors.primary} size={14} />
           </View>
         </View>
@@ -84,7 +86,7 @@ const SellerDisputesScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2" style={{ flex: 1 }}>Disputes</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>{t('disputes')}</CustomText>
         <NotificationIcon />
       </View>
       
@@ -104,14 +106,14 @@ const SellerDisputesScreen = () => {
           ListHeaderComponent={
             <View style={[styles.infoBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Gavel color={colors.primary} size={24} />
-              <CustomText style={[styles.infoTitle, { color: colors.foreground }]}>Resolution Center</CustomText>
-              <CustomText style={styles.infoDesc}>Communicate with buyers and AMO agents to resolve order issues.</CustomText>
+              <CustomText style={[styles.infoTitle, { color: colors.foreground }]}>{t('resolutionCenter')}</CustomText>
+              <CustomText style={styles.infoDesc}>{t('resolutionCenterDesc')}</CustomText>
             </View>
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <ShieldAlert color={colors.isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} size={64} />
-              <CustomText style={styles.emptyText}>No active disputes. Good job!</CustomText>
+              <CustomText style={styles.emptyText}>{t('noActiveDisputes')}</CustomText>
             </View>
           }
         />

@@ -9,10 +9,12 @@ import { productService } from '../../api/productService';
 import { useTheme } from '../../context/ThemeContext';
 import NotificationIcon from '../../components/NotificationIcon';
 import AddProductModal from '../../components/AddProductModal';
+import { useTranslation } from 'react-i18next';
 const SellerProductsScreen = () => {
   const { toggleDrawer } = useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +45,7 @@ const SellerProductsScreen = () => {
       const data = await productService.getMyProducts(user.id);
       setProducts(data);
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch products');
+      Alert.alert(t('error'), t('failedToFetchProducts'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -61,7 +63,7 @@ const SellerProductsScreen = () => {
       if (editProduct) {
         // Edit mode: updating product text fields only
         await productService.updateProduct(user.id, editProduct.id, productData);
-        Alert.alert('Success', 'Product updated successfully!');
+        Alert.alert(t('success'), t('productUpdatedSuccess'));
       } else {
         // Create mode: Needs full image upload
         // 1. Upload media to Cloudinary First
@@ -77,14 +79,14 @@ const SellerProductsScreen = () => {
           mediaUrls
         };
         await productService.createProduct(user.id, finalProductData);
-        Alert.alert('Success', productData.published ? 'Product published successfully!' : 'Product saved as draft!');
+        Alert.alert(t('success'), productData.published ? t('productPublishedSuccess') : t('productDraftSuccess'));
       }
       
       // 3. Cleanup and Refresh
       handleCloseModal();
       fetchProducts();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to save product');
+      Alert.alert(t('error'), error.message || t('failedToSaveProduct'));
     } finally {
       setIsSubmitting(false);
     }
@@ -92,11 +94,11 @@ const SellerProductsScreen = () => {
 
   const handleDeleteProduct = (productId) => {
     Alert.alert(
-      "Delete Product",
-      "Are you sure you want to delete this product? This action cannot be undone.",
+      t('deleteProduct'),
+      t('deleteProductConfirm'),
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: async () => {
+        { text: t('cancel'), style: "cancel" },
+        { text: t('delete'), style: "destructive", onPress: async () => {
             try {
               await productService.deleteProduct(user.id, productId);
               fetchProducts();
@@ -114,7 +116,7 @@ const SellerProductsScreen = () => {
       await productService.updateProduct(user.id, productId, { published: !currentStatus });
       fetchProducts();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to update visibility');
+      Alert.alert(t('error'), err.message || t('failedToUpdateVisibility'));
     }
   };
 
@@ -171,13 +173,13 @@ const SellerProductsScreen = () => {
               backgroundColor: item.published ? 'rgba(16, 185, 129, 0.1)' : colors.glass 
             }]}>
               <CustomText style={[styles.pubText, { color: item.published ? '#10B981' : colors.muted }]}>
-                {item.published ? 'LIVE' : 'DRAFT'}
+                {item.published ? t('live') : t('draft')}
               </CustomText>
             </View>
             <CustomText style={[styles.stockValue, { 
               color: item.stock <= 0 ? '#EF4444' : item.stock <= 5 ? '#F97316' : colors.foreground 
             }]}>
-              {item.stock} qty
+              {item.stock} {t('qty')}
             </CustomText>
           </View>
         </View>
@@ -188,7 +190,7 @@ const SellerProductsScreen = () => {
             onPress={() => handleEditClick(item)}
           >
             <Pencil color={colors.primary} size={16} />
-            <CustomText style={[styles.actionText, { color: colors.primary }]}>Edit</CustomText>
+            <CustomText style={[styles.actionText, { color: colors.primary }]}>{t('edit')}</CustomText>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.actionBtn, { backgroundColor: colors.glass }]} 
@@ -196,7 +198,7 @@ const SellerProductsScreen = () => {
           >
             {item.published ? <EyeOff color={colors.muted} size={16} /> : <Eye color={colors.primary} size={16} />}
             <CustomText style={[styles.actionText, { color: item.published ? colors.muted : colors.primary }]}>
-              {item.published ? 'Hide' : 'Show'}
+              {item.published ? t('hide') : t('show')}
             </CustomText>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -204,7 +206,7 @@ const SellerProductsScreen = () => {
             onPress={() => handleDeleteProduct(item.id)}
           >
             <Trash2 color="#EF4444" size={16} />
-            <CustomText style={[styles.actionText, { color: '#EF4444' }]}>Delete</CustomText>
+            <CustomText style={[styles.actionText, { color: '#EF4444' }]}>{t('delete')}</CustomText>
           </TouchableOpacity>
         </View>
       </View>
@@ -217,14 +219,14 @@ const SellerProductsScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2" style={{ flex: 1 }}>My Products</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>{t('myProducts')}</CustomText>
         <NotificationIcon style={{ marginRight: 12 }} />
         <TouchableOpacity 
           style={[styles.addButton, { backgroundColor: colors.primary }]}
           onPress={() => setModalVisible(true)}
         >
           <Plus color="white" size={20} />
-          <CustomText style={[styles.addButtonText, { color: 'white' }]}>Add</CustomText>
+          <CustomText style={[styles.addButtonText, { color: 'white' }]}>{t('add')}</CustomText>
         </TouchableOpacity>
       </View>
 
@@ -232,7 +234,7 @@ const SellerProductsScreen = () => {
         <View style={[styles.searchContainer, { backgroundColor: colors.glass, borderColor: colors.border }]}>
           <Search color={colors.muted} size={20} />
           <TextInput
-            placeholder="Search products..."
+            placeholder={t('searchProducts')}
             placeholderTextColor={colors.muted}
             style={[styles.searchInput, { color: colors.foreground }]}
             value={searchQuery}
@@ -255,7 +257,7 @@ const SellerProductsScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Package color={colors.isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} size={64} />
-              <CustomText style={styles.emptyText}>No products found.</CustomText>
+              <CustomText style={styles.emptyText}>{t('noProductsFound')}</CustomText>
             </View>
           }
         />

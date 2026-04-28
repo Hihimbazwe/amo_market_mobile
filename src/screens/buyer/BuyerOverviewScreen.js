@@ -10,6 +10,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { orderService } from '../../api/orderService';
 import { disputeService } from '../../api/disputeService';
 import { Loader2 } from 'lucide-react-native';
+import { useLanguage } from '../../context/LanguageContext';
 
 
 const mockOrders = [
@@ -21,6 +22,7 @@ const BuyerOverviewScreen = () => {
   const { toggleDrawer } = React.useContext(DrawerContext);
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const navigation = useNavigation();
   const firstName = user?.name?.split(' ')[0] || 'there';
   
@@ -53,7 +55,7 @@ const BuyerOverviewScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Dashboard</CustomText>
+        <CustomText variant="h2">{t('dashboard')}</CustomText>
       </View>
       
       <ScrollView contentContainerStyle={styles.content}>
@@ -62,7 +64,7 @@ const BuyerOverviewScreen = () => {
         <View style={[styles.searchContainer, { backgroundColor: colors.glass }]}>
           <Search color={colors.primary} size={20} style={styles.searchIcon} />
           <TextInput 
-            placeholder="Search products, orders..." 
+            placeholder={t('searchPlaceholder')} 
             placeholderTextColor={colors.muted}
             style={[styles.searchInput, { color: colors.foreground }]}
           />
@@ -71,15 +73,15 @@ const BuyerOverviewScreen = () => {
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <View>
-            <CustomText variant="h2">Buyer Dashboard</CustomText>
-            <CustomText style={{ color: colors.muted, marginTop: 4 }}>Welcome back, {firstName}!</CustomText>
+            <CustomText variant="h2">{t('buyerDashboard')}</CustomText>
+            <CustomText style={{ color: colors.muted, marginTop: 4 }}>{t('welcomeBack')}, {firstName}!</CustomText>
           </View>
           <TouchableOpacity
             style={[styles.shopBtn, { backgroundColor: colors.primary }]}
             onPress={() => navigation.navigate('Market')}
           >
             <Zap color={colors.white} size={16} />
-            <CustomText style={styles.shopBtnText}>Shop Now</CustomText>
+            <CustomText style={styles.shopBtnText}>{t('shopNow')}</CustomText>
           </TouchableOpacity>
         </View>
 
@@ -90,7 +92,7 @@ const BuyerOverviewScreen = () => {
               <ShoppingBag color="#3B82F6" size={20} />
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>{orders.length}</CustomText>
-            <CustomText style={[styles.statLabel, { color: colors.muted }]}>ACTIVE ORDERS</CustomText>
+            <CustomText style={[styles.statLabel, { color: colors.muted }]}>{t('activeOrders')}</CustomText>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
@@ -99,36 +101,36 @@ const BuyerOverviewScreen = () => {
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>
               Rwf {orders.reduce((sum, o) => sum + (o.total || 0), 0).toLocaleString()}
             </CustomText>
-            <CustomText style={[styles.statLabel, { color: colors.muted }]}>TOTAL SPENT</CustomText>
+            <CustomText style={[styles.statLabel, { color: colors.muted }]}>{t('totalSpent')}</CustomText>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
               <ShieldAlert color="#F97316" size={20} />
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>{disputes.length}</CustomText>
-            <CustomText style={[styles.statLabel, { color: colors.muted }]}>DISPUTES</CustomText>
+            <CustomText style={[styles.statLabel, { color: colors.muted }]}>{t('dispute').toUpperCase()}</CustomText>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(168, 85, 247, 0.1)' }]}>
               <Bell color="#A855F7" size={20} />
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>0</CustomText>
-            <CustomText style={[styles.statLabel, { color: colors.muted }]}>NOTIFICATIONS</CustomText>
+            <CustomText style={[styles.statLabel, { color: colors.muted }]}>{t('notification').toUpperCase()}</CustomText>
           </View>
         </View>
 
         {/* Recent Orders */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Orders</CustomText>
-            <TouchableOpacity><CustomText style={[styles.seeAllText, { color: colors.primary }]}>VIEW ALL</CustomText></TouchableOpacity>
+            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('recentOrders')}</CustomText>
+            <TouchableOpacity><CustomText style={[styles.seeAllText, { color: colors.primary }]}>{t('viewAll')}</CustomText></TouchableOpacity>
           </View>
           {loading ? (
             <View style={{ alignItems: 'center', padding: 20 }}>
                <Loader2 color={colors.primary} size={24} className="animate-spin" />
             </View>
           ) : orders.length === 0 ? (
-            <CustomText style={{ color: colors.muted, textAlign: 'center', marginVertical: 20 }}>No recent orders found.</CustomText>
+            <CustomText style={{ color: colors.muted, textAlign: 'center', marginVertical: 20 }}>{t('noRecentOrders')}</CustomText>
           ) : (
             orders.slice(0, 3).map((order) => (
               <View key={order.id} style={[styles.orderRow, { borderBottomColor: colors.glassBorder }]}>
@@ -147,17 +149,17 @@ const BuyerOverviewScreen = () => {
 
         {/* Promo Cards */}
         <View style={[styles.promoCard, { backgroundColor: colors.secondary }]}>
-          <CustomText style={styles.promoSub}>PREMIUM ACCOUNT</CustomText>
-          <CustomText style={[styles.promoTitle, { color: colors.white }]}>Unlock 5% Cashback</CustomText>
-          <CustomText style={styles.promoDesc}>Upgrade to AMO Plus to get instant cashback.</CustomText>
+          <CustomText style={styles.promoSub}>{t('premiumAccount')}</CustomText>
+          <CustomText style={[styles.promoTitle, { color: colors.white }]}>{t('unlockCashback')}</CustomText>
+          <CustomText style={styles.promoDesc}>{t('upgradeAmoPlus')}</CustomText>
         </View>
 
         <View style={[styles.promoCard, { backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
             <Clock color={colors.primary} size={16} />
-            <CustomText style={[styles.promoTitle, { color: colors.foreground }]}>Buyer Protection</CustomText>
+            <CustomText style={[styles.promoTitle, { color: colors.foreground }]}>{t('buyerProtection')}</CustomText>
           </View>
-          <CustomText style={[styles.promoDesc, { color: colors.muted }]}>Always communicate and pay through AMO to ensure 72h protection.</CustomText>
+          <CustomText style={[styles.promoDesc, { color: colors.muted }]}>{t('protectionDesc')}</CustomText>
         </View>
 
       </ScrollView>

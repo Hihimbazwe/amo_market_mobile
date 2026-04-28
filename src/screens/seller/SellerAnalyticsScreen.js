@@ -9,6 +9,7 @@ import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import NotificationIcon from '../../components/NotificationIcon';
+import { useTranslation } from 'react-i18next';
 
 
 // Removed hardcoded data constants as they are now fetched from the backend
@@ -18,6 +19,7 @@ export default function SellerAnalyticsScreen() {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [period, setPeriod] = useState('7D');
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState(null);
@@ -60,7 +62,7 @@ export default function SellerAnalyticsScreen() {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2" style={{ flex: 1 }}>Store Analytics</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>{t('storeAnalytics')}</CustomText>
         <NotificationIcon />
       </View>
 
@@ -74,10 +76,10 @@ export default function SellerAnalyticsScreen() {
             {/* Key Metrics */}
             <View style={styles.metricsGrid}>
               {[
-                { label: 'REVENUE', value: formatPrice(analytics?.revenue), delta: '+18%', color: '#10B981', icon: TrendingUp },
-                { label: 'VISITORS', value: analytics?.views || '0', delta: '+9%', color: '#3B82F6', icon: Users },
-                { label: 'ORDERS', value: analytics?.orders || '0', delta: '+24%', color: '#A855F7', icon: ShoppingBag },
-                { label: 'SOLD', value: analytics?.productsSold || '0', delta: '+1.2%', color: '#F97316', icon: BarChart2 },
+                { label: t('totalRevenue').toUpperCase(), value: formatPrice(analytics?.revenue), delta: '+18%', color: '#10B981', icon: TrendingUp },
+                { label: t('visitors'), value: analytics?.views || '0', delta: '+9%', color: '#3B82F6', icon: Users },
+                { label: t('orders').toUpperCase(), value: analytics?.orders || '0', delta: '+24%', color: '#A855F7', icon: ShoppingBag },
+                { label: t('sold'), value: analytics?.productsSold || '0', delta: '+1.2%', color: '#F97316', icon: BarChart2 },
               ].map((m) => {
                 const Icon = m.icon;
                 return (
@@ -99,7 +101,7 @@ export default function SellerAnalyticsScreen() {
         {/* Revenue Chart */}
         <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.chartHeader}>
-            <CustomText style={styles.chartTitle}>Revenue Over Time</CustomText>
+            <CustomText style={styles.chartTitle}>{t('revenueOverTime')}</CustomText>
             <View style={styles.periodPicker}>
               {PERIODS.map((p) => (
                 <TouchableOpacity
@@ -107,7 +109,7 @@ export default function SellerAnalyticsScreen() {
                   style={[styles.periodChip, { backgroundColor: colors.glass }, period === p && { backgroundColor: colors.primary }]}
                   onPress={() => setPeriod(p)}
                 >
-                  <CustomText style={[styles.periodText, period === p && { color: colors.white }]}>{p}</CustomText>
+                  <CustomText style={[styles.periodText, period === p && { color: colors.white }]}>{t(`period_${p}`)}</CustomText>
                 </TouchableOpacity>
               ))}
             </View>
@@ -139,11 +141,11 @@ export default function SellerAnalyticsScreen() {
 
         {/* Top Products */}
         <View style={styles.section}>
-          <CustomText style={styles.sectionTitle}>Top Products</CustomText>
+          <CustomText style={styles.sectionTitle}>{t('topProducts')}</CustomText>
           <View style={styles.listCard}>
             {topProducts.length === 0 ? (
               <View style={{ padding: 20, alignItems: 'center' }}>
-                <CustomText style={{ color: colors.muted }}>No products sold yet.</CustomText>
+                <CustomText style={{ color: colors.muted }}>{t('noProductsSoldYet')}</CustomText>
               </View>
             ) : (
               topProducts.map((p, i) => {
@@ -161,7 +163,7 @@ export default function SellerAnalyticsScreen() {
                         <View style={[styles.progressFill, { width: `${pct}%` }]} />
                       </View>
                     </View>
-                    <CustomText style={styles.productPct}>{p.sales} sales</CustomText>
+                    <CustomText style={styles.productPct}>{t('salesCount', { count: p.sales })}</CustomText>
                   </View>
                 );
               })
@@ -171,7 +173,7 @@ export default function SellerAnalyticsScreen() {
 
         {/* Category Breakdown (Static for now as backend doesn't provide it yet) */}
         <View style={styles.section}>
-          <CustomText style={styles.sectionTitle}>Sales by Category</CustomText>
+          <CustomText style={styles.sectionTitle}>{t('salesByCategory')}</CustomText>
           <View style={styles.listCard}>
             {[
               { name: 'Products', pct: 100, color: '#3B82F6' },

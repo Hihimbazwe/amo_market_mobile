@@ -21,6 +21,7 @@ import {
   MessageCircle,
   Truck,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import SellerOverviewScreen from '../screens/seller/SellerOverviewScreen';
 import SellerProductsScreen from '../screens/seller/SellerProductsScreen';
@@ -43,29 +44,29 @@ const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
 // Core nav groups — secondary items (Withdraw, Replacements, Analytics, Profile) live inside their related screens
-const NAV_GROUPS = [
+const NAV_GROUPS = (t) => [
   {
-    label: 'STORE',
+    label: t('store'),
     items: [
-      { name: 'Dashboard', icon: Home, screen: 'SellerOverview' },
-      { name: 'My Products', icon: Package, screen: 'SellerProducts' },
-      { name: 'Orders', icon: ShoppingBag, screen: 'SellerOrders' },
-      { name: 'Shipping', icon: Truck, screen: 'SellerShipment' },
-      { name: 'Disputes', icon: AlertCircle, screen: 'SellerDisputes' },
+      { name: t('dashboard'), icon: Home, screen: 'SellerOverview' },
+      { name: t('myProducts'), icon: Package, screen: 'SellerProducts' },
+      { name: t('orders'), icon: ShoppingBag, screen: 'SellerOrders' },
+      { name: t('shipping'), icon: Truck, screen: 'SellerShipment' },
+      { name: t('disputes'), icon: AlertCircle, screen: 'SellerDisputes' },
     ],
   },
   {
-    label: 'FINANCE',
+    label: t('finance'),
     items: [
-      { name: 'Wallet', icon: Wallet, screen: 'SellerWallet' },
-      { name: 'Membership', icon: CreditCard, screen: 'SellerMembership' },
+      { name: t('wallet'), icon: Wallet, screen: 'SellerWallet' },
+      { name: t('membership'), icon: CreditCard, screen: 'SellerMembership' },
     ],
   },
   {
-    label: 'ACCOUNT',
+    label: t('ACCOUNT'),
     items: [
-      { name: 'KYC Verification', icon: ShieldCheck, screen: 'SellerKYC' },
-      { name: 'Settings', icon: Settings, screen: 'SellerSettings' },
+      { name: t('kycVerification'), icon: ShieldCheck, screen: 'SellerKYC' },
+      { name: t('settings'), icon: Settings, screen: 'SellerSettings' },
     ],
   },
 ];
@@ -73,6 +74,7 @@ const NAV_GROUPS = [
 const CustomDrawer = ({ visible, onClose, navigation }) => {
   const { colors } = useTheme();
   const { logout, user } = useAuth();
+  const { t } = useTranslation(['dashboard', 'common']);
   const slideAnim = useRef(new Animated.Value(-width * 0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -98,10 +100,10 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   };
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('logoutConfirmTitle'), t('logoutConfirmDesc'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: t('logoutConfirmTitle'),
         style: 'destructive',
         onPress: () => { onClose(); logout(); navigation.navigate('Home'); },
       },
@@ -165,7 +167,7 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
               </View>
               <View style={{ flex: 1 }}>
                 <CustomText style={[styles.userEmail, { color: colors.foreground, fontSize: 14, fontWeight: '700' }]} numberOfLines={1}>
-                  {user?.name || 'Seller'}
+                  {user?.name || t('seller')}
                 </CustomText>
               </View>
             </View>
@@ -177,7 +179,7 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 24 }}
           >
-            {NAV_GROUPS.map((group, gIdx) => (
+            {NAV_GROUPS(t).map((group, gIdx) => (
               <View key={group.label} style={[styles.group, gIdx > 0 && { marginTop: 8 }]}>
                 <CustomText style={[styles.groupLabel, { color: colors.muted }]}>{group.label}</CustomText>
                 {group.items.map((item) => {
@@ -208,7 +210,7 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
               activeOpacity={0.8}
             >
               <LogOut color="#EF4444" size={18} />
-              <CustomText style={styles.logoutText}>Sign Out</CustomText>
+              <CustomText style={styles.logoutText}>{t('signOut')}</CustomText>
             </TouchableOpacity>
           </View>
         </Animated.View>

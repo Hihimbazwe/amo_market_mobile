@@ -7,6 +7,7 @@ import CustomText from '../../components/CustomText';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 import { sellerService } from '../../api/sellerService';
 
@@ -15,6 +16,7 @@ const SellerOverviewScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
   const firstName = user?.name?.split(' ')[0] || 'Seller';
 
@@ -70,7 +72,7 @@ const SellerOverviewScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Seller Dashboard</CustomText>
+        <CustomText variant="h2">{t('sellerDashboard')}</CustomText>
       </View>
       
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -79,7 +81,7 @@ const SellerOverviewScreen = () => {
         <View style={[styles.searchContainer, { backgroundColor: colors.glass }]}>
           <Search color={colors.primary} size={20} style={styles.searchIcon} />
           <TextInput 
-            placeholder="Search products, orders, analytics..." 
+            placeholder={t('searchSellerPlaceholder')} 
             placeholderTextColor={colors.muted}
             style={[styles.searchInput, { color: colors.foreground }]}
           />
@@ -88,15 +90,15 @@ const SellerOverviewScreen = () => {
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <View>
-            <CustomText variant="h2">Store Overview</CustomText>
-            <CustomText style={{ color: colors.muted, marginTop: 4 }}>Hello, {firstName}! How's business?</CustomText>
+            <CustomText variant="h2">{t('storeOverview')}</CustomText>
+            <CustomText style={{ color: colors.muted, marginTop: 4 }}>{t('sellerWelcome', { name: firstName })}</CustomText>
           </View>
           <TouchableOpacity 
             style={[styles.actionBtn, { backgroundColor: colors.primary }]}
             onPress={() => navigation.navigate('SellerProducts')}
           >
             <Package color="white" size={16} />
-            <CustomText style={[styles.actionBtnText, { color: 'white' }]}>Add</CustomText>
+            <CustomText style={[styles.actionBtnText, { color: 'white' }]}>{t('add')}</CustomText>
           </TouchableOpacity>
         </View>
 
@@ -113,7 +115,7 @@ const SellerOverviewScreen = () => {
               <Wallet color="#F97316" size={20} />
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>{formatPrice(data.revenue)}</CustomText>
-            <CustomText style={styles.statLabel}>TOTAL REVENUE</CustomText>
+            <CustomText style={styles.statLabel}>{t('totalRevenue')}</CustomText>
             <View style={styles.trendBadge}>
               <ArrowUpRight color="#10B981" size={10} />
               <CustomText style={styles.trendText}>+12%</CustomText>
@@ -125,7 +127,7 @@ const SellerOverviewScreen = () => {
               <Package color="#3B82F6" size={20} />
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>{data.activeProducts}</CustomText>
-            <CustomText style={styles.statLabel}>ACTIVE PRODUCTS</CustomText>
+            <CustomText style={styles.statLabel}>{t('activeProducts')}</CustomText>
           </View>
 
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -133,7 +135,7 @@ const SellerOverviewScreen = () => {
               <ShoppingBag color="#A855F7" size={20} />
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>{data.pendingShipments}</CustomText>
-            <CustomText style={styles.statLabel}>PENDING SHIPMENTS</CustomText>
+            <CustomText style={styles.statLabel}>{t('pendingShipments')}</CustomText>
           </View>
 
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -141,21 +143,21 @@ const SellerOverviewScreen = () => {
               <Wallet color="#10B981" size={20} />
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>{formatPrice(data.walletBalance)}</CustomText>
-            <CustomText style={styles.statLabel}>WALLET BALANCE</CustomText>
+            <CustomText style={styles.statLabel}>{t('walletBalance')}</CustomText>
           </View>
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <CustomText style={styles.sectionTitle}>Recent Orders</CustomText>
+            <CustomText style={styles.sectionTitle}>{t('recentOrders')}</CustomText>
             <TouchableOpacity onPress={() => navigation.navigate('SellerOrders')}>
-              <CustomText style={styles.seeAllText}>VIEW ALL</CustomText>
+              <CustomText style={styles.seeAllText}>{t('viewAll')}</CustomText>
             </TouchableOpacity>
           </View>
           {data.recentOrders.length === 0 ? (
             <View style={[styles.emptyRecent, { backgroundColor: colors.glass }]}>
               <ShoppingBag color={colors.muted} size={32} />
-              <CustomText style={{ color: colors.muted, marginTop: 12, fontSize: 13 }}>No recent orders to show.</CustomText>
+              <CustomText style={{ color: colors.muted, marginTop: 12, fontSize: 13 }}>{t('noRecentOrdersSeller')}</CustomText>
             </View>
           ) : (
             data.recentOrders.map((order) => {
@@ -194,8 +196,8 @@ const SellerOverviewScreen = () => {
               <Zap color="white" size={20} fill="white" />
             </View>
             <View style={{ flex: 1 }}>
-              <CustomText style={styles.upgradeTitle}>Upgrade to Elite Seller</CustomText>
-              <CustomText style={styles.upgradeDesc}>Get lower fees, priority support and featured listings.</CustomText>
+              <CustomText style={styles.upgradeTitle}>{t('upgradeElite')}</CustomText>
+              <CustomText style={styles.upgradeDesc}>{t('upgradeEliteDesc')}</CustomText>
             </View>
             <ArrowUpRight color="white" size={20} />
           </View>
@@ -211,8 +213,8 @@ const SellerOverviewScreen = () => {
             <BarChart2 color="#A855F7" size={20} />
           </View>
           <View style={{ flex: 1 }}>
-            <CustomText style={[styles.upgradeTitle, { color: colors.foreground }]}>View Analytics</CustomText>
-            <CustomText style={[styles.upgradeDesc, { color: colors.muted }]}>Sales trends, revenue & performance</CustomText>
+            <CustomText style={[styles.upgradeTitle, { color: colors.foreground }]}>{t('viewAnalytics')}</CustomText>
+            <CustomText style={[styles.upgradeDesc, { color: colors.muted }]}>{t('analyticsDesc')}</CustomText>
           </View>
           <ArrowUpRight color={colors.muted} size={20} />
         </TouchableOpacity>

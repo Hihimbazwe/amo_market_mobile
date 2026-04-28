@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import './src/i18n';
 import React from 'react';
 import { View, StyleSheet, AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -27,6 +28,7 @@ import { CartProvider, useCart } from './src/context/CartContext';
 import { WishlistProvider } from './src/context/WishlistContext';
 import { NotificationProvider, useNotifications } from './src/context/NotificationContext';
 import { PresenceProvider } from './src/context/PresenceContext';
+import { LanguageProvider } from './src/context/LanguageContext';
 import CustomText from './src/components/CustomText';
 import BuyerDashboardDrawer from './src/navigation/BuyerDashboardDrawer';
 import SellerDashboardDrawer from './src/navigation/SellerDashboardDrawer';
@@ -261,17 +263,19 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <PresenceProvider>
-          <ThemeProvider>
-            <NotificationProvider>
-              <CartProvider>
-                <WishlistProvider>
-                  <SafeAreaProvider>
-                    <RootNavigator />
-                  </SafeAreaProvider>
-                </WishlistProvider>
-              </CartProvider>
-            </NotificationProvider>
-          </ThemeProvider>
+          <LanguageProvider>
+            <ThemeProvider>
+              <NotificationProvider>
+                <CartProvider>
+                  <WishlistProvider>
+                    <SafeAreaProvider>
+                      <RootNavigator />
+                    </SafeAreaProvider>
+                  </WishlistProvider>
+                </CartProvider>
+              </NotificationProvider>
+            </ThemeProvider>
+          </LanguageProvider>
         </PresenceProvider>
       </AuthProvider>
     </GestureHandlerRootView>

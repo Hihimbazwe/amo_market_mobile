@@ -7,6 +7,7 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 // Mock transactions removed
 
@@ -14,6 +15,7 @@ const SellerWalletScreen = ({ navigation }) => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const [wallet, setWallet] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -53,14 +55,14 @@ const SellerWalletScreen = ({ navigation }) => {
           {!isWithdraw ? <TrendingUp color="#10B981" size={18} /> : <ArrowDownToLine color="#EF4444" size={18} />}
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <CustomText style={[styles.txType, { color: colors.foreground }]}>{!isWithdraw ? 'Product Sale' : `Withdrawal (${item.method || 'Bank'})`}</CustomText>
+          <CustomText style={[styles.txType, { color: colors.foreground }]}>{!isWithdraw ? t('productSale') : t('withdrawalWithMethod', { method: item.method || 'Bank' })}</CustomText>
           <CustomText style={styles.txDate}>{dateStr}</CustomText>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <CustomText style={[styles.txAmount, { color: !isWithdraw ? '#10B981' : '#EF4444' }]}>
             {`${!isWithdraw ? '+' : '-'} Rwf ${amount.toLocaleString()}`}
           </CustomText>
-          <CustomText style={styles.txStatus}>{item.status}</CustomText>
+          <CustomText style={styles.txStatus}>{t(item.status?.toLowerCase())}</CustomText>
         </View>
       </View>
     );
@@ -72,7 +74,7 @@ const SellerWalletScreen = ({ navigation }) => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Wallet</CustomText>
+        <CustomText variant="h2">{t('wallet')}</CustomText>
       </View>
       
       <ScrollView 
@@ -89,13 +91,13 @@ const SellerWalletScreen = ({ navigation }) => {
             {/* Balance Card */}
             <View style={styles.balanceCard}>
               <View style={styles.balanceInfo}>
-                <CustomText style={styles.balanceLabel}>AVAILABLE BALANCE</CustomText>
+                <CustomText style={styles.balanceLabel}>{t('availableBalance')}</CustomText>
                 <CustomText style={styles.balanceAmount}>Rwf {(wallet?.balance || 0).toLocaleString()}</CustomText>
               </View>
               <View style={styles.balanceActions}>
                 <TouchableOpacity style={styles.withdrawBtn} onPress={() => navigation.navigate('SellerWithdraw')}>
                   <ArrowDownToLine color="white" size={20} />
-                  <CustomText style={styles.withdrawBtnText}>Withdraw</CustomText>
+                  <CustomText style={styles.withdrawBtnText}>{t('withdraw')}</CustomText>
                 </TouchableOpacity>
               </View>
             </View>
@@ -103,11 +105,11 @@ const SellerWalletScreen = ({ navigation }) => {
             {/* Stats Row */}
             <View style={styles.statsRow}>
               <View style={[styles.miniStatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <CustomText style={styles.miniStatLabel}>PENDING</CustomText>
+                <CustomText style={styles.miniStatLabel}>{t('pendingUpper')}</CustomText>
                 <CustomText style={[styles.miniStatValue, { color: colors.foreground }]}>Rwf {(wallet?.pendingBalance || 0).toLocaleString()}</CustomText>
               </View>
               <View style={[styles.miniStatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <CustomText style={styles.miniStatLabel}>LIFETIME</CustomText>
+                <CustomText style={styles.miniStatLabel}>{t('lifetimeEarnings')}</CustomText>
                 <CustomText style={[styles.miniStatValue, { color: colors.foreground }]}>Rwf {(wallet?.lifetimeEarnings || 0).toLocaleString()}</CustomText>
               </View>
             </View>
@@ -115,7 +117,7 @@ const SellerWalletScreen = ({ navigation }) => {
         {/* Section Header */}
         <View style={styles.sectionHeader}>
           <History color={colors.primary} size={20} />
-          <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>Transaction History</CustomText>
+          <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('transactionHistory')}</CustomText>
         </View>
 
         {/* Transactions list implemented as children of ScrollView for simplicity in this mockup, 
@@ -124,7 +126,7 @@ const SellerWalletScreen = ({ navigation }) => {
           {wallet?.transactions?.length > 0 ? (
             wallet.transactions.map((item) => renderTransactionItem({ item }))
           ) : (
-            <CustomText style={{ color: colors.muted, textAlign: 'center', padding: 20 }}>No transactions yet.</CustomText>
+            <CustomText style={{ color: colors.muted, textAlign: 'center', padding: 20 }}>{t('noTransactionsYet')}</CustomText>
           )}
         </View>
           </>
@@ -137,8 +139,8 @@ const SellerWalletScreen = ({ navigation }) => {
               <CreditCard color={colors.isDarkMode ? colors.white : colors.primary} size={20} />
             </View>
             <View>
-              <CustomText style={[styles.methodTitle, { color: colors.foreground }]}>Payout Methods</CustomText>
-              <CustomText style={styles.methodDesc}>Manage bank & MOMO accounts</CustomText>
+              <CustomText style={[styles.methodTitle, { color: colors.foreground }]}>{t('payoutMethods')}</CustomText>
+              <CustomText style={styles.methodDesc}>{t('managePayoutAccounts')}</CustomText>
             </View>
           </View>
           <ArrowUpRight color={colors.muted} size={20} />

@@ -42,8 +42,10 @@ export const productService = {
         data = JSON.parse(text);
       } catch (e) {
         if (text?.includes('<html') || text?.includes('<!DOCTYPE')) {
+          console.error('[DEBUG] HTML response detected from:', url, text.slice(0, 200));
           throw new Error('Server error: Invalid response format.');
         }
+        console.error('[DEBUG] JSON parse error from:', url, text.slice(0, 200));
         throw new Error(`Invalid JSON from server at ${url}: ${text.slice(0, 100)}`);
       }
 

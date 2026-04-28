@@ -18,6 +18,7 @@ import {
   CircleUser as UserIcon,
   MessageCircle,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import AgentDashboardScreen from '../screens/agent/AgentDashboardScreen';
 import DeliveryRequestsScreen from '../screens/agent/DeliveryRequestsScreen';
@@ -32,21 +33,21 @@ import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
-const NAV_GROUPS = [
+const NAV_GROUPS = (t) => [
   {
-    label: 'DELIVERY',
+    label: t('delivery'),
     items: [
-      { name: 'Dashboard', icon: Home, screen: 'AgentDashboard' },
-      { name: 'Requests', icon: Truck, screen: 'DeliveryRequests' },
-      { name: 'My Deliveries', icon: Package, screen: 'AgentOrders' },
+      { name: t('dashboard'), icon: Home, screen: 'AgentDashboard' },
+      { name: t('requests'), icon: Truck, screen: 'DeliveryRequests' },
+      { name: t('myDeliveries'), icon: Package, screen: 'AgentOrders' },
     ],
   },
   {
-    label: 'ACCOUNT',
+    label: t('ACCOUNT'),
     items: [
-      { name: 'Coverage', icon: MapPin, screen: 'AgentCoverage' },
-      { name: 'Profile', icon: ShieldCheck, screen: 'AgentProfile' },
-      { name: 'Settings', icon: Settings, screen: 'AgentSettings' },
+      { name: t('coverage'), icon: MapPin, screen: 'AgentCoverage' },
+      { name: t('profile'), icon: ShieldCheck, screen: 'AgentProfile' },
+      { name: t('settings'), icon: Settings, screen: 'AgentSettings' },
     ],
   },
 ];
@@ -54,6 +55,7 @@ const NAV_GROUPS = [
 const CustomDrawer = ({ visible, onClose, navigation }) => {
   const { colors } = useTheme();
   const { logout, user } = useAuth();
+  const { t } = useTranslation(['dashboard', 'common']);
   const slideAnim = useRef(new Animated.Value(-width * 0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -79,10 +81,10 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   };
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('logoutConfirmTitle'), t('logoutConfirmDesc'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: t('logoutConfirmTitle'),
         style: 'destructive',
         onPress: () => { onClose(); logout(); navigation.navigate('Home'); },
       },
@@ -143,15 +145,15 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
               </View>
               <View style={{ flex: 1 }}>
                 <CustomText style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
-                  {user?.name || 'Agent'}
+                  {user?.name || t('agent')}
                 </CustomText>
-                <CustomText style={[styles.userRole, { color: colors.primary }]}>Verified Agent</CustomText>
+                <CustomText style={[styles.userRole, { color: colors.primary }]}>{t('verifiedAgent')}</CustomText>
               </View>
             </View>
           </View>
 
           <ScrollView style={styles.navContent} showsVerticalScrollIndicator={false}>
-            {NAV_GROUPS.map((group, gIdx) => (
+            {NAV_GROUPS(t).map((group, gIdx) => (
               <View key={group.label} style={[styles.group, gIdx > 0 && { marginTop: 8 }]}>
                 <CustomText style={[styles.groupLabel, { color: colors.muted }]}>{group.label}</CustomText>
                 {group.items.map((item) => {
@@ -178,10 +180,10 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
             <TouchableOpacity
               style={[styles.logoutBtn, { backgroundColor: 'rgba(239,68,68,0.08)' }]}
               onPress={handleLogout}
-              activeOpacity={0.8}
+               activeOpacity={0.8}
             >
               <LogOut color="#EF4444" size={18} />
-              <CustomText style={styles.logoutText}>Sign Out</CustomText>
+              <CustomText style={styles.logoutText}>{t('signOut')}</CustomText>
             </TouchableOpacity>
           </View>
         </Animated.View>

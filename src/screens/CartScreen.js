@@ -15,9 +15,11 @@ import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { Colors as StaticColors } from '../theme/colors';
 import {Text} from 'react-native';
 const CartScreen = ({ navigation }) => {
+  const { t } = useTranslation(['dashboard', 'common']);
   const { cartItems, cartTotal, loading, updateQuantity, removeFromCart, clearCart } = useCart();
   const { colors, isDarkMode } = useTheme();
 
@@ -46,7 +48,7 @@ const CartScreen = ({ navigation }) => {
 
   const handleCheckout = () => {
     if (selectedItemIds.length === 0) {
-      Alert.alert('No Items Selected', 'Please select at least one item to proceed to checkout.');
+      Alert.alert(t('noItemsSelected'), t('selectItemToCheckout'));
       return;
     }
     navigation.navigate('Checkout', { selectedItemIds });
@@ -54,11 +56,11 @@ const CartScreen = ({ navigation }) => {
 
   const handleRemoveItem = (productId) => {
     Alert.alert(
-      "Remove Item",
-      "Are you sure you want to remove this item from your cart?",
+      t('removeCartItem'),
+      t('removeCartItemConfirm'),
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Remove", style: "destructive", onPress: () => removeFromCart(productId) }
+        { text: t('cancel'), style: "cancel" },
+        { text: t('delete'), style: "destructive", onPress: () => removeFromCart(productId) }
       ]
     );
   };
@@ -101,7 +103,7 @@ const CartScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          <CustomText style={[styles.categoryText, { color: colors.muted }]}>{product.category}</CustomText>
+          <CustomText style={[styles.categoryText, { color: colors.muted }]}>{product.category ? t(product.category.toLowerCase()) : ''}</CustomText>
           
           <View style={styles.itemFooter}>
             <CustomText style={[styles.priceText, { color: colors.primary }]}>
@@ -134,6 +136,7 @@ const CartScreen = ({ navigation }) => {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
+          <CustomText style={{ marginTop: 12, color: colors.muted }}>{t('loading')}...</CustomText>
         </View>
       </SafeAreaView>
     );
@@ -149,16 +152,16 @@ const CartScreen = ({ navigation }) => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: colors.glass }]}>
             <ChevronLeft size={24} color={colors.foreground} />
           </TouchableOpacity>
-          <CustomText variant="h2" style={[styles.headerTitle, { color: colors.foreground }]}>My Cart</CustomText>
+          <CustomText variant="h2" style={[styles.headerTitle, { color: colors.foreground }]}>{t('myCart')}</CustomText>
         </View>
         {cartItems.length > 0 && (
           <TouchableOpacity onPress={() => {
-            Alert.alert("Clear Cart", "Are you sure you want to remove all items?", [
-              { text: "Cancel", style: "cancel" },
-              { text: "Clear All", style: "destructive", onPress: clearCart }
+            Alert.alert(t('clearCart'), t('clearCartConfirm'), [
+              { text: t('cancel'), style: "cancel" },
+              { text: t('clearAll'), style: "destructive", onPress: clearCart }
             ]);
           }}>
-            <CustomText style={styles.clearText}>Clear All</CustomText>
+            <CustomText style={styles.clearText}>{t('clearAll')}</CustomText>
           </TouchableOpacity>
         )}
       </View>
@@ -173,15 +176,14 @@ const CartScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.textContainer}>
-            <CustomText variant="h2" style={[styles.title, { color: colors.foreground }]}>Your cart is empty</CustomText>
+            <CustomText variant="h2" style={[styles.title, { color: colors.foreground }]}>{t('cartEmpty')}</CustomText>
             <CustomText style={[styles.subtitle, { color: colors.muted }]}>
-              Looks like you haven't added anything to your cart yet. 
-              Browse our marketplace to find amazing products!
+              {t('cartEmptySubtitle')}
             </CustomText>
           </View>
 
           <CustomButton 
-            title="Start Shopping"
+            title={t('startShopping')}
             style={styles.button}
             onPress={() => navigation.navigate('Home')}
           >
@@ -201,23 +203,23 @@ const CartScreen = ({ navigation }) => {
           {/* Summary Section */}
           <View style={[styles.summaryBox, { backgroundColor: colors.glass, borderTopColor: colors.border }]}>
             <View style={styles.summaryRow}>
-              <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Subtotal ({selectedItemIds.length} items)</CustomText>
+              <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>{t('subtotal')} ({selectedItemIds.length} items)</CustomText>
               <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
             </View>
             <View style={styles.summaryRow}>
-              <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Delivery</CustomText>
-              <CustomText style={[styles.freeText, { color: colors.muted }]}>Calculated at checkout</CustomText>
+              <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>{t('delivery')}</CustomText>
+              <CustomText style={[styles.freeText, { color: colors.muted }]}>{t('calculatedAtCheckout')}</CustomText>
             </View>
             
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             
             <View style={styles.totalRow}>
-              <CustomText variant="h3" style={{ color: colors.foreground }}>Total</CustomText>
+              <CustomText variant="h3" style={{ color: colors.foreground }}>{t('total')}</CustomText>
               <CustomText variant="h2" style={{ color: colors.primary }}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
             </View>
             
             <CustomButton 
-              title="Proceed to Checkout"
+              title={t('proceedToCheckout')}
               style={styles.checkoutBtn}
               onPress={handleCheckout}
             />

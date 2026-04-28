@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Switch, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { Menu, Bell, Lock, Shield, HelpCircle, Moon, User, ChevronRight, XCircle } from 'lucide-react-native';
+import { Menu, Bell, Lock, Shield, HelpCircle, Moon, User, ChevronRight, XCircle, Languages } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
@@ -11,6 +11,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
 import { chatService } from '../../api/chatService';
+import { useTranslation } from 'react-i18next';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -29,7 +30,7 @@ const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 
         thumbColor="white"
       />
     ) : (
-      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: colors.primary }]}>CHANGE</CustomText></TouchableOpacity>
+      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: colors.primary }]}>{value || 'CHANGE'}</CustomText></TouchableOpacity>
     )}
   </View>
 );
@@ -38,10 +39,14 @@ const BuyerSettingsScreen = () => {
   const { toggleDrawer } = React.useContext(DrawerContext);
   const { isDarkMode, colors, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation(['dashboard', 'common']);
+  const changeLanguage = (lng) => i18n.changeLanguage(lng);
+  const language = i18n.language;
   const navigation = useNavigation();
   const [notifs, setNotifs] = useState(true);
   const [hideAvailability, setHideAvailability] = useState(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -57,7 +62,7 @@ const BuyerSettingsScreen = () => {
     setHideAvailability(newValue);
     const res = await chatService.updatePrivacySettings(user.id, { hideAvailability: newValue });
     if (res.error) {
-      Alert.alert('Error', `Failed to update privacy settings: ${res.details || res.error}`);
+      Alert.alert(t('error'), `${t('failedToUpdatePrivacy')}: ${res.details || res.error}`);
       setHideAvailability(!newValue);
     }
   };
@@ -70,22 +75,22 @@ const BuyerSettingsScreen = () => {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('error'), t('fillAllFields'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+      Alert.alert(t('error'), t('passwordsDoNotMatch'));
       return;
     }
     if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert(t('error'), t('passwordTooShort'));
       return;
     }
 
     setUpdating(true);
     try {
       await authService.changePassword(user.id, currentPassword, newPassword);
-      Alert.alert('Success', 'Password updated successfully. Please log in again.');
+      Alert.alert(t('success'), t('passwordUpdatedSuccess'));
       setShowPasswordModal(false);
       setCurrentPassword('');
       setNewPassword('');
@@ -93,7 +98,7 @@ const BuyerSettingsScreen = () => {
       
       setTimeout(() => logout(), 1000);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update password');
+      Alert.alert(t('error'), error.message || t('failedToUpdatePassword'));
     } finally {
       setUpdating(false);
     }
@@ -105,21 +110,21 @@ const BuyerSettingsScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2">Settings</CustomText>
+        <CustomText variant="h2">{t('settings')}</CustomText>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
 
         {/* ACCOUNT */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>ACCOUNT</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('ACCOUNT') || 'ACCOUNT'}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('Profile')} activeOpacity={0.7}>
               <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
                 <User color={colors.muted} size={20} />
               </View>
               <View style={{ flex: 1, marginLeft: 16 }}>
-                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>My Profile</CustomText>
-                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>View and edit your profile</CustomText>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('myProfile') || 'My Profile'}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{t('manageProfile') || 'View and edit your profile'}</CustomText>
               </View>
               <ChevronRight color={colors.muted} size={18} />
             </TouchableOpacity>
@@ -128,27 +133,38 @@ const BuyerSettingsScreen = () => {
 
         {/* PREFERENCES */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>PREFERENCES</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('PREFERENCES')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Bell} title="Notifications" subtitle="Alerts for messages & orders" value={notifs} onValueChange={setNotifs} colors={colors} />
+            <SettingRow icon={Bell} title={t('pushNotifications')} subtitle={t('notifsDesc')} value={notifs} onValueChange={setNotifs} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Moon} title="Dark Mode" subtitle="Easier on the eyes" value={isDarkMode} onValueChange={toggleTheme} colors={colors} />
+            <SettingRow icon={Moon} title={t('darkMode')} subtitle={t('darkModeDesc')} value={isDarkMode} onValueChange={toggleTheme} colors={colors} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity style={styles.navRow} onPress={() => setShowLanguageModal(true)} activeOpacity={0.7}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
+                <Languages color={colors.muted} size={20} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('language')}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{language === 'en' ? 'English' : 'Ikinyarwanda'}</CustomText>
+              </View>
+              <ChevronRight color={colors.muted} size={18} />
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* SECURITY */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>SECURITY & PRIVACY</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('securityPrivacy')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Lock} title="Password" subtitle="Secure your account" type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
+            <SettingRow icon={Lock} title={t('password')} subtitle={t('secureAccount')} value={t('change')} type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             {loadingPrivacy ? (
               <View style={{ padding: 16, alignItems: 'center' }}><ActivityIndicator size="small" color={colors.primary} /></View>
             ) : (
               <SettingRow 
                 icon={Shield} 
-                title="Hide Availability" 
-                subtitle="Hide online status and last seen" 
+                title={t('hideAvailability')} 
+                subtitle={t('hideAvailabilityDesc')} 
                 value={hideAvailability} 
                 onValueChange={toggleAvailability} 
                 colors={colors} 
@@ -159,15 +175,15 @@ const BuyerSettingsScreen = () => {
 
         {/* SUPPORT */}
         <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>SUPPORT</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('support')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TouchableOpacity style={styles.navRow} onPress={() => {}} activeOpacity={0.7}>
               <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
                 <HelpCircle color={colors.muted} size={20} />
               </View>
               <View style={{ flex: 1, marginLeft: 16 }}>
-                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>Help Center</CustomText>
-                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>FAQs and customer support</CustomText>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('helpCenter')}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{t('faqsSupport')}</CustomText>
               </View>
               <ChevronRight color={colors.muted} size={18} />
             </TouchableOpacity>
@@ -189,7 +205,7 @@ const BuyerSettingsScreen = () => {
           >
             <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <View style={styles.modalHeader}>
-                <CustomText variant="h2">Change Password</CustomText>
+                <CustomText variant="h2">{t('changePassword')}</CustomText>
                 <TouchableOpacity onPress={() => setShowPasswordModal(false)}>
                   <XCircle color={colors.muted} size={24} />
                 </TouchableOpacity>
@@ -200,24 +216,24 @@ const BuyerSettingsScreen = () => {
                 showsVerticalScrollIndicator={false}
               >
                 <CustomInput
-                  label="Current Password"
-                  placeholder="Enter current password"
+                  label={t('currentPassword')}
+                  placeholder={t('enterCurrentPassword')}
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   secureTextEntry
                 />
                 <View style={{ height: 16 }} />
                 <CustomInput
-                  label="New Password"
-                  placeholder="Enter new password"
+                  label={t('newPassword')}
+                  placeholder={t('enterNewPassword')}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry
                 />
                 <View style={{ height: 16 }} />
                 <CustomInput
-                  label="Confirm New Password"
-                  placeholder="Confirm new password"
+                  label={t('confirmNewPassword')}
+                  placeholder={t('confirmNewPassword')}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
@@ -226,7 +242,7 @@ const BuyerSettingsScreen = () => {
                 <View style={{ height: 32 }} />
                 
                 <CustomButton
-                  title="Update Password"
+                  title={t('updatePassword')}
                   onPress={handleChangePassword}
                   loading={updating}
                 />
@@ -235,6 +251,56 @@ const BuyerSettingsScreen = () => {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* LANGUAGE MODAL */}
+      <Modal
+        visible={showLanguageModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowLanguageModal(false)}
+        >
+          <View style={[styles.langModalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.langModalHeader}>
+              <CustomText variant="h3">{t('selectLanguage')}</CustomText>
+              <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
+                <XCircle color={colors.muted} size={20} />
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={[styles.langOption, language === 'en' && { backgroundColor: colors.glass }]}
+              onPress={() => {
+                changeLanguage('en');
+                setShowLanguageModal(false);
+                Alert.alert(t('success'), t('languageChanged'));
+              }}
+            >
+              <CustomText style={[styles.langText, language === 'en' && { color: colors.primary, fontWeight: 'bold' }]}>English</CustomText>
+              {language === 'en' && <ChevronRight color={colors.primary} size={18} />}
+            </TouchableOpacity>
+            
+            <View style={[styles.divider, { backgroundColor: colors.border, marginHorizontal: 0 }]} />
+            
+            <TouchableOpacity 
+              style={[styles.langOption, language === 'rw' && { backgroundColor: colors.glass }]}
+              onPress={() => {
+                changeLanguage('rw');
+                setShowLanguageModal(false);
+                Alert.alert(t('success'), t('languageChanged'));
+              }}
+            >
+              <CustomText style={[styles.langText, language === 'rw' && { color: colors.primary, fontWeight: 'bold' }]}>Ikinyarwanda</CustomText>
+              {language === 'rw' && <ChevronRight color={colors.primary} size={18} />}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -274,6 +340,33 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     marginBottom: 24,
+  },
+  langModalContent: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    alignSelf: 'center',
+    marginBottom: 'auto',
+    marginTop: 'auto',
+  },
+  langModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  langOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  langText: {
+    fontSize: 16,
   },
 });
 

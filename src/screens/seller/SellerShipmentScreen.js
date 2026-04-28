@@ -16,11 +16,13 @@ import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
 import NotificationIcon from '../../components/NotificationIcon';
+import { useTranslation } from 'react-i18next';
 
 const SellerShipmentScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors } = useTheme();
+  const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
 
   const [tab, setTab] = useState('UNASSIGNED');
@@ -102,10 +104,10 @@ const SellerShipmentScreen = () => {
     setShippingId(orderId);
     try {
       await sellerService.shipOrder(user.id, orderId);
-      Alert.alert('Success', 'Order marked as shipped!');
+      Alert.alert(t('success'), t('orderMarkedShipped'));
       loadData();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to mark as shipped');
+      Alert.alert(t('error'), err.message || t('failedToMarkShipped'));
     } finally {
       setShippingId(null);
     }
@@ -116,11 +118,11 @@ const SellerShipmentScreen = () => {
     setAssigningCourier(true);
     try {
       await sellerService.assignCourier(user.id, selectedOrder.id, selectedCourierId);
-      Alert.alert('Success', 'Courier assigned!');
+      Alert.alert(t('success'), t('courierAssigned'));
       setShowCourierModal(false);
       loadData();
     } catch (err) {
-      Alert.alert('Error', 'Failed to assign courier');
+      Alert.alert(t('error'), t('failedToAssignCourier'));
     } finally {
       setAssigningCourier(false);
     }
@@ -131,11 +133,11 @@ const SellerShipmentScreen = () => {
     setAssigningAgent(true);
     try {
       await sellerService.assignAgent(user.id, selectedOrder.id, selectedAgentId);
-      Alert.alert('Success', 'Agent assigned!');
+      Alert.alert(t('success'), t('agentAssigned'));
       setShowAgentModal(false);
       loadData();
     } catch (err) {
-      Alert.alert('Error', 'Failed to assign agent');
+      Alert.alert(t('error'), t('failedToAssignAgent'));
     } finally {
       setAssigningAgent(false);
     }
@@ -181,25 +183,25 @@ const SellerShipmentScreen = () => {
 
           <View style={styles.assignmentGrid}>
             <View style={styles.assignBox}>
-              <CustomText style={styles.assignLabel}>COURIER</CustomText>
+              <CustomText style={styles.assignLabel}>{t('courier').toUpperCase()}</CustomText>
               {item.Courier ? (
                 <View>
                   <CustomText style={styles.assignValue}>{item.Courier.courierName}</CustomText>
                   <CustomText style={styles.assignSub}>{item.Courier.courierPhone}</CustomText>
                 </View>
               ) : (
-                <CustomText style={styles.unassigned}>Unassigned</CustomText>
+                <CustomText style={styles.unassigned}>{t('unassigned')}</CustomText>
               )}
             </View>
             <View style={styles.assignBox}>
-              <CustomText style={styles.assignLabel}>AGENT</CustomText>
+              <CustomText style={styles.assignLabel}>{t('agent').toUpperCase()}</CustomText>
               {item.agent ? (
                 <View>
                   <CustomText style={styles.assignValue}>{item.agent.user?.name}</CustomText>
                   <CustomText style={[styles.assignSub, { color: '#EAB308' }]}>★ {item.agent.rating?.toFixed(1)}</CustomText>
                 </View>
               ) : (
-                <CustomText style={styles.unassigned}>No agent</CustomText>
+                <CustomText style={styles.unassigned}>{t('noAgent')}</CustomText>
               )}
             </View>
           </View>
@@ -224,20 +226,20 @@ const SellerShipmentScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2" style={{ flex: 1 }}>Shipping</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>{t('shipping')}</CustomText>
         <NotificationIcon />
       </View>
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
-        {['UNASSIGNED', 'ASSIGNED', 'ALL'].map((t) => (
+        {['UNASSIGNED', 'ASSIGNED', 'ALL'].map((tabKey) => (
           <TouchableOpacity 
-            key={t} 
-            onPress={() => setTab(t)}
-            style={[styles.tab, tab === t && { borderBottomColor: colors.primary }]}
+            key={tabKey} 
+            onPress={() => setTab(tabKey)}
+            style={[styles.tab, tab === tabKey && { borderBottomColor: colors.primary }]}
           >
-            <CustomText style={[styles.tabText, { color: tab === t ? colors.primary : colors.muted }]}>
-              {t}
+            <CustomText style={[styles.tabText, { color: tab === tabKey ? colors.primary : colors.muted }]}>
+              {t(tabKey.toLowerCase())}
             </CustomText>
           </TouchableOpacity>
         ))}
@@ -249,7 +251,7 @@ const SellerShipmentScreen = () => {
           <Search size={18} color={colors.muted} />
           <TextInput
             style={{ flex: 1, color: colors.foreground, marginLeft: 8, fontSize: 14 }}
-            placeholder="Search orders..."
+            placeholder={t('searchOrders')}
             placeholderTextColor={colors.muted}
             value={search}
             onChangeText={(text) => setSearch(text)}
@@ -271,7 +273,7 @@ const SellerShipmentScreen = () => {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Package size={48} color={colors.muted} style={{ opacity: 0.3 }} />
-              <CustomText style={{ color: colors.muted, marginTop: 12 }}>No orders found</CustomText>
+              <CustomText style={{ color: colors.muted, marginTop: 12 }}>{t('noOrdersFound')}</CustomText>
             </View>
           }
         />
@@ -306,7 +308,7 @@ const SellerShipmentScreen = () => {
                       }}
                     >
                       <Truck size={18} color="#F97316" />
-                      <CustomText style={styles.menuItemText}>{selectedOrder.Courier ? 'Reassign Courier' : 'Assign Courier'}</CustomText>
+                      <CustomText style={styles.menuItemText}>{selectedOrder.Courier ? t('reassignCourier') : t('assignCourier')}</CustomText>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.menuItem}
@@ -317,7 +319,7 @@ const SellerShipmentScreen = () => {
                       }}
                     >
                       <UserPlus size={18} color="#A855F7" />
-                      <CustomText style={styles.menuItemText}>{selectedOrder.agent ? 'Reassign Agent' : 'Assign Agent'}</CustomText>
+                      <CustomText style={styles.menuItemText}>{selectedOrder.agent ? t('reassignAgent') : t('assignAgent')}</CustomText>
                     </TouchableOpacity>
                   </>
                 )}
@@ -332,7 +334,7 @@ const SellerShipmentScreen = () => {
         <View style={styles.slideModalOverlay}>
           <View style={[styles.slideModalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
-              <CustomText variant="h2">Select Courier</CustomText>
+              <CustomText variant="h2">{t('selectCourier')}</CustomText>
               <TouchableOpacity onPress={() => setShowCourierModal(false)}><X size={24} color={colors.muted} /></TouchableOpacity>
             </View>
             <ScrollView style={{ flex: 1 }}>
@@ -358,7 +360,7 @@ const SellerShipmentScreen = () => {
               onPress={handleAssignCourier}
               disabled={assigningCourier || !selectedCourierId}
             >
-              {assigningCourier ? <Loader2 size={20} color="white" className="animate-spin" /> : <CustomText style={styles.submitBtnText}>Assign Courier</CustomText>}
+              {assigningCourier ? <Loader2 size={20} color="white" className="animate-spin" /> : <CustomText style={styles.submitBtnText}>{t('assignCourier')}</CustomText>}
             </TouchableOpacity>
           </View>
         </View>
@@ -369,7 +371,7 @@ const SellerShipmentScreen = () => {
         <View style={styles.slideModalOverlay}>
           <View style={[styles.slideModalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
-              <CustomText variant="h2">Select Agent</CustomText>
+              <CustomText variant="h2">{t('selectAgent')}</CustomText>
               <TouchableOpacity onPress={() => setShowAgentModal(false)}><X size={24} color={colors.muted} /></TouchableOpacity>
             </View>
             <ScrollView style={{ flex: 1 }}>
@@ -398,7 +400,7 @@ const SellerShipmentScreen = () => {
               onPress={handleAssignAgent}
               disabled={assigningAgent || !selectedAgentId}
             >
-              {assigningAgent ? <Loader2 size={20} color="white" className="animate-spin" /> : <CustomText style={styles.submitBtnText}>Assign Agent</CustomText>}
+              {assigningAgent ? <Loader2 size={20} color="white" className="animate-spin" /> : <CustomText style={styles.submitBtnText}>{t('assignAgent')}</CustomText>}
             </TouchableOpacity>
           </View>
         </View>
