@@ -39,6 +39,7 @@ import ChatListScreen from './src/screens/shared/ChatListScreen';
 import ChatDetailScreen from './src/screens/shared/ChatDetailScreen';
 import StatusViewerScreen from './src/screens/shared/StatusViewerScreen';
 import CartScreen from './src/screens/CartScreen';
+import AutoLogoutWarningModal from './src/components/modals/AutoLogoutWarningModal';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -175,17 +176,26 @@ const RootNavigator = () => {
   
   const inactivityTimer = React.useRef(null);
   const backgroundTime = React.useRef(null);
+  const [showWarning, setShowWarning] = React.useState(false);
 
-  const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
+  const INACTIVITY_LIMIT = 4 * 60 * 1000; // 4 minutes
 
   const resetTimer = React.useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    setShowWarning(false);
+    
     if (!user) return; // Only track logged-in users
 
     inactivityTimer.current = setTimeout(() => {
-      logout();
+      setShowWarning(true);
     }, INACTIVITY_LIMIT);
-  }, [user, logout]);
+  }, [user]);
+
+  const handleLogout = React.useCallback(() => {
+    setShowWarning(false);
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    logout();
+  }, [logout]);
 
   React.useEffect(() => {
     resetTimer();
@@ -199,11 +209,16 @@ const RootNavigator = () => {
       if (nextAppState === 'active') {
         if (backgroundTime.current && user) {
           const elapsed = Date.now() - backgroundTime.current;
-          if (elapsed >= INACTIVITY_LIMIT) {
-            logout();
+          if (elapsed >= INACTIVITY_LIMIT + 60000) {
+            handleLogout();
+          } else if (elapsed >= INACTIVITY_LIMIT) {
+            setShowWarning(true);
+          } else {
+            resetTimer();
           }
+        } else {
+          resetTimer();
         }
-        resetTimer();
       } else if (nextAppState.match(/inactive|background/)) {
         backgroundTime.current = Date.now();
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
@@ -212,7 +227,7 @@ const RootNavigator = () => {
     return () => {
       subscription.remove();
     };
-  }, [user, resetTimer, logout]);
+  }, [user, resetTimer, handleLogout]);
 
   if (loading) {
     return <LoadingScreen />;
@@ -243,20 +258,29 @@ const RootNavigator = () => {
     <View 
       style={{ flex: 1 }}
       onStartShouldSetResponderCapture={() => {
-        resetTimer();
+        if (!showWarning) resetTimer();
         return false; 
       }}
       onPanResponderCapture={() => {
-        resetTimer();
+        if (!showWarning) resetTimer();
         return false;
       }}
     >
       <NavigationContainer linking={linking}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="MainApp" component={AppTabs} />
-          <Stack.Screen name="Auth" component={AuthStack} />
+          {user ? (
+            <Stack.Screen name="MainApp" component={AppTabs} />
+          ) : (
+            <Stack.Screen name="Auth" component={AuthStack} />
+          )}
         </Stack.Navigator>
       </NavigationContainer>
+      
+      <AutoLogoutWarningModal 
+        visible={showWarning} 
+        onDismiss={resetTimer} 
+        onLogout={handleLogout} 
+      />
     </View>
   );
 };

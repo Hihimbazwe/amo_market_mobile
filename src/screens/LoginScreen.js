@@ -38,23 +38,7 @@ const LoginScreen = ({ navigation }) => {
     try {
       const result = await authService.login(email, password);
       await login(result);
-      Alert.alert('Success', 'Logged in successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            const state = navigation.getState();
-            if (state && state.routes && state.routes.length > 0) {
-              const firstRouteName = state.routes[0].name;
-              navigation.reset({
-                index: 0,
-                routes: [{ name: firstRouteName }],
-              });
-            }
-            
-            navigation.navigate(['SELLER', 'COURIER', 'AGENT'].includes(result.role?.toUpperCase()) ? 'Me' : 'Home');
-          },
-        },
-      ]);
+      Alert.alert('Success', 'Logged in successfully!');
 
     } catch (error) {
       if (error.message === 'EmailVryErr') {

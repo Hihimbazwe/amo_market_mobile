@@ -50,11 +50,14 @@ export const CartProvider = ({ children }) => {
 
   const updateQuantity = async (productId, quantity) => {
     if (!user?.id) return;
+    
+    // Optimistic UI update: update local state immediately
+    setCartItems(prev => prev.map(item => 
+      item.productId === productId ? { ...item, quantity } : item
+    ));
+
     try {
       await cartService.updateCartItem(user.id, productId, quantity);
-      setCartItems(prev => prev.map(item => 
-        item.productId === productId ? { ...item, quantity } : item
-      ));
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to update quantity');
       await fetchCart(); // Re-sync if local update fails

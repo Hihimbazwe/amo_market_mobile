@@ -211,8 +211,7 @@ const SellerOrdersScreen = () => {
         </View>
 
         {/* Action Indicator */}
-        <View style={styles.cardFooterAction}>
-          <CustomText style={{ fontSize: 11, color: colors.muted, fontWeight: '600' }}>{t('')}</CustomText>
+        <View style={[styles.cardFooterAction, { justifyContent: 'flex-end' }]}>
           <MoreVertical color={colors.muted} size={16} />
         </View>
       </TouchableOpacity>

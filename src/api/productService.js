@@ -50,6 +50,10 @@ export const productService = {
       }
 
       if (!response.ok) {
+        if (response.status === 500) {
+          console.warn('[DEBUG] Server returned 500 Internal Server Error. Falling back to empty array to prevent app crash.');
+          return [];
+        }
         throw new Error(data.error || `Failed to fetch products (${response.status}) from ${url}`);
       }
 
