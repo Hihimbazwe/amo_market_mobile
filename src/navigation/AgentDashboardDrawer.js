@@ -26,6 +26,7 @@ import AgentOrdersScreen from '../screens/agent/AgentOrdersScreen';
 import AgentCoverageScreen from '../screens/agent/AgentCoverageScreen';
 import AgentProfileScreen from '../screens/agent/AgentProfileScreen';
 import AgentSettingsScreen from '../screens/agent/AgentSettingsScreen';
+import AgentVerifyCodeScreen from '../screens/agent/AgentVerifyCodeScreen';
 import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
@@ -39,7 +40,8 @@ const NAV_GROUPS = (t) => [
     items: [
       { name: t('dashboard'), icon: Home, screen: 'AgentDashboard' },
       { name: t('requests'), icon: Truck, screen: 'DeliveryRequests' },
-      { name: t('myDeliveries'), icon: Package, screen: 'AgentOrders' },
+      { name: t('myOrders'), icon: Package, screen: 'AgentOrders' },
+      { name: t('verifyCode'), icon: ShieldCheck, screen: 'AgentVerifyCode' },
     ],
   },
   {
@@ -205,6 +207,7 @@ export default function AgentDashboardDrawer({ navigation }) {
           <Stack.Screen name="AgentCoverage" component={AgentCoverageScreen} />
           <Stack.Screen name="AgentProfile" component={AgentProfileScreen} />
           <Stack.Screen name="AgentSettings" component={AgentSettingsScreen} />
+          <Stack.Screen name="AgentVerifyCode" component={AgentVerifyCodeScreen} />
           <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
         </Stack.Navigator>
 

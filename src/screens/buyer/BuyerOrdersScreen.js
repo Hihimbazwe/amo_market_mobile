@@ -160,69 +160,55 @@ const BuyerOrdersScreen = ({ navigation }) => {
           </View>
         ) : (
           filteredOrders.map((order) => {
-            const isEligible = order.status === 'DELIVERED' || order.status === 'COMPLETED';
+            const statusColor = getStatusColor(order.status);
             return (
-              <View key={order.id} style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
-                <View style={styles.orderTop}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <CustomText style={[styles.orderId, { color: colors.foreground }]} numberOfLines={1}>
-                      {order.items?.[0]?.product?.title || order.items?.[0]?.product?.name || 'Order'}
-                    </CustomText>
-                    <CustomText style={[styles.orderDate, { color: colors.muted }]}>
-                      {new Date(order.createdAt).toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </CustomText>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                       <CustomText style={{ fontSize: 10, color: colors.muted, fontWeight: 'bold' }}>#{order.id.slice(-8).toUpperCase()}</CustomText>
-                       {order.pickupType === "PICKUP" && (
-                         <View style={[styles.pickupBadge, { backgroundColor: colors.primary + '15' }]}>
-                           <QrCode size={8} color={colors.primary} />
-                           <CustomText style={{ fontSize: 8, color: colors.primary, fontWeight: 'bold', marginLeft: 4 }}>PICKUP</CustomText>
-                         </View>
-                       )}
-                    </View>
+              <TouchableOpacity 
+                key={order.id} 
+                style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}
+                onPress={() => handleOpenOptions(order)}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={[styles.refBadge, { backgroundColor: colors.primary + '15' }]}>
+                    <Package size={12} color={colors.primary} />
+                    <CustomText style={[styles.ref, { color: colors.primary }]}>#{order.id.slice(-8).toUpperCase()}</CustomText>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20', marginRight: 8 }]}>
-                      <CustomText style={[styles.orderStatus, { color: getStatusColor(order.status) }]}>
-                        {t(order.status.toLowerCase()) || order.status}
+                  <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
+                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                    <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(order.status?.toLowerCase())}</CustomText>
+                  </View>
+                </View>
+
+                <View style={styles.cardBody}>
+                  <CustomText variant="h3" style={[styles.name, { color: colors.foreground }]}>
+                    {order.items?.[0]?.product?.title || order.items?.[0]?.product?.name || t('order')}
+                  </CustomText>
+                  
+                  <View style={styles.locationContainer}>
+                    <View style={[styles.locationIconBox, { backgroundColor: colors.primary + '10' }]}>
+                      <ShoppingBag color={colors.primary} size={16} />
+                    </View>
+                    <View style={styles.locationInfo}>
+                      <CustomText style={[styles.locationLabel, { color: colors.muted }]}>{t('orderItems')}</CustomText>
+                      <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
+                        {t('itemsCount', { count: order.items.length })}
                       </CustomText>
                     </View>
-                    <TouchableOpacity onPress={() => handleOpenOptions(order)} style={{ padding: 4 }}>
-                        <MoreVertical color={colors.muted} size={20} />
-                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.priceRow}>
+                    <CustomText style={{ color: colors.muted, fontSize: 12 }}>{t('totalAmount')}</CustomText>
+                    <CustomText style={{ fontWeight: '900', color: colors.foreground, fontSize: 16 }}>
+                      Rwf {order.totalAmount?.toLocaleString() || order.total?.toLocaleString()}
+                    </CustomText>
                   </View>
                 </View>
-                <View style={[styles.orderBottom, { borderTopColor: colors.glassBorder }]}>
-                  <CustomText style={[styles.orderTotal, { color: colors.foreground }]}>Rwf {order.totalAmount?.toLocaleString() || order.total?.toLocaleString()}</CustomText>
-                  
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity 
-                      style={[styles.smallBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-                      onPress={() => navigation.navigate('OrderTracking', { orderId: order.id })}
-                    >
-                      <TrackIcon size={12} color={colors.primary} />
-                      <CustomText style={[styles.btnText, { color: colors.primary }]}>{t('track')}</CustomText>
-                    </TouchableOpacity>
 
-                    <TouchableOpacity 
-                      style={[styles.smallBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-                      onPress={() => navigation.navigate('Disputes', { orderId: order.id })}
-                    >
-                      <AlertTriangle size={12} color={colors.error || '#EF4444'} />
-                      <CustomText style={[styles.btnText, { color: colors.error || '#EF4444' }]}>{t('report')}</CustomText>
-                    </TouchableOpacity>
-
-                    {isEligible && (
-                        <TouchableOpacity 
-                        style={[styles.smallBtn, { backgroundColor: colors.glass, borderColor: colors.primary }]}
-                        onPress={() => navigation.navigate('Replacements', { initiateReplacementForOrderId: order.id })}
-                        >
-                        <CustomText style={[styles.btnText, { color: colors.primary }]}>{t('replace')}</CustomText>
-                        </TouchableOpacity>
-                    )}
-                  </View>
+                {/* Action Indicator */}
+                <View style={styles.cardFooterAction}>
+                  <CustomText style={{ fontSize: 11, color: colors.muted, fontWeight: '600' }}>{t('tapForOptions')}</CustomText>
+                  <MoreVertical color={colors.muted} size={16} />
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
@@ -323,6 +309,20 @@ const BuyerOrdersScreen = ({ navigation }) => {
                     >
                     <RefreshCw size={20} color="#fbbf24" />
                     <CustomText style={[styles.optionLabel, { color: '#fbbf24' }]}>{t('requestReturn')}</CustomText>
+                    </TouchableOpacity>
+                )}
+
+                {/* Initiate Replacement */}
+                {(selectedOrder?.status === 'DELIVERED' || selectedOrder?.status === 'COMPLETED') && (
+                    <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => {
+                        setOptionsVisible(false);
+                        navigation.navigate('Replacements', { initiateReplacementForOrderId: selectedOrder.id });
+                    }}
+                    >
+                    <RefreshCw size={20} color={colors.primary} />
+                    <CustomText style={[styles.optionLabel, { color: colors.primary }]}>{t('replace')}</CustomText>
                     </TouchableOpacity>
                 )}
 
@@ -438,20 +438,25 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 14, fontWeight: '700' },
   content: { padding: 16 },
   emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100 },
-  orderCard: { borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1 },
-  orderTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  orderId: { fontWeight: 'bold', fontSize: 16, marginBottom: 4 },
-  orderDate: { fontSize: 12 },
-  pickupBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 8 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  orderStatus: { fontWeight: 'bold', fontSize: 12 },
-  orderBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTopWidth: 1 },
-  orderTotal: { fontWeight: 'bold', fontSize: 14 },
-  actionRow: { flexDirection: 'row', gap: 8 },
-  smallBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 4 },
-  btnText: { fontSize: 11, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  optionsContainer: { padding: 24, borderTopLeftRadius: 32, borderTopRightRadius: 32, borderWidth: 1, maxHeight: '80%' },
+  orderCard: { borderRadius: 24, borderWidth: 1, padding: 16, marginBottom: 16, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  refBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  ref: { fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeText: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+  cardBody: { gap: 4 },
+  name: { fontSize: 18, fontWeight: '900', marginBottom: 4 },
+  locationContainer: { flexDirection: 'row', paddingVertical: 8, gap: 12, alignItems: 'center' },
+  locationIconBox: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  locationInfo: { flex: 1 },
+  locationLabel: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 1 },
+  addressText: { fontSize: 13, fontWeight: '500' },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  cardFooterAction: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 12, opacity: 0.6 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  optionsContainer: { width: '100%', padding: 24, borderRadius: 24, borderWidth: 1, maxHeight: '80%' },
   modalHeader: { alignItems: 'center' },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: 20 },
   optionItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8 },

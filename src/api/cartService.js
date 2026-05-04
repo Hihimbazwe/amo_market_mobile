@@ -39,12 +39,12 @@ export const cartService = {
     }
   },
 
-  addToCart: async (userId, productId, quantity = 1) => {
+  addToCart: async (userId, productId, quantity = 1, selectedVariants = {}) => {
     try {
       const response = await fetch(`${BASE_URL}/api/cart`, {
         method: 'POST',
         headers: buildHeaders(userId),
-        body: JSON.stringify({ productId, quantity }),
+        body: JSON.stringify({ productId, quantity, selectedVariants }),
       });
 
       const text = await response.text();

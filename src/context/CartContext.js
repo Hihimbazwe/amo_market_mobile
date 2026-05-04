@@ -30,14 +30,14 @@ export const CartProvider = ({ children }) => {
     fetchCart();
   }, [fetchCart]);
 
-  const addToCart = async (productId, quantity = 1) => {
+  const addToCart = async (productId, quantity = 1, selectedVariants = {}) => {
     if (!user?.id) {
       Alert.alert('Authentication Required', 'Please log in to add items to your cart.');
       return;
     }
     setLoading(true);
     try {
-      await cartService.addToCart(user.id, productId, quantity);
+      await cartService.addToCart(user.id, productId, quantity, selectedVariants);
       await fetchCart();
       return true;
     } catch (error) {

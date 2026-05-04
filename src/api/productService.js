@@ -90,10 +90,13 @@ export const productService = {
 
   createProduct: async (userId, productData) => {
     try {
-      const response = await fetch(`${BASE_URL}/api/mobile/products`, {
+      const response = await fetch(`${BASE_URL}/api/products`, {
         method: 'POST',
-        headers: commonHeaders,
-        body: JSON.stringify({ userId, ...productData }),
+        headers: {
+          ...commonHeaders,
+          'x-user-id': userId
+        },
+        body: JSON.stringify(productData),
       });
 
       const text = await response.text();

@@ -53,6 +53,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [addingToCart, setAddingToCart] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [selectedVariants, setSelectedVariants] = useState({});
   
   const isFavorite = routeProduct?.id ? isInWishlist(routeProduct.id) : false;
   const media = routeProduct?.media || [];
@@ -68,8 +69,17 @@ const ProductDetailScreen = ({ route, navigation }) => {
     description: routeProduct?.description || 'No description available.',
     specifications: [
       { label: 'Category', value: routeProduct?.category || 'General' },
-      { label: 'Condition', value: 'New' },
-      { label: 'Availability', value: routeProduct?.stock > 0 ? 'In Stock' : 'Out of Stock' },
+      { label: 'Brand', value: routeProduct?.brand || 'Generic' },
+      { label: 'Condition', value: routeProduct?.condition || 'New' },
+      { label: 'Stock', value: routeProduct?.stock > 0 ? `${routeProduct.stock} units available` : 'Out of Stock' },
+      ...(routeProduct?.weight ? [{ label: 'Weight', value: `${routeProduct.weight} kg` }] : []),
+      ...(routeProduct?.dimensions ? [
+        { label: 'Length', value: `${routeProduct.dimensions.length} cm` },
+        { label: 'Width', value: `${routeProduct.dimensions.width} cm` },
+        { label: 'Height', value: `${routeProduct.dimensions.height} cm` }
+      ] : []),
+      ...(routeProduct?.isAuthentic ? [{ label: 'Authentic', value: 'Yes (Guaranteed)' }] : []),
+      ...(routeProduct?.attributes?.map(a => ({ label: a.name, value: a.value })) || []),
     ],
     seller: {
       id: routeProduct?.sellerId || routeProduct?.seller?.id,
@@ -112,8 +122,18 @@ const ProductDetailScreen = ({ route, navigation }) => {
   };
 
   const handleAddToCart = async () => {
+    // Validate that all variant types are selected if the product has variants
+    if (routeProduct?.variants && routeProduct.variants.length > 0) {
+      const variantNames = [...new Set(routeProduct.variants.map(v => v.name))];
+      const missing = variantNames.filter(name => !selectedVariants[name]);
+      if (missing.length > 0) {
+        Alert.alert("Selection Required", `Please select: ${missing.join(", ")}`);
+        return;
+      }
+    }
+
     setAddingToCart(true);
-    const success = await addToCart(product.id, qty);
+    const success = await addToCart(product.id, qty, selectedVariants);
     setAddingToCart(false);
     if (success) {
       Alert.alert(
@@ -229,13 +249,23 @@ const ProductDetailScreen = ({ route, navigation }) => {
         {/* Content */}
         <View style={styles.content}>
           <View style={styles.titleSection}>
-            <CustomText variant="h1" style={styles.title}>{product.title}</CustomText>
-            {product.seller.isVerified && (
-              <View style={styles.verifiedBadge}>
-                <ShieldCheck size={14} color="#4ade80" />
-                <CustomText style={styles.verifiedText}>Verified</CustomText>
+            <View style={{ flex: 1 }}>
+              <CustomText variant="h1" style={styles.title}>{product.title}</CustomText>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                {product.seller.isVerified && (
+                  <View style={styles.verifiedBadge}>
+                    <ShieldCheck size={14} color="#4ade80" />
+                    <CustomText style={styles.verifiedText}>Verified Seller</CustomText>
+                  </View>
+                )}
+                {routeProduct?.isAuthentic && (
+                  <View style={[styles.verifiedBadge, { backgroundColor: 'rgba(230, 126, 34, 0.1)' }]}>
+                    <Flame size={14} color="#e67e22" />
+                    <CustomText style={[styles.verifiedText, { color: '#e67e22' }]}>Authentic</CustomText>
+                  </View>
+                )}
               </View>
-            )}
+            </View>
           </View>
 
           <View style={styles.ratingRow}>
@@ -249,11 +279,20 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
           <View style={styles.priceContainer}>
             <View style={styles.priceBox}>
-              <CustomText variant="h1" style={styles.price}>Rwf {(product.price * qty).toLocaleString()}</CustomText>
-              {qty > 1 && <CustomText variant="caption" style={styles.unitPrice}>Total Price</CustomText>}
-            </View>
-            <View style={styles.unitPriceBox}>
-              <CustomText variant="caption">Unit Price: Rwf {product.price.toLocaleString()}</CustomText>
+              {(() => {
+                const basePrice = product.price;
+                const variantsPrice = Object.entries(selectedVariants).reduce((acc, [name, val]) => {
+                  const variant = routeProduct?.variants?.find(v => v.name === name && v.value === val);
+                  return acc + (variant?.price || 0);
+                }, 0);
+                const currentPrice = basePrice + variantsPrice;
+                return (
+                  <>
+                    <CustomText variant="h1" style={styles.price}>Rwf {(currentPrice * qty).toLocaleString()}</CustomText>
+                    {qty > 1 && <CustomText variant="caption" style={styles.unitPrice}>Total Price (Rwf {currentPrice.toLocaleString()} ea)</CustomText>}
+                  </>
+                );
+              })()}
             </View>
           </View>
 
@@ -333,6 +372,49 @@ const ProductDetailScreen = ({ route, navigation }) => {
               </View>
             ))}
           </View>
+
+          {/* Variants Selection */}
+          {routeProduct?.variants && routeProduct.variants.length > 0 && (
+            <View style={styles.variantsSection}>
+              {Object.entries(
+                routeProduct.variants.reduce((acc, v) => {
+                  if (!acc[v.name]) acc[v.name] = [];
+                  acc[v.name].push(v);
+                  return acc;
+                }, {})
+              ).map(([varName, vars]) => (
+                <View key={varName} style={styles.variantGroup}>
+                  <CustomText style={styles.variantLabel}>Select {varName}</CustomText>
+                  <View style={styles.variantOptions}>
+                    {vars.map((v) => (
+                      <TouchableOpacity
+                        key={v.value}
+                        onPress={() => setSelectedVariants({...selectedVariants, [varName]: v.value})}
+                        style={[
+                          styles.variantOption,
+                          selectedVariants[varName] === v.value && styles.variantOptionActive,
+                          v.stock === 0 && styles.variantOptionDisabled
+                        ]}
+                        disabled={v.stock === 0}
+                      >
+                        <CustomText style={[
+                          styles.variantOptionText,
+                          selectedVariants[varName] === v.value && styles.variantOptionTextActive
+                        ]}>
+                          {v.value}
+                        </CustomText>
+                        {v.price > 0 && (
+                          <CustomText style={styles.variantPrice}>
+                            +Rwf {v.price.toLocaleString()}
+                          </CustomText>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Qty and Add to Cart Row */}
           <View style={styles.actionRow}>
@@ -623,8 +705,56 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    marginTop: 24,
+    marginTop: 12,
     gap: 12,
+  },
+  variantsSection: {
+    marginTop: 24,
+    gap: 16,
+  },
+  variantGroup: {
+    gap: 8,
+  },
+  variantLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  variantOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  variantOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    alignItems: 'center',
+  },
+  variantOptionActive: {
+    borderColor: '#e67e22',
+    backgroundColor: 'rgba(230, 126, 34, 0.1)',
+  },
+  variantOptionDisabled: {
+    opacity: 0.3,
+  },
+  variantOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  variantOptionTextActive: {
+    color: '#e67e22',
+  },
+  variantPrice: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 2,
   },
   qtySelector: {
     flexDirection: 'row',
@@ -705,10 +835,13 @@ const styles = StyleSheet.create({
   },
   specLabel: {
     fontWeight: '700',
-    width: 100,
+    width: 120,
+    color: '#94a3b8',
   },
   specValue: {
-    color: '#94a3b8',
+    flex: 1,
+    color: '#ffffff',
+    fontWeight: '500',
   },
   relatedSection: {
     marginTop: 40,

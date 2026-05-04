@@ -30,7 +30,7 @@ export const agentService = {
   getProfile: async () => {
     try {
       const headers = await buildHeaders();
-      const response = await fetch(`${API_URL}/api/agent/profile`, { headers });
+      const response = await fetch(`${API_URL}/api/agent/profile?t=${Date.now()}`, { headers });
       
       const responseText = await response.text();
       let data;
@@ -59,7 +59,7 @@ export const agentService = {
   getOrders: async () => {
     try {
       const headers = await buildHeaders();
-      const response = await fetch(`${API_URL}/api/agent/orders`, { headers });
+      const response = await fetch(`${API_URL}/api/agent/orders?t=${Date.now()}`, { headers });
       
       const responseText = await response.text();
       let data;
@@ -85,7 +85,7 @@ export const agentService = {
   getDeliveryRequests: async () => {
     try {
       const headers = await buildHeaders();
-      const response = await fetch(`${API_URL}/api/agent/delivery-requests`, { headers });
+      const response = await fetch(`${API_URL}/api/agent/delivery-requests?t=${Date.now()}`, { headers });
       
       const responseText = await response.text();
       let data;
@@ -259,6 +259,71 @@ export const agentService = {
       return data;
     } catch (error) {
       console.error('updateProfile error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Verify a 6-digit delivery code or pickup code
+   * @param {Object} data { deliveryCode, confirmed } or { code }
+   */
+  verifyCode: async (data) => {
+    try {
+      const headers = await buildHeaders();
+      const response = await fetch(`${API_URL}/api/agent/verify`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data)
+      });
+
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error('Invalid server response');
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Verification failed');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('verifyCode error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update order status (ship, in_transit, out_for_delivery, ready)
+   * @param {string} orderId 
+   * @param {string} action 
+   */
+  updateOrderStatus: async (orderId, action) => {
+    try {
+      const headers = await buildHeaders();
+      const response = await fetch(`${API_URL}/api/agent/orders`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ orderId, action })
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error('Invalid server response');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update order status');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('updateOrderStatus error:', error);
       throw error;
     }
   }

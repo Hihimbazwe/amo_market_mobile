@@ -14,6 +14,7 @@ import MarketplaceScreen from './src/screens/MarketplaceScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 // Cart removed from tabs
 import CheckoutScreen from './src/screens/CheckoutScreen';
+import OrderSuccessScreen from './src/screens/OrderSuccessScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import VerifyOTPScreen from './src/screens/VerifyOTPScreen';
@@ -50,6 +51,7 @@ const HomeStack = () => (
     <Stack.Screen name="Cart" component={CartScreen} />
     <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
     <Stack.Screen name="Checkout" component={CheckoutScreen} />
+    <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
@@ -67,6 +69,7 @@ const MarketplaceStack = () => (
     <Stack.Screen name="Cart" component={CartScreen} />
     <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
     <Stack.Screen name="Checkout" component={CheckoutScreen} />
+    <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />

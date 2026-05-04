@@ -46,6 +46,13 @@ const ProductCard = ({ product, onPress }) => {
             </LinearGradient>
           </View>
         )}
+        {product.isAuthentic && (
+          <View style={[styles.badge, { left: product.isHotDeal ? 45 : 8, backgroundColor: 'rgba(230, 126, 34, 0.9)' }]}>
+            <View style={[styles.badgeGradient, { paddingHorizontal: 6 }]}>
+              <CustomText style={[styles.badgeText, { fontSize: 8 }]}>AUTHENTIC</CustomText>
+            </View>
+          </View>
+        )}
         <TouchableOpacity 
           style={styles.wishlistButton} 
           onPress={handleToggleWishlist}

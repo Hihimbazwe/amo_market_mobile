@@ -281,7 +281,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
-  addButton: { marginLeft: 'auto', padding: 8, borderRadius: 12 },
+  addButton: { 
+    marginLeft: 'auto', 
+    paddingHorizontal: 24, 
+    paddingVertical: 10, 
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 100,
+    justifyContent: 'center'
+  },
+  addButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
   searchSection: { padding: 16 },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',

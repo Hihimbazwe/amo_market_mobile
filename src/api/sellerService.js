@@ -445,5 +445,41 @@ export const sellerService = {
       console.error('getFollowStatus error:', error);
       throw error;
     }
-  }
+  },
+
+  // Inventory Management
+  getInventory: async (userId) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/seller/inventory`, {
+        method: 'GET',
+        headers: buildHeaders(userId),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON: ${text.slice(0, 100)}`); }
+      if (!response.ok) throw new Error(data.error || `Failed to fetch inventory (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('getInventory error:', error);
+      throw error;
+    }
+  },
+
+  updateInventoryStock: async (userId, payload) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/seller/inventory`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+        body: JSON.stringify(payload),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON: ${text.slice(0, 100)}`); }
+      if (!response.ok) throw new Error(data.error || `Failed to update inventory (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('updateInventoryStock error:', error);
+      throw error;
+    }
+  },
 };

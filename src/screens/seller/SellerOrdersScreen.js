@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TouchableWithoutFeedback } from 'react-native';
-import { Menu, Search, ShoppingBag, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone } from 'lucide-react-native';
+import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
@@ -163,54 +163,59 @@ const SellerOrdersScreen = () => {
 
   const renderOrderItem = ({ item }) => {
     const orderTitle = item.items && item.items.length > 0 && item.items[0].product ? item.items[0].product.title : t('orderItems');
-    const dateStr = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const statusColor = statusColors[item.status]?.text || '#94a3b8';
     
     return (
-      <View style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.orderHeader}>
-          <View style={{ flex: 1, marginRight: 8 }}>
-            {/* Real name of the orders not the id */}
-            <CustomText style={[styles.orderId, { color: colors.foreground }]} numberOfLines={1}>{orderTitle}</CustomText>
-            <CustomText style={styles.orderDate}>{dateStr}</CustomText>
+      <TouchableOpacity 
+        style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={() => {
+          setSelectedOrderForActions(item);
+          setActionModalVisible(true);
+        }}
+      >
+        <View style={styles.cardHeader}>
+          <View style={[styles.refBadge, { backgroundColor: colors.primary + '15' }]}>
+            <PackageIcon size={12} color={colors.primary} />
+            <CustomText style={[styles.ref, { color: colors.primary }]}>#{item.id.slice(-8).toUpperCase()}</CustomText>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusColors[item.status]?.bg || colors.glass }]}>
-            <CustomText style={[styles.statusText, { color: statusColors[item.status]?.text || colors.muted }]}>
-              {t(item.status?.toLowerCase())}
+          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(item.status?.toLowerCase())}</CustomText>
+          </View>
+        </View>
+
+        <View style={styles.cardBody}>
+          <CustomText variant="h3" style={[styles.name, { color: colors.foreground }]}>{orderTitle}</CustomText>
+          
+          <View style={styles.locationContainer}>
+            <View style={[styles.locationIconBox, { backgroundColor: colors.primary + '10' }]}>
+              <User color={colors.primary} size={16} />
+            </View>
+            <View style={styles.locationInfo}>
+              <CustomText style={[styles.locationLabel, { color: colors.muted }]}>{t('recipient')}</CustomText>
+              <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
+                {item.recipientName || t('unknownBuyer')}
+              </CustomText>
+            </View>
+          </View>
+
+          <View style={styles.priceRow}>
+            <View style={styles.itemsBadge}>
+              <ShoppingBag size={12} color={colors.muted} />
+              <CustomText style={{ fontSize: 11, color: colors.muted }}>{t('itemsCount', { count: item.items.length })}</CustomText>
+            </View>
+            <CustomText style={{ fontWeight: '900', color: colors.foreground, fontSize: 16 }}>
+              {formatPrice(item.payment?.amount || item.total || 0)}
             </CustomText>
           </View>
         </View>
-        
-        <View style={[styles.orderBody, { borderBottomColor: colors.border }]}>
-          <View style={styles.orderInfoRow}>
-            <User color={colors.muted} size={14} />
-            <CustomText style={styles.orderInfoText}>{item.recipientName || t('unknownBuyer')}</CustomText>
-          </View>
-          <View style={styles.orderInfoRow}>
-            <ShoppingBag color={colors.muted} size={14} />
-            <CustomText style={styles.orderInfoText}>{t('itemsCount', { count: item.items.length })}</CustomText>
-          </View>
-          {item.agent && (
-             <View style={styles.orderInfoRow}>
-               <UserCheck color={colors.primary} size={14} />
-               <CustomText style={[styles.orderInfoText, { color: colors.primary }]}>{t('agent')}: {item.agent.user?.name || t('assigned')}</CustomText>
-             </View>
-          )}
-        </View>
-        
-        <View style={styles.orderFooter}>
-          <CustomText style={[styles.orderAmount, { color: colors.foreground }]}>{formatPrice(item.payment?.amount || 0)}</CustomText>
 
-          <TouchableOpacity 
-            style={styles.moreButton}
-            onPress={() => {
-              setSelectedOrderForActions(item);
-              setActionModalVisible(true);
-            }}
-          >
-            <MoreVertical color={colors.muted} size={20} />
-          </TouchableOpacity>
+        {/* Action Indicator */}
+        <View style={styles.cardFooterAction}>
+          <CustomText style={{ fontSize: 11, color: colors.muted, fontWeight: '600' }}>{t('')}</CustomText>
+          <MoreVertical color={colors.muted} size={16} />
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -305,33 +310,7 @@ const SellerOrdersScreen = () => {
               <View style={[styles.actionMenuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {selectedOrderForActions && (
                   <>
-                    {/* Ship Option */}
-                    {(selectedOrderForActions.status === 'PAID' || selectedOrderForActions.status === 'PROCESSING') && (
-                      <TouchableOpacity 
-                        style={[styles.actionMenuItem, { borderBottomColor: colors.border }]}
-                        onPress={() => {
-                          setActionModalVisible(false);
-                          handleShipOrder(selectedOrderForActions.id);
-                        }}
-                      >
-                        <Truck size={18} color="#10B981" />
-                        <CustomText style={styles.actionMenuText}>{t('shipOrder')}</CustomText>
-                      </TouchableOpacity>
-                    )}
-
-                    {/* Assign/Change Agent Option */}
-                    {(selectedOrderForActions.status === 'PAID' || selectedOrderForActions.status === 'PROCESSING' || selectedOrderForActions.status === 'PENDING') && (
-                      <TouchableOpacity 
-                        style={[styles.actionMenuItem, { borderBottomColor: colors.border }]}
-                        onPress={() => {
-                          setActionModalVisible(false);
-                          openAgentModal(selectedOrderForActions);
-                        }}
-                      >
-                        <UserCheck size={18} color={colors.primary} />
-                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.agent ? t('changeAgent') : t('assignAgent')}</CustomText>
-                      </TouchableOpacity>
-                    )}
+                    {/* Ship and Agent assignment options removed as requested by USER */}
 
                     {/* Assign Courier Option */}
                     {['PAID', 'PROCESSING', 'PENDING', 'SHIPPED'].includes(selectedOrderForActions.status?.toUpperCase()) && (
@@ -578,25 +557,23 @@ const styles = StyleSheet.create({
     fontWeight: '700' 
   },
   listContent: { padding: 16, paddingBottom: 100 },
-  orderCard: {
-    borderRadius: 16, padding: 16, borderWidth: 1,
-    marginBottom: 16
-  },
-  orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  orderId: { fontSize: 16, fontWeight: 'bold' },
-  orderDate: { fontSize: 11, marginTop: 4 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 10, fontWeight: 'bold', letterSpacing: 0.5 },
-  orderBody: { gap: 8, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1 },
-  orderInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  orderInfoText: { fontSize: 13, color: '#94a3b8' },
-  orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderAmount: { fontSize: 16, fontWeight: '900' },
-  actionButtons: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  smallBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 4 },
-  btnText: { fontSize: 11, fontWeight: 'bold' },
-  viewDetails: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  viewDetailsText: { fontSize: 11, fontWeight: '900', color: '#94a3b8' },
+  orderCard: { borderRadius: 24, borderWidth: 1, padding: 16, marginBottom: 16, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  refBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  ref: { fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeText: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+  cardBody: { gap: 4 },
+  name: { fontSize: 18, fontWeight: '900', marginBottom: 4 },
+  locationContainer: { flexDirection: 'row', paddingVertical: 8, gap: 12, alignItems: 'center' },
+  locationIconBox: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  locationInfo: { flex: 1 },
+  locationLabel: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 1 },
+  addressText: { fontSize: 13, fontWeight: '500' },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  itemsBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.03)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  cardFooterAction: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 12, opacity: 0.6 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', height: 300 },
   emptyText: { marginTop: 16, fontSize: 14, fontWeight: '600' },
   replacementsCard: {
@@ -636,11 +613,11 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   submitAssignBtn: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12, gap: 8 },
   moreButton: { padding: 8, marginRight: -8 },
-  overlayCentered: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  actionMenuCard: { width: '80%', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  overlayCentered: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  actionMenuCard: { width: '100%', borderRadius: 24, borderWidth: 1, overflow: 'hidden', padding: 8 },
   actionMenuHeader: { padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  actionMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1 },
-  actionMenuText: { fontSize: 14, fontWeight: '600' },
+  actionMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 16 },
+  actionMenuText: { fontSize: 15, fontWeight: '600' },
 });
 
 export default SellerOrdersScreen;

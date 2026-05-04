@@ -12,7 +12,9 @@ import {
   Alert,
   Dimensions,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Modal,
+  FlatList
 } from 'react-native';
 import {
   User,
@@ -85,6 +87,13 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [locLoading, setLocLoading] = useState(false);
   const [agents, setAgents] = useState([]);
   const [selectedAgentId, setSelectedAgentId] = useState(null);
+
+  // Picker Modal State
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerData, setPickerData] = useState([]);
+  const [pickerTitle, setPickerTitle] = useState('');
+  const [onSelectCallback, setOnSelectCallback] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Payment details
   const [paymentMethod, setPaymentMethod] = useState('MOBILE_MONEY');
@@ -251,28 +260,100 @@ const CheckoutScreen = ({ route, navigation }) => {
     </View>
   );
 
+  const openPicker = (label, options, onSelect) => {
+    if (!options || options.length === 0) {
+      if (locLoading) return; // Wait for loading
+      Alert.alert('No Data', `No ${label.toLowerCase()}s found for the selected location.`);
+      return;
+    }
+    setPickerTitle(`Select ${label}`);
+    setPickerData(options);
+    setOnSelectCallback(() => onSelect);
+    setSearchQuery('');
+    setPickerVisible(true);
+  };
+
   const renderDropdown = (label, value, onValueChange, options, disabled) => (
     <View style={[styles.dropdownGroup, disabled && { opacity: 0.5 }]}>
       {renderLabel(label)}
       <View style={[styles.dropdownWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
         <TouchableOpacity 
           style={[styles.dropdownTrigger, { borderColor: colors.border }]}
-          onPress={() => {
-            if (disabled) return;
-            Alert.alert(`Select ${label}`, '', options.map(o => ({
-              text: o,
-              onPress: () => onValueChange(o)
-            })).concat([{ text: 'Cancel', style: 'cancel' }]));
-          }}
+          disabled={disabled || locLoading}
+          onPress={() => openPicker(label, options, onValueChange)}
         >
           <CustomText style={[styles.dropdownValue, { color: value ? colors.foreground : colors.muted }]}>
-            {value || `Select ${label}`}
+            {value || (locLoading && !disabled ? 'Loading...' : `Select ${label}`)}
           </CustomText>
-          <ChevronDown size={14} color={colors.muted} />
+          {locLoading && !disabled ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <ChevronDown size={14} color={colors.muted} />
+          )}
         </TouchableOpacity>
       </View>
     </View>
   );
+
+  const renderPickerModal = () => {
+    const filteredData = pickerData.filter(item => 
+      item.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return (
+      <Modal
+        visible={pickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <CustomText variant="h3" style={{ color: colors.foreground }}>{pickerTitle}</CustomText>
+              <TouchableOpacity onPress={() => setPickerVisible(false)} style={styles.closeBtn}>
+                <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>Done</CustomText>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={[styles.searchWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.searchInput, { color: colors.foreground }]}
+                placeholder="Search..."
+                placeholderTextColor={colors.muted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            <FlatList
+              data={filteredData}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.pickerItem, { borderBottomColor: colors.border }]}
+                  onPress={() => {
+                    onSelectCallback(item);
+                    setPickerVisible(false);
+                  }}
+                >
+                  <CustomText style={{ color: colors.foreground, fontSize: 16 }}>{item}</CustomText>
+                  {loc[pickerTitle.replace('Select ', '').toLowerCase()] === item && (
+                    <CheckCircle2 size={18} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={() => (
+                <View style={styles.emptyPicker}>
+                  <CustomText style={{ color: colors.muted }}>No results found</CustomText>
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -605,6 +686,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         </CustomButton>
       </View>
       </KeyboardAvoidingView>
+      {renderPickerModal()}
     </SafeAreaView>
   );
 };
@@ -942,6 +1024,51 @@ const styles = StyleSheet.create({
   primaryNavBtn: {
     flex: 2,
     height: 52,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    height: '80%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    marginBottom: 16,
+  },
+  closeBtn: {
+    padding: 8,
+  },
+  searchWrapper: {
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    justifyContent: 'center',
+  },
+  searchInput: {
+    fontSize: 16,
+  },
+  pickerItem: {
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+  },
+  emptyPicker: {
+    padding: 40,
+    alignItems: 'center',
   }
 });
 

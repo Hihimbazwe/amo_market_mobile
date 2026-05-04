@@ -128,54 +128,75 @@ export default function CourierShipmentsScreen({ navigation }) {
   const filtered = filter === 'ALL' ? shipments : shipments.filter(s => s.status === filter);
 
   const renderItem = ({ item }) => {
-    const statusColor = STATUS_COLORS[item.status] || '#94a3b8';
-    const isActive = ['PENDING', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(item.status);
-    
+    const statusColor = STATUS_COLORS[item.status] || '#cbd5e1';
     return (
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <TouchableOpacity 
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={() => {
+          setSelectedShipment(item);
+          setActionModalVisible(true);
+        }}
+      >
         <View style={styles.cardHeader}>
-          <CustomText style={[styles.ref, { color: colors.muted }]}>#{item.orderId?.slice(-8).toUpperCase()}</CustomText>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={[styles.badge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
-              <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(item.status?.toLowerCase())}</CustomText>
+          <View style={[styles.refBadge, { backgroundColor: colors.primary + '15' }]}>
+            <Package size={12} color={colors.primary} />
+            <CustomText style={[styles.ref, { color: colors.primary }]}>#{item.orderId?.slice(-8).toUpperCase()}</CustomText>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(item.status?.toLowerCase())}</CustomText>
+          </View>
+        </View>
+
+        <View style={styles.cardBody}>
+          <CustomText variant="h3" style={[styles.name, { color: colors.foreground }]}>{item.recipientName}</CustomText>
+          
+          <View style={styles.locationContainer}>
+            <View style={[styles.locationIconBox, { backgroundColor: colors.primary + '10' }]}>
+              <MapPin color={colors.primary} size={16} />
             </View>
-            <TouchableOpacity 
-              onPress={() => {
-                setSelectedShipment(item);
-                setActionModalVisible(true);
-              }}
-              style={styles.moreBtn}
+            <View style={styles.locationInfo}>
+              <CustomText style={[styles.locationLabel, { color: colors.muted }]}>{t('deliveryAddress')}</CustomText>
+              <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={2}>
+                {item.address}
+              </CustomText>
+            </View>
+          </View>
+
+          <View style={styles.contactRow}>
+            {item.phoneNumber && (
+              <View style={styles.contactItem}>
+                <Phone color={colors.primary} size={14} />
+                <CustomText style={[styles.contactText, { color: colors.foreground }]}>{item.phoneNumber}</CustomText>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Dynamic Action Button */}
+        <View style={styles.actionContainer}>
+          {item.status === 'PENDING' && (
+            <TouchableOpacity
+              onPress={() => handleUpdateStatus(item.id, 'IN_TRANSIT')}
+              style={[styles.actionBtn, { backgroundColor: '#A855F7' }]}
             >
-              <MoreVertical color={colors.muted} size={18} />
+              <Truck color="#fff" size={16} />
+              <CustomText style={styles.actionBtnText}>{t('markAsInTransit')}</CustomText>
             </TouchableOpacity>
-          </View>
+          )}
+
+          {(item.status === 'IN_TRANSIT' || item.status === 'PICKED_UP') && (
+            <TouchableOpacity
+              onPress={() => handleUpdateStatus(item.id, 'OUT_FOR_DELIVERY')}
+              style={[styles.actionBtn, { backgroundColor: 'transparent', borderColor: '#F97316', borderWidth: 1 }]}
+            >
+              <Truck color="#F97316" size={16} />
+              <CustomText style={[styles.actionBtnText, { color: '#F97316' }]}>{t('markAsOutForDelivery')}</CustomText>
+            </TouchableOpacity>
+          )}
+
         </View>
-
-        <CustomText style={[styles.name, { color: colors.foreground }]}>{item.recipientName}</CustomText>
-
-        <View style={styles.infoRow}>
-          <MapPin color={colors.muted} size={13} />
-          <CustomText style={[styles.infoText, { color: colors.muted }]} numberOfLines={1}>{item.address}</CustomText>
-        </View>
-
-        {item.phoneNumber && (
-          <View style={styles.infoRow}>
-            <Phone color={colors.muted} size={13} />
-            <CustomText style={[styles.infoText, { color: colors.muted }]}>{item.phoneNumber}</CustomText>
-          </View>
-        )}
-
-        {isActive && (
-          <TouchableOpacity
-            onPress={() => handleMarkDelivered(item)}
-            style={styles.deliverBtn}
-            activeOpacity={0.8}
-          >
-            <CheckCircle2 color="#fff" size={16} />
-            <CustomText style={styles.deliverBtnText}>{t('markAsDelivered')}</CustomText>
-          </TouchableOpacity>
-        )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -246,30 +267,11 @@ export default function CourierShipmentsScreen({ navigation }) {
                 {selectedShipment && (
                   <>
                     <TouchableOpacity 
-                      style={[styles.menuItem, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-                      onPress={() => handleUpdateStatus(selectedShipment.id, 'IN_TRANSIT')}
-                    >
-                      <Truck size={18} color="#A855F7" />
-                      <CustomText style={styles.menuItemText}>{t('markAsInTransit')}</CustomText>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.menuItem, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                      style={[styles.menuItem]}
                       onPress={() => handleUpdateStatus(selectedShipment.id, 'OUT_FOR_DELIVERY')}
                     >
                       <Truck size={18} color="#F97316" />
-                      <CustomText style={styles.menuItemText}>{t('outForDelivery')}</CustomText>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={styles.menuItem}
-                      onPress={() => {
-                        setActionModalVisible(false);
-                        setAgentModalVisible(true);
-                      }}
-                    >
-                      <UserPlus size={18} color="#3B82F6" />
-                      <CustomText style={styles.menuItemText}>{t('assignDeliveryAgent')}</CustomText>
+                      <CustomText style={styles.menuItemText}>{t('markAsOutForDelivery')}</CustomText>
                     </TouchableOpacity>
                   </>
                 )}
@@ -352,18 +354,27 @@ const styles = StyleSheet.create({
     fontWeight: '700' 
   },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { padding: 16, gap: 12 },
-  card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 8 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  ref: { fontSize: 11, fontFamily: 'monospace' },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
-  badgeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  moreBtn: { padding: 4 },
-  name: { fontSize: 15, fontWeight: '700' },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  infoText: { fontSize: 13, flex: 1 },
-  deliverBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#f97316', borderRadius: 12, paddingVertical: 14, marginTop: 4 },
-  deliverBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  listContent: { padding: 16, gap: 16 },
+  card: { borderRadius: 24, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  refBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  ref: { fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeText: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+  cardBody: { gap: 12 },
+  name: { fontSize: 20, fontWeight: '900', marginBottom: 4 },
+  locationContainer: { flexDirection: 'row', paddingVertical: 12, gap: 12, alignItems: 'center' },
+  locationIconBox: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  locationInfo: { flex: 1 },
+  locationLabel: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 1 },
+  addressText: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  contactRow: { flexDirection: 'row', gap: 16, marginTop: 4 },
+  contactItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  contactText: { fontSize: 13, fontWeight: '600' },
+  actionContainer: { marginTop: 16 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, paddingVertical: 14 },
+  actionBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 8 },
   
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },

@@ -8,7 +8,7 @@ import CustomText from '../components/CustomText';
 import Svg, { Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import {
   Home,
-  Package,
+  Package as PackageIcon,
   ShoppingBag,
   Wallet,
   Settings,
@@ -36,6 +36,7 @@ import SellerWithdrawScreen from '../screens/seller/SellerWithdrawScreen';
 import SellerAnalyticsScreen from '../screens/seller/SellerAnalyticsScreen';
 import SellerMembershipScreen from '../screens/seller/SellerMembershipScreen';
 import SellerKYCScreen from '../screens/seller/SellerKYCScreen';
+import SellerInventoryScreen from '../screens/seller/SellerInventoryScreen';
 import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
@@ -49,7 +50,8 @@ const NAV_GROUPS = (t) => [
     label: t('store'),
     items: [
       { name: t('dashboard'), icon: Home, screen: 'SellerOverview' },
-      { name: t('myProducts'), icon: Package, screen: 'SellerProducts' },
+      { name: t('myProducts'), icon: PackageIcon, screen: 'SellerProducts' },
+      { name: t('inventory'), icon: PackageIcon, screen: 'SellerInventory' },
       { name: t('orders'), icon: ShoppingBag, screen: 'SellerOrders' },
       { name: t('shipping'), icon: Truck, screen: 'SellerShipment' },
       { name: t('disputes'), icon: AlertCircle, screen: 'SellerDisputes' },
@@ -237,6 +239,7 @@ export default function SellerDashboardDrawer({ navigation }) {
           <Stack.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
           <Stack.Screen name="SellerMembership" component={SellerMembershipScreen} />
           <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
+          <Stack.Screen name="SellerInventory" component={SellerInventoryScreen} />
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
           <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />

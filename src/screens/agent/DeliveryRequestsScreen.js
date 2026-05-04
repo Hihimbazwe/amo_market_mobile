@@ -52,9 +52,9 @@ const DeliveryRequestsScreen = () => {
         }
     };
 
-    const isActionable = (o) => o.shippingStatus === "AWAITING_PICKUP" || o.shippingStatus === "LABEL_GENERATED";
-    const pending = orders.filter(isActionable);
-    const active = orders.filter(o => ["PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(o.shippingStatus));
+    const isActionable = (o) => o.status === "AWAITING_PICKUP" || o.status === "LABEL_GENERATED" || o.status === "PICKED_UP" || o.status === "IN_TRANSIT";
+    const pending = orders.filter(o => ["AWAITING_PICKUP", "LABEL_GENERATED"].includes(o.status));
+    const active = orders.filter(o => ["PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(o.status));
 
     const renderOrderCard = (order, type) => {
         const isExp = expanded === order.id;
@@ -71,7 +71,7 @@ const DeliveryRequestsScreen = () => {
                         </CustomText>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
                             <View style={styles.infoItem}><MapPin size={10} color={colors.muted} /><CustomText style={styles.infoText}>{order.address}</CustomText></View>
-                            <View style={styles.infoItem}><Clock size={10} color={colors.muted} /><CustomText style={styles.infoText}>Rwf {order.totalAmount.toLocaleString()}</CustomText></View>
+                            <View style={styles.infoItem}><Clock size={10} color={colors.muted} /><CustomText style={styles.infoText}>Rwf {(order.totalAmount || order.total || 0).toLocaleString()}</CustomText></View>
                         </View>
                     </View>
                     <TouchableOpacity onPress={() => setExpanded(isExp ? null : order.id)}>
