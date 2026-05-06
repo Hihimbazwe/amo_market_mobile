@@ -46,11 +46,14 @@ const Stack = createNativeStackNavigator();
 
 // --- STACKS ---
 
+import SellerStoreScreen from './src/screens/buyer/SellerStoreScreen';
+
 const HomeStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="HomeMain" component={HomeScreen} />
     <Stack.Screen name="Cart" component={CartScreen} />
     <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+    <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
     <Stack.Screen name="Checkout" component={CheckoutScreen} />
     <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
@@ -69,6 +72,7 @@ const MarketplaceStack = () => (
     <Stack.Screen name="MarketMain" component={MarketplaceScreen} />
     <Stack.Screen name="Cart" component={CartScreen} />
     <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+    <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
     <Stack.Screen name="Checkout" component={CheckoutScreen} />
     <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
     <Stack.Screen name="Login" component={LoginScreen} />
@@ -271,7 +275,10 @@ const RootNavigator = () => {
           {user ? (
             <Stack.Screen name="MainApp" component={AppTabs} />
           ) : (
-            <Stack.Screen name="Auth" component={AuthStack} />
+            <>
+              <Stack.Screen name="MainApp" component={AppTabs} />
+              <Stack.Screen name="Auth" component={AuthStack} />
+            </>
           )}
         </Stack.Navigator>
       </NavigationContainer>

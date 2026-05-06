@@ -38,7 +38,21 @@ const LoginScreen = ({ navigation }) => {
     try {
       const result = await authService.login(email, password);
       await login(result);
-      Alert.alert('Success', 'Logged in successfully!');
+      
+      // Redirect based on role
+      const role = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
+      
+      if (['SELLER', 'COURIER', 'AGENT'].includes(role)) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { screen: 'Me' } }],
+        });
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+        });
+      }
 
     } catch (error) {
       if (error.message === 'EmailVryErr') {

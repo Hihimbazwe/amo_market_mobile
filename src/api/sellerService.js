@@ -180,6 +180,41 @@ export const sellerService = {
     }
   },
 
+  markPrepared: async (userId, orderId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/prepare`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to mark as prepared (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('markPrepared error:', error);
+      throw error;
+    }
+  },
+
+  verifyPickupCode: async (userId, orderId, pickupCode) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/verify-pickup`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ pickupCode }),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to verify pickup code (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('verifyPickupCode error:', error);
+      throw error;
+    }
+  },
+
   getWallet: async (userId) => {
     try {
       const response = await fetch(`${BASE_URL}/api/wallet`, {
@@ -394,6 +429,27 @@ export const sellerService = {
     }
   },
 
+  getPublicProfile: async (sellerId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/public/seller/${sellerId}`, {
+        method: 'GET',
+        headers: commonHeaders,
+      });
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+      }
+      if (!response.ok) throw new Error(data.error || `Failed to fetch public profile (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('getPublicProfile error:', error);
+      throw error;
+    }
+  },
+
   updateProfile: async (userId, profileData) => {
     try {
       const response = await fetch(`${BASE_URL}/api/seller/profile`, {
@@ -412,6 +468,28 @@ export const sellerService = {
       return data;
     } catch (error) {
       console.error('updateProfile error:', error);
+      throw error;
+    }
+  },
+
+  updateLocation: async (userId, locationData) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/location`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+        body: JSON.stringify(locationData)
+      });
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+      }
+      if (!response.ok) throw new Error(data.error || `Failed to update location (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('updateLocation error:', error);
       throw error;
     }
   },

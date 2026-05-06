@@ -10,7 +10,10 @@ import {
   Linking,
   TextInput,
   Dimensions,
-  Image
+  Image,
+  Modal,
+  Alert,
+  Platform
 } from 'react-native';
 import { 
   ArrowLeft, 
@@ -31,7 +34,9 @@ import {
   ZoomOut,
   RotateCcw,
   Wifi,
-  WifiOff
+  WifiOff,
+  ChevronRight,
+  Info
 } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -41,35 +46,52 @@ import CustomButton from '../../components/CustomButton';
 import { useLanguage } from '../../context/LanguageContext';
 import QRCode from 'react-native-qrcode-svg';
 import { WebView } from 'react-native-webview';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
 const getForwardSteps = (t) => [
-  { key: "AWAITING_PICKUP",  label: t('orderPlaced'),         icon: Package },
-  { key: "PICKED_UP",        label: t('shipped'),              icon: Truck },
+  { key: "PENDING",   label: t('orderPlaced'), icon: Package },
+  { key: "PICKED_UP", label: t('shipped'),      icon: Truck },
   { key: "IN_TRANSIT",       label: t('inTransit'),           icon: Navigation },
   { key: "OUT_FOR_DELIVERY", label: t('readyForCollection'), icon: MapPin },
   { key: "DELIVERED",        label: t('delivered'),            icon: CheckCircle2 },
 ];
 
-const getReturnSteps = (t) => [
-  { key: "RETURN_INITIATED",  label: t('returnRequested'), icon: RotateCcw },
-  { key: "RETURN_IN_TRANSIT", label: t('agentCollecting'),  icon: Truck },
-  { key: "RETURN_RECEIVED",   label: t('sellerReceived'),  icon: Package },
-  { key: "RETURN_REFUNDED",   label: t('refunded'),         icon: CheckCircle2 },
+const getPickupSteps = (t) => [
+  { key: "PENDING",   label: t('orderPlaced'),    icon: Package },
+  { key: "PREPARED",  label: t('prepared'),        icon: Package },
+  { key: "PICKED_UP", label: t('pickedUp'),       icon: CheckCircle2 },
 ];
 
-const STATUS_TO_SHIPPING = {
-  PENDING:   "AWAITING_PICKUP",
-  PAID:      "AWAITING_PICKUP",
+const getReturnSteps = (t) => [
+  { key: "RETURN_REQUESTED",  label: t('returnRequested'), icon: RotateCcw },
+  { key: "RETURN_IN_TRANSIT", label: t('agentCollecting'),  icon: Truck },
+  { key: "RETURN_COMPLETED",  label: t('sellerReceived'),  icon: Package },
+  { key: "REFUNDED",          label: t('refunded'),         icon: CheckCircle2 },
+];
+
+const STATUS_TO_STEP = {
+  PENDING:   "PENDING",
+  PAID:      "PENDING",
+  CONFIRMED: "PENDING",
   SHIPPED:   "OUT_FOR_DELIVERY",
   DELIVERED: "DELIVERED",
   COMPLETED: "DELIVERED",
-  CANCELLED: "AWAITING_PICKUP",
+  CANCELLED: "PENDING",
 };
 
-const RETURN_STATUSES = ["RETURN_REQUESTED", "RETURNED"];
-const RETURN_SHIPPING_STATUSES = ["RETURN_INITIATED", "RETURN_IN_TRANSIT", "RETURN_RECEIVED", "RETURN_REFUNDED"];
+const PICKUP_STATUS_TO_STEP = {
+  PENDING:   "PENDING",
+  PAID:      "PENDING",
+  CONFIRMED: "PENDING",
+  PREPARED:  "PREPARED",
+  PICKED_UP: "PICKED_UP",
+  COMPLETED: "PICKED_UP",
+  CANCELLED: "PENDING",
+};
+
+const RETURN_STATUSES = ["RETURN_REQUESTED", "RETURN_IN_TRANSIT", "RETURN_COMPLETED", "RETURNED_TO_SELLER", "REFUNDED"];
 
 const getStepIndex = (steps, status) => {
   const idx = steps.findIndex((s) => s.key === status);
@@ -78,7 +100,7 @@ const getStepIndex = (steps, status) => {
 
 const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const { orderId } = route.params;
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { user } = useAuth();
   const { t } = useLanguage();
   
@@ -92,6 +114,10 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const [ratingComment, setRatingComment] = useState("");
   const [submittingRating, setSubmittingRating] = useState(false);
   const [ratingDone, setRatingDone] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [deliveryCodeVisible, setDeliveryCodeVisible] = useState(false);
+  const [pickupCodeVisible, setPickupCodeVisible] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     if (!user?.id || !orderId) return;
@@ -131,18 +157,19 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
     }
   }, [order?.agentId, order?.status, fetchAgentLocation]);
 
-  const handleGenerateCode = async () => {
+  const handleCancelOrder = async () => {
     if (!user?.id || !orderId) return;
-    setLoading(true);
+    setCancelling(true);
     try {
-      const data = await orderService.getDeliveryCode(user.id, orderId);
-      // After generating, we re-fetch order details to get the updated trackingCode/Courier info
+      await orderService.cancelOrder(user.id, orderId);
+      setShowCancelModal(false);
       await fetchOrder();
+      Alert.alert(t('success'), t('orderCancelledSuccess'));
     } catch (error) {
-      console.error('Generate code error:', error);
-      alert(t('failedToGenerateCode'));
+      console.error('Cancel order error:', error);
+      Alert.alert(t('error'), error.message || t('failedToCancelOrder'));
     } finally {
-      setLoading(false);
+      setCancelling(false);
     }
   };
 
@@ -166,18 +193,25 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
 
   const isReturn = useMemo(() => {
     if (!order) return false;
-    return RETURN_STATUSES.includes(order.status) || RETURN_SHIPPING_STATUSES.includes(order.shippingStatus);
+    return RETURN_STATUSES.includes(order.status);
   }, [order]);
 
-  const activeSteps = useMemo(() => isReturn ? getReturnSteps(t) : getForwardSteps(t), [isReturn, t]);
+  const isPickup = useMemo(() => order?.pickupType === "PICKUP", [order]);
+
+  const activeSteps = useMemo(() => {
+    if (isReturn) return getReturnSteps(t);
+    if (isPickup) return getPickupSteps(t);
+    return getForwardSteps(t);
+  }, [isReturn, isPickup, t]);
 
   const currentStep = useMemo(() => {
     if (!order) return 0;
-    const resolvedShipping = activeSteps.some(s => s.key === order.shippingStatus)
-      ? order.shippingStatus
-      : (STATUS_TO_SHIPPING[order.status] ?? "AWAITING_PICKUP");
-    return getStepIndex(activeSteps, resolvedShipping);
-  }, [order, activeSteps]);
+    const statusToStep = isPickup ? PICKUP_STATUS_TO_STEP : STATUS_TO_STEP;
+    const resolvedStep = activeSteps.some(s => s.key === order.status)
+      ? order.status
+      : (statusToStep[order.status] ?? "PENDING");
+    return getStepIndex(activeSteps, resolvedStep);
+  }, [order, activeSteps, isPickup]);
 
   const stepTimestamps = useMemo(() => {
     if (!order?.TrackingEvent) return {};
@@ -185,25 +219,46 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
     order.TrackingEvent.forEach(ev => {
       if (!map[ev.status]) map[ev.status] = ev.createdAt;
     });
-    if (!map["AWAITING_PICKUP"]) map["AWAITING_PICKUP"] = order.createdAt;
+    if (!map["PENDING"]) map["PENDING"] = order.createdAt;
     return map;
   }, [order]);
 
-  const deliveryCode = order?.Courier?.qrToken || order?.trackingCode;
-  const isReadyForCollection = (order?.pickupType === "PICKUP" && !!order?.pickupCode) || !!deliveryCode;
-  const isActive = ["PAID", "SHIPPED", "DELIVERED", "PICKED_UP"].includes(order?.status);
+  const canCancel = useMemo(() => {
+    if (!order) return false;
+    if (isPickup) {
+      return !["PICKED_UP", "COMPLETED", "CANCELLED", "PREPARED"].includes(order.status);
+    }
+    return !["PICKED_UP", "COMPLETED", "CANCELLED", "PREPARED", "DELIVERED", "IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(order.status);
+  }, [order, isPickup]);
+
+  // Delivery code logic for DELIVERY orders
+  const courier = order?.Courier;
+  const deliveryCode = courier?.qrToken || order?.trackingCode;
+  const isCodeUsed = !!deliveryCode?.startsWith("USED_") || courier?.handedOver === true;
+  
+  const showDeliveryCode = useMemo(() => {
+    return order?.pickupType === "DELIVERY" && !!deliveryCode && order.status === "OUT_FOR_DELIVERY";
+  }, [order, deliveryCode]);
+
+  const isReadyForCollection = useMemo(() => {
+    return order?.pickupType === "PICKUP" && 
+           !!order?.pickupCode && 
+           order.status !== "PENDING" && 
+           order.status !== "PENDING_PAYMENT";
+  }, [order]);
 
   const qrPayload = useMemo(() => {
-    if (!order) return "";
-    const codeToUse = deliveryCode || order.pickupCode;
+    if (!order || !order.pickupCode) return "";
     return [
-      `${deliveryCode ? 'Delivery' : 'Pickup'} Code: ${codeToUse}`,
+      `Code: ${order.pickupCode}`,
       `Order: #${order.id.slice(-8).toUpperCase()}`,
       `Buyer: ${order.buyer?.name || order.recipientName}`,
       `Phone: ${order.phoneNumber}`,
       order.pickupLocation ? `Location: ${order.pickupLocation.name} — ${order.pickupLocation.address}` : "",
     ].filter(Boolean).join("\n");
-  }, [order, deliveryCode]);
+  }, [order]);
+
+  const isActive = ["PAID", "SHIPPED", "DELIVERED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(order?.status);
 
   if (loading) {
     return (
@@ -247,33 +302,67 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchOrder(); }} tintColor={colors.primary} />}
       >
-        {/* Generate Code Action (if not ready) */}
-        {!isReadyForCollection && (order.status === "PAID" || order.status === "PROCESSING") && (
-          <View style={[styles.card, { backgroundColor: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }]}>
-             <View style={styles.qrHeader}>
-               <View style={[styles.qrIconBox, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
-                 <QrCode size={20} color="#3b82f6" />
-               </View>
-               <View style={{ flex: 1, marginLeft: 12 }}>
-                 <CustomText style={{ fontWeight: 'bold', color: '#3b82f6' }}>{t('deliveryCodeRequired')}</CustomText>
-                 <CustomText style={{ fontSize: 11, color: colors.muted }}>{t('generateCodeDesc')}</CustomText>
-               </View>
-             </View>
-             <CustomButton
-               title={t('generateDeliveryCode')}
-               onPress={handleGenerateCode}
-               style={{ backgroundColor: '#3b82f6' }}
-             />
+        {/* Cancel Confirmation Modal */}
+        <Modal
+          visible={showCancelModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowCancelModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+              <View style={styles.modalHeader}>
+                <View style={[styles.modalIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+                  <AlertTriangle size={24} color="#ef4444" />
+                </View>
+                <View style={{ marginLeft: 12 }}>
+                  <CustomText variant="h3">{t('cancelOrder')}?</CustomText>
+                  <CustomText style={{ fontSize: 11, color: colors.muted }}>#{order.id.slice(-8).toUpperCase()}</CustomText>
+                </View>
+              </View>
+              
+              <CustomText style={{ color: colors.muted, marginVertical: 16 }}>
+                {t('cancelOrderConfirmDesc')}
+              </CustomText>
+
+              {order.totalAmount > 0 && (
+                <View style={[styles.refundBox, { backgroundColor: 'rgba(34, 197, 94, 0.1)', borderColor: 'rgba(34, 197, 94, 0.2)' }]}>
+                  <CheckCircle2 size={16} color="#22c55e" />
+                  <CustomText style={{ color: '#22c55e', fontWeight: 'bold', fontSize: 12, marginLeft: 8 }}>
+                    Rwf {order.totalAmount.toLocaleString()} {t('refundToWallet')}
+                  </CustomText>
+                </View>
+              )}
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={[styles.modalBtn, { backgroundColor: colors.glass }]} 
+                  onPress={() => setShowCancelModal(false)}
+                >
+                  <CustomText style={{ fontWeight: 'bold' }}>{t('keepOrder')}</CustomText>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalBtn, { backgroundColor: '#ef4444' }]} 
+                  onPress={handleCancelOrder}
+                  disabled={cancelling}
+                >
+                  {cancelling ? <ActivityIndicator size="small" color="#fff" /> : (
+                    <CustomText style={{ color: '#fff', fontWeight: 'bold' }}>{t('yesCancel')}</CustomText>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        )}
+        </Modal>
+
         {/* Progress Timeline */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: isReturn ? 'rgba(239, 68, 68, 0.2)' : colors.glassBorder }]}>
           <View style={styles.sectionHeader}>
-            <CustomText style={styles.sectionLabel}>{isReturn ? t('returnProgress') : t('deliveryProgress')}</CustomText>
+            <CustomText style={styles.sectionLabel}>{isReturn ? t('returnProgress') : (isPickup ? t('pickupProgress') : t('deliveryProgress'))}</CustomText>
             {isReturn && (
               <View style={[styles.badge, { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
                 <RotateCcw size={10} color="#ef4444" />
-                <CustomText style={{ fontSize: 8, color: '#ef4444', fontWeight: 'bold', marginLeft: 4 }}>{t('returnProgress')}</CustomText>
+                <CustomText style={{ fontSize: 8, color: '#ef4444', fontWeight: 'bold', marginLeft: 4 }}>{t('returnActive')}</CustomText>
               </View>
             )}
           </View>
@@ -298,7 +387,7 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
                 const Icon = step.icon;
                 
                 return (
-                  <View key={step.key} style={styles.stepItem}>
+                  <View key={step.key} style={[styles.stepItem, { width: (width - 64) / activeSteps.length }]}>
                     <View style={[
                       styles.stepIcon, 
                       { 
@@ -328,8 +417,8 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* QR Code Section */}
-        {/* isReadyForCollection && (
+        {/* Delivery Code Card — for DELIVERY orders */}
+        {showDeliveryCode && (
           <View style={[styles.card, { backgroundColor: 'rgba(249, 115, 22, 0.05)', borderColor: 'rgba(249, 115, 22, 0.2)' }]}>
             <View style={styles.qrHeader}>
               <View style={[styles.qrIconBox, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
@@ -337,32 +426,101 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <CustomText style={{ fontWeight: 'bold', color: colors.primary }}>
-                  {deliveryCode ? t('deliveryCode') : t('yourPickupCode')}
+                  {isCodeUsed ? t('deliveryCodeUsed') : t('yourDeliveryCode')}
                 </CustomText>
                 <CustomText style={{ fontSize: 11, color: colors.muted }}>
-                  {deliveryCode ? t('showCodeToCourier') : t('showQrToAgent')}
+                  {isCodeUsed ? t('codeVerifiedDesc') : t('shareCodeWithAgent')}
                 </CustomText>
+              </View>
+            </View>
+
+            {isCodeUsed ? (
+              <View style={[styles.codeUsedBox, { backgroundColor: 'rgba(34, 197, 94, 0.1)', borderColor: 'rgba(34, 197, 94, 0.2)' }]}>
+                <CustomText style={styles.codeVerifiedText}>VERIFIED</CustomText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  <CheckCircle2 size={12} color="#22c55e" />
+                  <CustomText style={{ fontSize: 11, color: '#22c55e', fontWeight: 'bold', marginLeft: 4 }}>{t('successfullyDelivered')}</CustomText>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.codeRevealContainer}>
+                <View style={[styles.codeDisplayBox, { backgroundColor: 'rgba(0,0,0,0.2)', borderColor: colors.glassBorder }]}>
+                  {deliveryCodeVisible ? (
+                    <CustomText style={styles.codeMainText}>{deliveryCode}</CustomText>
+                  ) : (
+                    <CustomText style={[styles.codeMainText, { opacity: 0.2 }]}>••••••</CustomText>
+                  )}
+                </View>
+                <TouchableOpacity 
+                  onPress={() => setDeliveryCodeVisible(!deliveryCodeVisible)}
+                  style={[styles.revealBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                >
+                  <CustomText style={{ color: colors.primary, fontWeight: 'bold', fontSize: 12 }}>
+                    {deliveryCodeVisible ? t('hideCode') : t('revealCode')}
+                  </CustomText>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Ready for Collection — QR Code Card for PICKUP */}
+        {isReadyForCollection && (
+          <View style={[styles.card, { backgroundColor: 'rgba(249, 115, 22, 0.05)', borderColor: 'rgba(249, 115, 22, 0.2)' }]}>
+            <View style={styles.qrHeader}>
+              <View style={[styles.qrIconBox, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
+                <QrCode size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <CustomText style={{ fontWeight: 'bold', color: colors.primary }}>{t('yourPickupCode')}</CustomText>
+                <CustomText style={{ fontSize: 11, color: colors.muted }}>{t('showQrToSeller')}</CustomText>
               </View>
             </View>
             
             <View style={styles.qrContent}>
-              <View style={styles.qrWrapper}>
-                <QRCode
-                  value={qrPayload}
-                  size={180}
-                  color={colors.primary}
-                  backgroundColor="transparent"
+              {!pickupCodeVisible ? (
+                <CustomButton 
+                  title={t('showPickupCode')}
+                  onPress={() => setPickupCodeVisible(true)}
+                  style={{ width: '100%' }}
                 />
-              </View>
-              <View style={styles.codeDisplay}>
-                <CustomText style={styles.codeLabel}>
-                  {deliveryCode ? t('deliveryCode') : t('yourPickupCode')}
-                </CustomText>
-                <CustomText style={styles.codeText}>{deliveryCode || order.pickupCode}</CustomText>
-              </View>
+              ) : (
+                <View style={{ alignItems: 'center', width: '100%' }}>
+                  <View style={styles.qrWrapper}>
+                    <QRCode
+                      value={qrPayload}
+                      size={200}
+                      color={isDarkMode ? '#fff' : '#000'}
+                      backgroundColor="transparent"
+                    />
+                  </View>
+                  <View style={styles.codeDisplay}>
+                    <CustomText style={styles.codeLabel}>{t('yourPickupCode')}</CustomText>
+                    <CustomText style={styles.codeText}>{order.pickupCode}</CustomText>
+                  </View>
+
+                  {order.pickupLocation && (
+                    <View style={[styles.pickupInfoCard, { backgroundColor: 'rgba(0,0,0,0.2)', borderColor: colors.glassBorder }]}>
+                      <CustomText style={{ color: colors.primary, fontWeight: 'bold', fontSize: 12, marginBottom: 8 }}>{t('pickupLocation')}</CustomText>
+                      <CustomText style={{ fontWeight: 'bold', fontSize: 14 }}>{order.pickupLocation.name}</CustomText>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                        <MapPin size={12} color={colors.muted} />
+                        <CustomText style={{ fontSize: 12, color: colors.muted, marginLeft: 4 }}>{order.pickupLocation.address}</CustomText>
+                      </View>
+                    </View>
+                  )}
+
+                  <TouchableOpacity 
+                    onPress={() => setPickupCodeVisible(false)}
+                    style={{ marginTop: 16 }}
+                  >
+                    <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>{t('hideCode')}</CustomText>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
-        ) */}
+        )}
 
         {/* Agent Card */}
         {order.agent && isActive && (
@@ -472,7 +630,7 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
             <MapPin size={14} color={colors.muted} />
             <View style={styles.infoCol}>
               <CustomText style={styles.infoLabel}>{t('address')}</CustomText>
-              <CustomText style={styles.infoValue}>{order.address}</CustomText>
+              <CustomText style={styles.infoValue}>{order.address || (order.pickupType === 'PICKUP' ? t('pickupAtStore') : '')}</CustomText>
             </View>
           </View>
           
@@ -554,19 +712,31 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
 
         {/* Actions */}
         <View style={styles.actionsContainer}>
-          <CustomButton 
-            variant="outline" 
-            title={t('requestReplacement')} 
-            style={{ flex: 1 }}
+          {canCancel && (
+            <TouchableOpacity 
+              style={[styles.actionBtn, { borderColor: '#ef4444' }]}
+              onPress={() => setShowCancelModal(true)}
+            >
+              <AlertTriangle size={16} color="#ef4444" />
+              <CustomText style={[styles.actionBtnText, { color: '#ef4444' }]}>{t('cancelOrder')}</CustomText>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            style={[styles.actionBtn, { borderColor: colors.glassBorder }]}
             onPress={() => navigation.navigate('Replacements', { initiateReplacementForOrderId: order.id })}
-          />
-          <CustomButton 
-            variant="outline" 
-            title={t('reportIssue')} 
-            style={{ flex: 1, borderColor: '#ef4444' }}
-            textStyle={{ color: '#ef4444' }}
-            onPress={() => navigation.navigate('Disputes', { orderId: order.id })}
-          />
+          >
+            <Package size={16} color={colors.muted} />
+            <CustomText style={[styles.actionBtnText, { color: colors.foreground }]}>{t('requestReplacement')}</CustomText>
+          </TouchableOpacity>
+          {!canCancel && (
+            <TouchableOpacity 
+              style={[styles.actionBtn, { borderColor: '#ef4444' }]}
+              onPress={() => navigation.navigate('Disputes', { orderId: order.id })}
+            >
+              <AlertTriangle size={16} color="#ef4444" />
+              <CustomText style={[styles.actionBtnText, { color: '#ef4444' }]}>{t('reportIssue')}</CustomText>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -589,19 +759,28 @@ const styles = StyleSheet.create({
   progressLine: { height: 4, borderRadius: 2, position: 'absolute', top: 16, left: 24, right: 24 },
   progressFill: { height: '100%', borderRadius: 2 },
   stepsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  stepItem: { alignItems: 'center', width: (width - 64) / 5 },
+  stepItem: { alignItems: 'center' },
   stepIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   stepLabel: { fontSize: 8, fontWeight: 'bold', textAlign: 'center', marginTop: 8 },
   stepTime: { fontSize: 7, color: '#94a3b8', textAlign: 'center', marginTop: 2 },
   
-  // QR Code
+  // QR Code & Codes
   qrHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   qrIconBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   qrContent: { alignItems: 'center', paddingVertical: 10 },
-  qrWrapper: { backgroundColor: '#fff', padding: 16, borderRadius: 20 },
+  qrWrapper: { padding: 16, borderRadius: 20 },
   codeDisplay: { marginTop: 20, alignItems: 'center' },
   codeLabel: { fontSize: 10, fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4 },
   codeText: { fontSize: 28, fontWeight: '900', letterSpacing: 4, color: '#f97316' },
+
+  codeUsedBox: { borderRadius: 20, borderWidth: 1, padding: 20, alignItems: 'center' },
+  codeVerifiedText: { fontSize: 24, fontWeight: '900', letterSpacing: 4, color: '#22c55e', opacity: 0.5, textDecorationLine: 'line-through' },
+  codeRevealContainer: { alignItems: 'center' },
+  codeDisplayBox: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 32, paddingVertical: 16, marginBottom: 12 },
+  codeMainText: { fontSize: 32, fontWeight: '900', letterSpacing: 8, color: '#f97316', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  revealBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, borderWidth: 1 },
+
+  pickupInfoCard: { width: '100%', marginTop: 20, borderRadius: 20, borderWidth: 1, padding: 16 },
 
   // Agent
   agentHeader: { flexDirection: 'row', alignItems: 'center' },
@@ -654,8 +833,20 @@ const styles = StyleSheet.create({
   starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 20 },
   commentInput: { borderWidth: 1, borderRadius: 16, padding: 12, fontSize: 13, textAlignVertical: 'top', minHeight: 80 },
 
-  actionsContainer: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 40 },
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { width: '100%', borderRadius: 32, borderWidth: 1, padding: 24 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  modalIconBox: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  refundBox: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, borderWidth: 1, marginBottom: 20 },
+  modalActions: { flexDirection: 'row', gap: 12 },
+  modalBtn: { flex: 1, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+
+  actionsContainer: { flexDirection: 'column', gap: 12, marginTop: 8, marginBottom: 40 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 56, borderRadius: 20, borderWidth: 1, gap: 8 },
+  actionBtnText: { fontWeight: 'bold', fontSize: 14 },
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
 
 export default BuyerOrderTrackingScreen;
+ 

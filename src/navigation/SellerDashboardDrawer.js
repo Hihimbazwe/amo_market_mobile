@@ -41,6 +41,13 @@ import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
 
+// Buyer features for navigation parity
+import ProductDetailScreen from '../screens/ProductDetailScreen';
+import SellerStoreScreen from '../screens/buyer/SellerStoreScreen';
+import CartScreen from '../screens/CartScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
+import OrderSuccessScreen from '../screens/OrderSuccessScreen';
+
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
@@ -243,6 +250,13 @@ export default function SellerDashboardDrawer({ navigation }) {
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
           <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
+          
+          {/* Parity Screens */}
+          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+          <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
+          <Stack.Screen name="Cart" component={CartScreen} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} />
+          <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
         </Stack.Navigator>
 
         <CustomDrawer

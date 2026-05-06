@@ -29,6 +29,11 @@ import CourierProfileScreen from '../screens/courier/CourierProfileScreen';
 import CourierSettingsScreen from '../screens/courier/CourierSettingsScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 
+// Buyer features for navigation parity
+import ProductDetailScreen from '../screens/ProductDetailScreen';
+import SellerStoreScreen from '../screens/buyer/SellerStoreScreen';
+import CartScreen from '../screens/CartScreen';
+
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
@@ -219,6 +224,9 @@ export default function CourierDashboardDrawer({ navigation }) {
           <Stack.Screen name="CourierProfile" component={CourierProfileScreen} />
           <Stack.Screen name="CourierSettings" component={CourierSettingsScreen} />
           <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
+          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+          <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
+          <Stack.Screen name="Cart" component={CartScreen} />
         </Stack.Navigator>
 
         <CustomDrawer

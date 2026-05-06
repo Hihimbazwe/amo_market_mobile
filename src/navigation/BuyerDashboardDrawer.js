@@ -36,6 +36,12 @@ import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
 
+import ProductDetailScreen from '../screens/ProductDetailScreen';
+import SellerStoreScreen from '../screens/buyer/SellerStoreScreen';
+import CartScreen from '../screens/CartScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
+import OrderSuccessScreen from '../screens/OrderSuccessScreen';
+
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
@@ -200,6 +206,11 @@ export default function BuyerDashboard({ navigation }) {
           <Stack.Screen name="Settings" component={BuyerSettingsScreen} />
           <Stack.Screen name="OrderTracking" component={BuyerOrderTrackingScreen} />
           <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
+          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+          <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
+          <Stack.Screen name="Cart" component={CartScreen} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} />
+          <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
         </Stack.Navigator>
         
         <CustomDrawer 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TouchableWithoutFeedback } from 'react-native';
-import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone } from 'lucide-react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
+import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone, CheckCircle2, ClipboardList, KeyRound } from 'lucide-react-native';
+import { TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
@@ -40,10 +41,17 @@ const SellerOrdersScreen = () => {
   const [loadingCouriers, setLoadingCouriers] = useState(false);
   const [selectedCourierId, setSelectedCourierId] = useState('');
 
+  // Prepare & Verify Pickup state
+  const [preparingOrderId, setPreparingOrderId] = useState(null);
+  const [showVerifyPickupModal, setShowVerifyPickupModal] = useState(false);
+  const [pickupCodeInput, setPickupCodeInput] = useState('');
+  const [verifyingPickup, setVerifyingPickup] = useState(false);
+
   const statusColors = {
     PENDING: { bg: colors.glass, text: colors.muted },
     PROCESSING: { bg: 'rgba(59, 130, 246, 0.1)', text: '#3B82F6' },
     PAID: { bg: 'rgba(59, 130, 246, 0.1)', text: '#3B82F6' },
+    PREPARED: { bg: 'rgba(245, 158, 11, 0.1)', text: '#F59E0B' },
     SHIPPED: { bg: 'rgba(249, 115, 22, 0.1)', text: colors.primary },
     DELIVERED: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10B981' },
     COMPLETED: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10B981' },
@@ -155,6 +163,57 @@ const SellerOrdersScreen = () => {
         }
       }
     ]);
+  };
+
+  const handleMarkPrepared = (order) => {
+    setActionModalVisible(false);
+    Alert.alert(
+      t('markAsPrepared'),
+      t('markAsPreparedConfirm'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('confirm'),
+          onPress: async () => {
+            setPreparingOrderId(order.id);
+            try {
+              await sellerService.markPrepared(user.id, order.id);
+              Alert.alert(t('success'), t('orderMarkedPrepared'));
+              fetchOrdersAndReplacements();
+            } catch (err) {
+              Alert.alert(t('error'), err.message || t('failedToMarkPrepared'));
+            } finally {
+              setPreparingOrderId(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleOpenVerifyPickup = (order) => {
+    setTargetOrderId(order.id);
+    setPickupCodeInput('');
+    setActionModalVisible(false);
+    setTimeout(() => setShowVerifyPickupModal(true), 150);
+  };
+
+  const handleVerifyPickup = async () => {
+    if (!pickupCodeInput.trim()) {
+      Alert.alert(t('error'), t('pickupCodeRequired'));
+      return;
+    }
+    setVerifyingPickup(true);
+    try {
+      await sellerService.verifyPickupCode(user.id, targetOrderId, pickupCodeInput.trim().toUpperCase());
+      setShowVerifyPickupModal(false);
+      Alert.alert(t('success'), t('pickupVerified'));
+      fetchOrdersAndReplacements();
+    } catch (err) {
+      Alert.alert(t('error'), err.message || t('failedToVerifyPickup'));
+    } finally {
+      setVerifyingPickup(false);
+    }
   };
 
   const filteredOrders = filter === 'ALL' ? orders : orders.filter(o => o.status === filter);
@@ -309,11 +368,33 @@ const SellerOrdersScreen = () => {
               <View style={[styles.actionMenuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {selectedOrderForActions && (
                   <>
-                    {/* Ship and Agent assignment options removed as requested by USER */}
+                    {/* Mark as Prepared — show for PAID, CONFIRMED, PLACED orders */}
+                    {['PAID', 'CONFIRMED', 'PLACED', 'PENDING'].includes(selectedOrderForActions.status?.toUpperCase()) && (
+                      <TouchableOpacity
+                        style={[styles.actionMenuItem]}
+                        onPress={() => handleMarkPrepared(selectedOrderForActions)}
+                        disabled={preparingOrderId === selectedOrderForActions.id}
+                      >
+                        <ClipboardList size={18} color="#F59E0B" />
+                        <CustomText style={[styles.actionMenuText, { color: '#F59E0B' }]}>{t('markAsPrepared')}</CustomText>
+                      </TouchableOpacity>
+                    )}
 
-                    {/* Assign Courier Option */}
+                    {/* Verify Pickup Code — ONLY for PICKUP orders in eligible statuses */}
+                    {selectedOrderForActions.pickupType === 'PICKUP' &&
+                      ['PREPARED', 'CONFIRMED', 'PLACED', 'PAID'].includes(selectedOrderForActions.status?.toUpperCase()) && (
+                      <TouchableOpacity
+                        style={[styles.actionMenuItem]}
+                        onPress={() => handleOpenVerifyPickup(selectedOrderForActions)}
+                      >
+                        <CheckCircle2 size={18} color="#10B981" />
+                        <CustomText style={[styles.actionMenuText, { color: '#10B981' }]}>{t('verifyPickupCode')}</CustomText>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Assign Courier — for delivery orders */}
                     {['PAID', 'PROCESSING', 'PENDING', 'SHIPPED'].includes(selectedOrderForActions.status?.toUpperCase()) && (
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={[styles.actionMenuItem]}
                         onPress={() => {
                           setActionModalVisible(false);
@@ -522,6 +603,87 @@ const SellerOrdersScreen = () => {
         </View>
       </Modal>
 
+      {/* Verify Pickup Code Modal */}
+      <Modal visible={showVerifyPickupModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', height: '70%' }}
+          >
+            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '100%' }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <CustomText variant="h2">{t('verifyPickupCode')}</CustomText>
+                  {targetOrderId && (
+                    <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                      {t('order')} #{targetOrderId.slice(-8).toUpperCase()}
+                    </CustomText>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => setShowVerifyPickupModal(false)} style={styles.closeBtn}>
+                  <X color={colors.muted} size={24} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView 
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingBottom: 20 }}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.pickupCodeSection}>
+                  <View style={[styles.pickupIconCircle, { backgroundColor: '#10B98115' }]}>
+                    <ShieldCheck color="#10B981" size={40} />
+                  </View>
+                  
+                  <CustomText variant="h2" style={styles.pickupSectionTitle}>{t('enterPickupCode')}</CustomText>
+                  <CustomText style={[styles.pickupSectionSubtitle, { color: colors.muted }]}>
+                    {t('askBuyerForPickupCode') || "Ask the buyer for the 6-character code shown in their app to verify the collection."}
+                  </CustomText>
+
+                  <View style={[styles.pickupInputWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                    <TextInput
+                      style={[styles.pickupInput, { color: colors.foreground }]}
+                      placeholder="A B 1 2 3 4"
+                      placeholderTextColor={colors.muted}
+                      autoCapitalize="characters"
+                      maxLength={8}
+                      value={pickupCodeInput}
+                      onChangeText={v => setPickupCodeInput(v.toUpperCase())}
+                      letterSpacing={8}
+                    />
+                  </View>
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowVerifyPickupModal(false)}>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>{t('cancel')}</CustomText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.submitAssignBtn,
+                    { backgroundColor: '#f97316' },
+                    (verifyingPickup || !pickupCodeInput.trim()) && { opacity: 0.5 }
+                  ]}
+                  onPress={handleVerifyPickup}
+                  disabled={verifyingPickup || !pickupCodeInput.trim()}
+                >
+                  {verifyingPickup ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <ShieldCheck size={18} color="white" />
+                      <CustomText style={{ fontWeight: 'bold', color: 'white' }}>
+                        {t('verifyAndComplete')}
+                      </CustomText>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -617,6 +779,12 @@ const styles = StyleSheet.create({
   actionMenuHeader: { padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
   actionMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 16 },
   actionMenuText: { fontSize: 15, fontWeight: '600' },
+  pickupCodeSection: { alignItems: 'center', paddingVertical: 20 },
+  pickupIconCircle: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  pickupSectionTitle: { textAlign: 'center', marginBottom: 12 },
+  pickupSectionSubtitle: { textAlign: 'center', marginBottom: 32, fontSize: 14, lineHeight: 20 },
+  pickupInputWrapper: { width: '100%', height: 64, borderRadius: 16, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+  pickupInput: { fontSize: 24, fontWeight: '900', textAlign: 'center', width: '100%' },
 });
 
 export default SellerOrdersScreen;

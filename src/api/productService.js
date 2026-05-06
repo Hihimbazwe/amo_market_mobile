@@ -10,7 +10,7 @@ const commonHeaders = {
 export const productService = {
   getProducts: async (filters = {}) => {
     try {
-      const { category, province, district } = filters;
+      const { category, province, district, sellerId } = filters;
       
       let url = `${BASE_URL}/api/products?limit=50`;
       if (category && category !== 'All Categories') {
@@ -21,6 +21,9 @@ export const productService = {
       }
       if (district && district !== 'All Districts') {
         url += `&district=${encodeURIComponent(district)}`;
+      }
+      if (sellerId) {
+        url += `&sellerId=${encodeURIComponent(sellerId)}`;
       }
       if (filters.followerId) {
         url += `&followerId=${encodeURIComponent(filters.followerId)}`;
@@ -220,6 +223,47 @@ export const productService = {
       return data.secure_url;
     } catch (error) {
       console.error('Cloudinary upload error:', error);
+      throw error;
+    }
+  },
+
+  getReviews: async (productId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/products/${productId}/reviews`, {
+        headers: commonHeaders
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('getReviews error:', error);
+      return [];
+    }
+  },
+
+  getComments: async (productId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/products/${productId}/comments`, {
+        headers: commonHeaders
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('getComments error:', error);
+      return [];
+    }
+  },
+
+  postComment: async (userId, productId, text) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/products/${productId}/comments`, {
+        method: 'POST',
+        headers: {
+          ...commonHeaders,
+          'x-user-id': userId
+        },
+        body: JSON.stringify({ text })
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('postComment error:', error);
       throw error;
     }
   }

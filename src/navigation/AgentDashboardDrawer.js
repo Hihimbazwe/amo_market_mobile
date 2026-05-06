@@ -31,6 +31,10 @@ import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
 
+import ProductDetailScreen from '../screens/ProductDetailScreen';
+import SellerStoreScreen from '../screens/buyer/SellerStoreScreen';
+import CartScreen from '../screens/CartScreen';
+
 const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
@@ -209,6 +213,9 @@ export default function AgentDashboardDrawer({ navigation }) {
           <Stack.Screen name="AgentSettings" component={AgentSettingsScreen} />
           <Stack.Screen name="AgentVerifyCode" component={AgentVerifyCodeScreen} />
           <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
+          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+          <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
+          <Stack.Screen name="Cart" component={CartScreen} />
         </Stack.Navigator>
 
         <CustomDrawer

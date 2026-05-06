@@ -30,7 +30,7 @@ const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 
         thumbColor="white"
       />
     ) : (
-      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: colors.primary }]}>{t('common:change').toUpperCase()}</CustomText></TouchableOpacity>
+      <TouchableOpacity onPress={onPress}><CustomText style={[styles.actionText, { color: colors.primary }]}>CHANGE</CustomText></TouchableOpacity>
     )}
   </View>
 );

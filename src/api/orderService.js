@@ -17,10 +17,13 @@ const handleResponse = async (response, errorMsg) => {
   let data;
   try {
     data = JSON.parse(text);
+    if (data.details) {
+      data.error = `${data.error || 'Error'}: ${data.details}`;
+    }
   } catch (err) {
-    // If text starts with <!DOCTYPE it's likely a 500 error page from Next.js
+    // If text starts with <!DOCTYPE it's likely a 500 error page from Next.js (when not handled)
     if (text.trim().startsWith('<!DOCTYPE')) {
-      data = { error: 'Server Error (500). Please try again later.' };
+      data = { error: 'Server Error (500). Please check server logs.' };
     } else {
       data = { error: text || errorMsg };
     }
@@ -93,6 +96,19 @@ export const orderService = {
       return await handleResponse(response, 'Failed to fetch delivery code');
     } catch (error) {
       console.error('getDeliveryCode error:', error);
+      throw error;
+    }
+  },
+
+  cancelOrder: async (userId, orderId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/orders/${orderId}/cancel`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+      });
+      return await handleResponse(response, 'Failed to cancel order');
+    } catch (error) {
+      console.error('cancelOrder error:', error);
       throw error;
     }
   }

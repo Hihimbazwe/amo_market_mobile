@@ -48,16 +48,28 @@ const CheckoutScreen = ({ route, navigation }) => {
   const { cartItems, cartTotal, clearCart, removeFromCart } = useCart();
   
   const selectedItemIds = route.params?.selectedItemIds;
+  const buyNowProduct = route.params?.buyNowProduct;
+  const buyNowQty = route.params?.qty || 1;
 
   const checkoutItems = useMemo(() => {
+    if (buyNowProduct) {
+      return [{
+        id: 'buynow',
+        product: buyNowProduct,
+        quantity: buyNowQty
+      }];
+    }
     if (!selectedItemIds) return cartItems;
     return cartItems.filter(item => selectedItemIds.includes(item.id));
-  }, [cartItems, selectedItemIds]);
+  }, [cartItems, selectedItemIds, buyNowProduct, buyNowQty]);
 
   const checkoutTotal = useMemo(() => {
+    if (buyNowProduct) {
+      return buyNowProduct.price * buyNowQty;
+    }
     if (!selectedItemIds) return cartTotal;
     return checkoutItems.reduce((total, item) => total + (item.product.price * item.quantity), 0);
-  }, [checkoutItems, cartTotal, selectedItemIds]);
+  }, [checkoutItems, cartTotal, selectedItemIds, buyNowProduct, buyNowQty]);
 
   const { user } = useAuth();
   const { colors, isDarkMode } = useTheme();
@@ -210,7 +222,9 @@ const CheckoutScreen = ({ route, navigation }) => {
       await checkoutService.processPayment(user.id, paymentData);
       
       // Remove only the items that were checked out
-      if (selectedItemIds && selectedItemIds.length < cartItems.length) {
+      if (buyNowProduct) {
+        // Don't clear cart for buy now
+      } else if (selectedItemIds && selectedItemIds.length < cartItems.length) {
         await Promise.all(checkoutItems.map(item => removeFromCart(item.product.id)));
       } else {
         clearCart();

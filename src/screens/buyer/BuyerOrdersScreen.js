@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Linking, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   Loader2, 
@@ -16,6 +16,7 @@ import {
   RefreshCw,
   ShoppingBag,
   PackageCheck,
+  CheckCircle2,
   X
 } from 'lucide-react-native';
 import CustomText from '../../components/CustomText';
@@ -35,6 +36,7 @@ const getStatusColor = (status) => {
     case 'DELIVERED': return '#10B981'; // green
     case 'PROCESSING':
     case 'PAID':
+    case 'PREPARED':
     case 'PENDING': return '#F59E0B'; // yellow
     case 'SHIPPED': return '#3B82F6'; // blue
     case 'CANCELLED': return '#EF4444'; // red
@@ -42,7 +44,7 @@ const getStatusColor = (status) => {
   }
 };
 
-const filterTabs = ['All', 'PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+const filterTabs = ['All', 'PENDING', 'PAID', 'PREPARED', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
 const BuyerOrdersScreen = ({ navigation }) => {
   const { toggleDrawer } = React.useContext(DrawerContext);
@@ -59,15 +61,23 @@ const BuyerOrdersScreen = ({ navigation }) => {
   const [deliveryCodeVisible, setDeliveryCodeVisible] = useState(false);
   const [deliveryCodeData, setDeliveryCodeData] = useState(null);
   const [deliveryCodeLoading, setDeliveryCodeLoading] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const fetchOrders = async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
       const data = await orderService.getOrders(user.id);
-      setOrders(data);
+      if (Array.isArray(data)) {
+        setOrders(data);
+      } else {
+        console.error('Data is not an array:', data);
+        setOrders([]);
+      }
     } catch (error) {
       console.error('Fetch orders error:', error);
+      Alert.alert(t('error'), t('failedToFetchOrders') + ": " + error.message);
     } finally {
       setLoading(false);
     }
@@ -108,6 +118,32 @@ const BuyerOrdersScreen = ({ navigation }) => {
     } finally {
       setDeliveryCodeLoading(false);
     }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!user?.id || !selectedOrder) return;
+    setCancelling(true);
+    try {
+      await orderService.cancelOrder(user.id, selectedOrder.id);
+      setShowCancelModal(false);
+      setOptionsVisible(false);
+      await fetchOrders();
+      Alert.alert(t('success'), t('orderCancelledSuccess'));
+    } catch (error) {
+      console.error('Cancel order error:', error);
+      Alert.alert(t('error'), error.message || t('failedToCancelOrder'));
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const canCancel = (order) => {
+    if (!order) return false;
+    const isPickup = order.pickupType === "PICKUP";
+    if (isPickup) {
+      return !["PICKED_UP", "COMPLETED", "CANCELLED", "PREPARED"].includes(order.status);
+    }
+    return !["PICKED_UP", "COMPLETED", "CANCELLED", "PREPARED", "DELIVERED", "IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(order.status);
   };
 
   return (
@@ -156,7 +192,15 @@ const BuyerOrdersScreen = ({ navigation }) => {
         ) : filteredOrders.length === 0 ? (
           <View style={styles.emptyState}>
             <Package color={colors.muted} size={48} />
-            <CustomText variant="subtitle" style={{ marginTop: 16 }}>{t('noOrdersFound').replace('{tab}', activeTab === 'All' ? t('all') : t(activeTab.toLowerCase()) || activeTab)}</CustomText>
+            <CustomText variant="subtitle" style={{ marginTop: 16 }}>
+              {t('noOrdersFound')}
+            </CustomText>
+            <CustomText style={{ fontSize: 10, color: colors.muted, marginTop: 8, opacity: 0.5 }}>
+              Logged in as: {user?.email} ({user?.id?.slice(0,8)}...)
+            </CustomText>
+            <TouchableOpacity onPress={fetchOrders} style={{ marginTop: 20, padding: 10 }}>
+               <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>{t('retry')}</CustomText>
+            </TouchableOpacity>
           </View>
         ) : (
           filteredOrders.map((order) => {
@@ -338,6 +382,20 @@ const BuyerOrdersScreen = ({ navigation }) => {
                 <CustomText style={[styles.optionLabel, { color: colors.error || '#EF4444' }]}>{t('reportIssue')}</CustomText>
                 </TouchableOpacity>
 
+                {/* Cancel Order */}
+                {canCancel(selectedOrder) && (
+                  <TouchableOpacity 
+                    style={styles.optionItem}
+                    onPress={() => {
+                      setOptionsVisible(false);
+                      setShowCancelModal(true);
+                    }}
+                  >
+                    <AlertTriangle size={20} color="#ef4444" />
+                    <CustomText style={[styles.optionLabel, { color: '#ef4444' }]}>{t('cancelOrder')}</CustomText>
+                  </TouchableOpacity>
+                )}
+
                 {/* Download Invoice */}
                 {selectedOrder?.status !== "PENDING" && selectedOrder?.status !== "CANCELLED" && (
                     <TouchableOpacity 
@@ -423,6 +481,59 @@ const BuyerOrdersScreen = ({ navigation }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Cancel Confirmation Modal */}
+      <Modal
+        visible={showCancelModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCancelModal(false)}
+      >
+        <View style={styles.cancelModalOverlay}>
+          <View style={[styles.cancelModalContent, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+            <View style={styles.cancelModalHeader}>
+              <View style={[styles.cancelModalIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+                <AlertTriangle size={24} color="#ef4444" />
+              </View>
+              <View style={{ marginLeft: 12 }}>
+                <CustomText variant="h3">{t('cancelOrder')}?</CustomText>
+                <CustomText style={{ fontSize: 11, color: colors.muted }}>#{selectedOrder?.id?.slice(-8).toUpperCase()}</CustomText>
+              </View>
+            </View>
+            
+            <CustomText style={{ color: colors.muted, marginVertical: 16 }}>
+              {t('cancelOrderConfirmDesc')}
+            </CustomText>
+
+            {selectedOrder?.totalAmount > 0 && (
+              <View style={[styles.refundBox, { backgroundColor: 'rgba(34, 197, 94, 0.1)', borderColor: 'rgba(34, 197, 94, 0.2)' }]}>
+                <CheckCircle2 size={16} color="#22c55e" />
+                <CustomText style={{ color: '#22c55e', fontWeight: 'bold', fontSize: 12, marginLeft: 8 }}>
+                  Rwf {selectedOrder.totalAmount.toLocaleString()} {t('refundToWallet')}
+                </CustomText>
+              </View>
+            )}
+
+            <View style={styles.cancelModalActions}>
+              <TouchableOpacity 
+                style={[styles.cancelModalBtn, { backgroundColor: colors.glass }]} 
+                onPress={() => setShowCancelModal(false)}
+              >
+                <CustomText style={{ fontWeight: 'bold' }}>{t('keepOrder')}</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.cancelModalBtn, { backgroundColor: '#ef4444' }]} 
+                onPress={handleCancelOrder}
+                disabled={cancelling}
+              >
+                {cancelling ? <ActivityIndicator size="small" color="#fff" /> : (
+                  <CustomText style={{ color: '#fff', fontWeight: 'bold' }}>{t('yesCancel')}</CustomText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -437,7 +548,6 @@ const styles = StyleSheet.create({
   filterPill: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)' },
   pillText: { fontSize: 14, fontWeight: '700' },
   content: { padding: 16 },
-  emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100 },
   orderCard: { borderRadius: 24, borderWidth: 1, padding: 16, marginBottom: 16, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   refBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
@@ -453,8 +563,8 @@ const styles = StyleSheet.create({
   locationLabel: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 1 },
   addressText: { fontSize: 13, fontWeight: '500' },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
-  cardFooterAction: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 12, opacity: 0.6 },
-  emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100 },
+  cardFooterAction: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 12, opacity: 0.6 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100, paddingHorizontal: 32 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   optionsContainer: { width: '100%', padding: 24, borderRadius: 24, borderWidth: 1, maxHeight: '80%' },
   modalHeader: { alignItems: 'center' },
@@ -473,7 +583,16 @@ const styles = StyleSheet.create({
   qrDisplayBox: { width: '100%', minHeight: 200, borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 1, padding: 20, marginBottom: 20 },
   qrCodeLabel: { fontSize: 10, fontWeight: 'bold', color: 'rgba(255,255,255,0.6)', letterSpacing: 2, marginBottom: 8 },
   qrCodeText: { fontSize: 42, fontWeight: '900', letterSpacing: 6 },
-  qrFooterText: { fontSize: 10, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: 24, lineHeight: 16 }
+  qrFooterText: { fontSize: 10, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: 24, lineHeight: 16 },
+
+  // Cancel Modal Styles
+  cancelModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  cancelModalContent: { width: '100%', padding: 24, borderRadius: 32, borderWidth: 1 },
+  cancelModalHeader: { flexDirection: 'row', alignItems: 'center' },
+  cancelModalIconBox: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  refundBox: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, borderWidth: 1, marginBottom: 20 },
+  cancelModalActions: { flexDirection: 'row', gap: 12 },
+  cancelModalBtn: { flex: 1, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }
 });
 
 export default BuyerOrdersScreen;
