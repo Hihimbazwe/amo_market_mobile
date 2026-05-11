@@ -17,7 +17,10 @@ import {
   ShoppingBag,
   PackageCheck,
   CheckCircle2,
-  X
+  X,
+  MapPin,
+  Store,
+  ChevronDown
 } from 'lucide-react-native';
 import CustomText from '../../components/CustomText';
 import { BuyerDrawerContext as DrawerContext } from '../../context/BuyerDrawerContext';
@@ -56,6 +59,8 @@ const BuyerOrdersScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [upcomingPickupOrder, setUpcomingPickupOrder] = useState(null);
+  const [hoursRemaining, setHoursRemaining] = useState(0);
 
   // Delivery Code Modal states
   const [deliveryCodeVisible, setDeliveryCodeVisible] = useState(false);
@@ -87,6 +92,49 @@ const BuyerOrdersScreen = ({ navigation }) => {
     fetchOrders();
   }, [user?.id]);
 
+  const parsePickupSlot = (slotStr) => {
+    if (!slotStr) return null;
+    try {
+      const parts = slotStr.split(' at ');
+      if (parts.length !== 2) return null;
+      const now = new Date();
+      // Try to parse with the current year
+      const dateStr = `${parts[0]}, ${now.getFullYear()} ${parts[1]}`;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      return d;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    if (!orders || orders.length === 0) return;
+    let soonest = null;
+    let minDiff = Infinity;
+
+    orders.forEach(order => {
+      if (order.pickupType === 'PICKUP' && order.pickupSlot && ['PENDING', 'PAID', 'PREPARED'].includes(order.status?.toUpperCase())) {
+        const slotDate = parsePickupSlot(order.pickupSlot);
+        if (slotDate) {
+          const diffMs = slotDate.getTime() - new Date().getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
+          if (diffHours >= -2 && diffHours <= 4 && diffHours < minDiff) {
+            minDiff = diffHours;
+            soonest = order;
+          }
+        }
+      }
+    });
+
+    if (soonest) {
+      setUpcomingPickupOrder(soonest);
+      setHoursRemaining(minDiff);
+    } else {
+      setUpcomingPickupOrder(null);
+    }
+  }, [orders]);
+
   const filteredOrders = orders.filter(
     (order) => activeTab === 'All' || order.status?.toUpperCase() === activeTab.toUpperCase()
   );
@@ -98,8 +146,12 @@ const BuyerOrdersScreen = ({ navigation }) => {
 
   const handleDownloadInvoice = () => {
     if (!selectedOrder) return;
-    const url = `${API_BASE_URL}/api/orders/${selectedOrder.id}/invoice`;
-    Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+    const url = `${API_BASE_URL}/api/orders/${selectedOrder.id}/invoice?userId=${user.id}`;
+    // The server side now handles the connection retries to prevent the 500 error.
+    Linking.openURL(url).catch(err => {
+      console.error("Couldn't load page", err);
+      Alert.alert("Error", "Could not open the invoice. Please try again.");
+    });
     setOptionsVisible(false);
   };
 
@@ -183,6 +235,18 @@ const BuyerOrdersScreen = ({ navigation }) => {
         </ScrollView>
       </View>
 
+      {upcomingPickupOrder && (
+        <View style={{ backgroundColor: 'rgba(249, 115, 22, 0.1)', borderColor: 'rgba(249, 115, 22, 0.3)', borderWidth: 1, margin: 16, marginBottom: 0, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center' }}>
+          <Store color="#f97316" size={28} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <CustomText style={{ color: '#f97316', fontWeight: 'bold', fontSize: 13, marginBottom: 2 }}>Upcoming Pickup Reminder</CustomText>
+            <CustomText style={{ color: colors.foreground, fontSize: 12, lineHeight: 18 }}>
+              Your order #{upcomingPickupOrder.id.slice(-8).toUpperCase()} is scheduled for pickup in roughly {Math.ceil(hoursRemaining)} hour{Math.ceil(hoursRemaining) !== 1 ? 's' : ''} ({upcomingPickupOrder.pickupSlot}).
+            </CustomText>
+          </View>
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? (
           <View style={styles.emptyState}>
@@ -205,12 +269,34 @@ const BuyerOrdersScreen = ({ navigation }) => {
         ) : (
           filteredOrders.map((order) => {
             const statusColor = getStatusColor(order.status);
+            const isPickup = order.pickupType === 'PICKUP';
+
+            // Group items by seller for pickup orders
+            const sellerGroups = {};
+            if (isPickup && order.items?.length > 0) {
+              order.items.forEach(item => {
+                const sellerId = item.product?.seller?.id || item.product?.sellerId || 'unknown';
+                if (!sellerGroups[sellerId]) {
+                  sellerGroups[sellerId] = {
+                    sellerName: item.product?.seller?.user?.name || item.product?.sellerName || 'Store',
+                    location: item.product?.seller?.locationAddress ||
+                              (item.product?.district && item.product?.province
+                                ? `${item.product.district}, ${item.product.province}`
+                                : item.product?.location || 'Location not set'),
+                    items: []
+                  };
+                }
+                sellerGroups[sellerId].items.push(item);
+              });
+            }
+
             return (
               <TouchableOpacity 
                 key={order.id} 
                 style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}
                 onPress={() => handleOpenOptions(order)}
               >
+                {/* Card Header — always shown */}
                 <View style={styles.cardHeader}>
                   <View style={[styles.refBadge, { backgroundColor: colors.primary + '15' }]}>
                     <Package size={12} color={colors.primary} />
@@ -222,34 +308,103 @@ const BuyerOrdersScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                <View style={styles.cardBody}>
-                  <CustomText variant="h3" style={[styles.name, { color: colors.foreground }]}>
-                    {order.items?.[0]?.product?.title || order.items?.[0]?.product?.name || t('order')}
-                  </CustomText>
-                  
-                  <View style={styles.locationContainer}>
-                    <View style={[styles.locationIconBox, { backgroundColor: colors.primary + '10' }]}>
-                      <ShoppingBag color={colors.primary} size={16} />
-                    </View>
-                    <View style={styles.locationInfo}>
-                      <CustomText style={[styles.locationLabel, { color: colors.muted }]}>{t('orderItems')}</CustomText>
-                      <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
-                        {t('itemsCount', { count: order.items.length })}
+                {isPickup && Object.keys(sellerGroups).length > 0 ? (
+                  // ── PICKUP ORDER: grouped by seller ──
+                  <View style={styles.cardBody}>
+                    {/* Removed pickup banner per user request */}
+
+                    {/* One section per seller */}
+                    {Object.entries(sellerGroups).map(([sellerId, group], idx) => {
+                      const groupStatusColor = getStatusColor(order.status);
+                      return (
+                        <View
+                          key={sellerId}
+                          style={[
+                            styles.storeGroupFlat,
+                            idx > 0 && { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.glassBorder }
+                          ]}
+                        >
+                          {/* Store header row */}
+                          <View style={styles.storeHeader}>
+                            <View style={[styles.storeIconBox, { backgroundColor: colors.primary + '10' }]}>
+                              <Store size={14} color={colors.primary} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                              <CustomText style={[styles.storeName, { color: colors.foreground }]} numberOfLines={1}>
+                                {group.sellerName}
+                              </CustomText>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                <MapPin size={11} color={colors.muted} />
+                                <CustomText style={[styles.storeLocation, { color: colors.muted }]} numberOfLines={1}>
+                                  {group.location}
+                                </CustomText>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* Products in this store group */}
+                          <View style={styles.storeProducts}>
+                            {group.items.map((item, pIdx) => (
+                              <View key={pIdx} style={[styles.productRow, pIdx < group.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.glassBorder }]}>
+                                <View style={[styles.productQtyBadge, { backgroundColor: colors.primary + '18' }]}>
+                                  <CustomText style={[styles.productQtyText, { color: colors.primary }]}>
+                                    x{item.quantity || 1}
+                                  </CustomText>
+                                </View>
+                                <CustomText style={[styles.productTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                  {item.product?.title || item.product?.name || 'Product'}
+                                </CustomText>
+                                <CustomText style={[styles.productPrice, { color: colors.muted }]}>
+                                  Rwf {((item.price || item.product?.price || 0) * (item.quantity || 1)).toLocaleString()}
+                                </CustomText>
+                              </View>
+                            ))}
+                          </View>
+
+
+                        </View>
+                      );
+                    })}
+
+                    {/* Total */}
+                    <View style={[styles.priceRow, { borderTopColor: colors.glassBorder }]}>
+                      <CustomText style={{ color: colors.muted, fontSize: 12 }}>{t('totalAmount')}</CustomText>
+                      <CustomText style={{ fontWeight: '900', color: colors.foreground, fontSize: 16 }}>
+                        Rwf {order.totalAmount?.toLocaleString() || order.total?.toLocaleString()}
                       </CustomText>
                     </View>
                   </View>
-
-                  <View style={styles.priceRow}>
-                    <CustomText style={{ color: colors.muted, fontSize: 12 }}>{t('totalAmount')}</CustomText>
-                    <CustomText style={{ fontWeight: '900', color: colors.foreground, fontSize: 16 }}>
-                      Rwf {order.totalAmount?.toLocaleString() || order.total?.toLocaleString()}
+                ) : (
+                  // ── DELIVERY ORDER: existing simple layout ──
+                  <View style={styles.cardBody}>
+                    <CustomText variant="h3" style={[styles.name, { color: colors.foreground }]}>
+                      {order.items?.[0]?.product?.title || order.items?.[0]?.product?.name || t('order')}
                     </CustomText>
+                    
+                    <View style={styles.locationContainer}>
+                      <View style={[styles.locationIconBox, { backgroundColor: colors.primary + '10' }]}>
+                        <ShoppingBag color={colors.primary} size={16} />
+                      </View>
+                      <View style={styles.locationInfo}>
+                        <CustomText style={[styles.locationLabel, { color: colors.muted }]}>{t('orderItems')}</CustomText>
+                        <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
+                          {t('itemsCount', { count: order.items.length })}
+                        </CustomText>
+                      </View>
+                    </View>
+
+                    <View style={styles.priceRow}>
+                      <CustomText style={{ color: colors.muted, fontSize: 12 }}>{t('totalAmount')}</CustomText>
+                      <CustomText style={{ fontWeight: '900', color: colors.foreground, fontSize: 16 }}>
+                        Rwf {order.totalAmount?.toLocaleString() || order.total?.toLocaleString()}
+                      </CustomText>
+                    </View>
                   </View>
-                </View>
+                )}
 
                 {/* Action Indicator */}
                 <View style={styles.cardFooterAction}>
-                  <CustomText style={{ fontSize: 11, color: colors.muted, fontWeight: '600' }}>{t('tapForOptions')}</CustomText>
+                  <CustomText style={{ fontSize: 11, color: colors.muted, fontWeight: '600' }}>{t('more Options')}</CustomText>
                   <MoreVertical color={colors.muted} size={16} />
                 </View>
               </TouchableOpacity>
@@ -313,7 +468,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
                     }}
                     >
                     <QrCode size={20} color={colors.primary} />
-                    <CustomText style={styles.optionLabel}>{t('viewPickupQR')}</CustomText>
+                    <CustomText style={styles.optionLabel}>{t('view QR Code')}</CustomText>
                     </TouchableOpacity>
                 )}
 
@@ -338,7 +493,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
                     }}
                     >
                     <Edit2 size={20} color={colors.primary} />
-                    <CustomText style={styles.optionLabel}>{t('editPickup')}</CustomText>
+                    <CustomText style={styles.optionLabel}>{t('edit pickup')}</CustomText>
                     </TouchableOpacity>
                 )}
 
@@ -403,7 +558,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
                         onPress={handleDownloadInvoice}
                     >
                         <FileText size={20} color="#3b82f6" />
-                        <CustomText style={[styles.optionLabel, { color: '#3b82f6' }]}>{t('downloadInvoice')}</CustomText>
+                        <CustomText style={[styles.optionLabel, { color: '#3b82f6' }]}>{t('download Invoice')}</CustomText>
                     </TouchableOpacity>
                 )}
 
@@ -591,6 +746,27 @@ const styles = StyleSheet.create({
   cancelModalHeader: { flexDirection: 'row', alignItems: 'center' },
   cancelModalIconBox: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   refundBox: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, borderWidth: 1, marginBottom: 20 },
+  // Pickup order styles
+  pickupBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
+  pickupBannerText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  storeGroupFlat: { overflow: 'hidden', marginBottom: 4 },
+  storeHeader: { flexDirection: 'row', alignItems: 'center', padding: 10 },
+  storeIconBox: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  storeName: { fontSize: 13, fontWeight: '800' },
+  storeLocation: { fontSize: 11, marginLeft: 4, flex: 1 },
+  miniStatusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
+  miniStatusText: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase' },
+  storeProducts: { paddingHorizontal: 12, paddingBottom: 8 },
+  productRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 },
+  productQtyBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  productQtyText: { fontSize: 11, fontWeight: '800' },
+  productTitle: { flex: 1, fontSize: 13, fontWeight: '600' },
+  productPrice: { fontSize: 11, fontWeight: '700' },
+  pickupProgress: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 8 },
+  progressDot: { width: 10, height: 10, borderRadius: 5 },
+  progressLine: { flex: 1, height: 2, marginHorizontal: 2 },
+  pickupProgressLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 10, paddingTop: 4 },
+  progressLabel: { fontSize: 8, fontWeight: '700', textAlign: 'center', flex: 1 },
   cancelModalActions: { flexDirection: 'row', gap: 12 },
   cancelModalBtn: { flex: 1, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }
 });

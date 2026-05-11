@@ -218,21 +218,16 @@ const MarketplaceScreen = ({ navigation, route }) => {
       
       {/* Search Header */}
       <View style={styles.header}>
-        <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+        <TouchableOpacity 
+          style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
+          onPress={() => navigation.navigate('GlobalSearch')}
+          activeOpacity={0.8}
+        >
           <Search color={colors.muted} size={20} style={styles.searchIcon} />
-          <TextInput 
-            style={[styles.input, { color: colors.foreground }]}
-            placeholder={t('searchMarketplace')}
-            placeholderTextColor={colors.muted}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <X color={colors.muted} size={20} />
-            </TouchableOpacity>
-          )}
-        </View>
+          <CustomText style={[styles.input, { color: colors.muted }]}>
+            {search || t('searchMarketplace')}
+          </CustomText>
+        </TouchableOpacity>
         <NotificationIcon />
         <TouchableOpacity 
           style={[styles.filterButton, { backgroundColor: colors.primary }]}

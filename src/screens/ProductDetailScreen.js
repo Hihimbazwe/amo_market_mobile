@@ -32,8 +32,10 @@ import {
   Flame,
   CreditCard,
   Store,
-  ShoppingBag
+  ShoppingBag,
+  Play
 } from 'lucide-react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import CustomText from '../components/CustomText';
 import CustomInput from '../components/CustomInput';
 import { useAuth } from '../context/AuthContext';
@@ -45,6 +47,23 @@ import { productService } from '../api/productService';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
+
+const VideoComponent = ({ url }) => {
+  const player = useVideoPlayer(url, (player) => {
+    player.loop = true;
+    player.play();
+    player.muted = true;
+  });
+
+  return (
+    <VideoView 
+      player={player} 
+      style={{ width: width, height: 400 }} 
+      allowsFullscreen 
+      allowsPictureInPicture 
+    />
+  );
+};
 
 const ProductDetailScreen = ({ route, navigation }) => {
   const { product: routeProduct } = route.params || {};
@@ -215,26 +234,16 @@ const ProductDetailScreen = ({ route, navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.imageContainer}>
           {hasImages ? (
-            <>
-              <FlatList
-                data={media}
-                horizontal
-                pagingEnabled
-                nestedScrollEnabled={true}
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={width}
-                decelerationRate="fast"
-                keyExtractor={(item, index) => item.id || index.toString()}
-                onMomentumScrollEnd={(e) => {
-                  const offset = e.nativeEvent.contentOffset.x;
-                  setActiveImageIndex(Math.round(offset / width));
-                }}
-                renderItem={({ item }) => (
-                  <View style={styles.carouselItem}>
-                    <Image source={{ uri: item.url }} style={styles.carouselImage} resizeMode="cover" />
-                  </View>
+            <View style={{ flex: 1 }}>
+              {/* Main Preview */}
+              <View style={styles.mainPreview}>
+                {media[activeImageIndex].type?.toLowerCase() === 'video' || media[activeImageIndex].url.match(/\.(mp4|mov|avi|webm)$/i) ? (
+                  <VideoComponent url={media[activeImageIndex].url} />
+                ) : (
+                  <Image source={{ uri: media[activeImageIndex].url }} style={styles.carouselImage} resizeMode="cover" />
                 )}
-              />
+              </View>
+
               <View style={styles.badgeOverlay}>
                 {product.isHotDeal && (
                   <View style={styles.hotBadge}>
@@ -246,14 +255,9 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   <CustomText style={styles.hotBadgeText}>BESTSELLER</CustomText>
                 </View>
               </View>
-              {media.length > 1 && (
-                <View style={styles.pagination}>
-                  {media.map((_, i) => (
-                    <View key={`dot-${i}`} style={[styles.paginationDot, activeImageIndex === i && styles.paginationDotActive]} />
-                  ))}
-                </View>
-              )}
-            </>
+
+              {/* Thumbnails moved to dark content section below */}
+            </View>
           ) : (
             <View style={[styles.image, { backgroundColor: colors.glass, justifyContent: 'center', alignItems: 'center' }]}>
                <ShoppingBag size={80} color={colors.muted} opacity={0.2} />
@@ -282,6 +286,36 @@ const ProductDetailScreen = ({ route, navigation }) => {
         </View>
 
         <View style={[styles.content, { backgroundColor: colors.background }]}>
+
+          {/* Thumbnail strip — lives in the dark panel, just above title */}
+          {media.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.thumbnailScroll}
+              style={styles.thumbnailContainer}
+            >
+              {media.map((item, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[
+                    styles.thumbnailItem,
+                    activeImageIndex === i && { borderColor: colors.primary, borderWidth: 2.5 }
+                  ]}
+                  onPress={() => setActiveImageIndex(i)}
+                >
+                  {item.type?.toLowerCase() === 'video' || item.url.match(/\.(mp4|mov|avi|webm)$/i) ? (
+                    <View style={[styles.thumbnailImage, { backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' }]}>
+                      <Play size={16} color="#fff" fill="#fff" />
+                    </View>
+                  ) : (
+                    <Image source={{ uri: item.url }} style={styles.thumbnailImage} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
           <View style={styles.titleSection}>
             <View style={{ flex: 1 }}>
               <CustomText variant="h1" style={styles.title}>{product.title}</CustomText>
@@ -592,7 +626,31 @@ const styles = StyleSheet.create({
     height: 400,
     width: '100%',
   },
-  image: {
+  mainPreview: {
+    flex: 1,
+  },
+  carouselImage: {
+    width: width,
+    height: 400,
+  },
+  thumbnailContainer: {
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  thumbnailScroll: {
+    paddingHorizontal: 0,
+    gap: 10,
+  },
+  thumbnailItem: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  thumbnailImage: {
     width: '100%',
     height: '100%',
   },

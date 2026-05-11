@@ -21,6 +21,7 @@ import VerifyOTPScreen from './src/screens/VerifyOTPScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
+import GlobalSearchScreen from './src/screens/GlobalSearchScreen';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -40,6 +41,29 @@ import ChatDetailScreen from './src/screens/shared/ChatDetailScreen';
 import StatusViewerScreen from './src/screens/shared/StatusViewerScreen';
 import CartScreen from './src/screens/CartScreen';
 import AutoLogoutWarningModal from './src/components/modals/AutoLogoutWarningModal';
+import 'react-native-gesture-handler';
+// Network Performance Logger
+const originalFetch = global.fetch;
+global.fetch = async (...args) => {
+  const url = args[0];
+  const startTime = Date.now();
+  console.log(`🌐 API CALL STARTED: ${url}`);
+  try {
+    const response = await originalFetch(...args);
+    const duration = Date.now() - startTime;
+    const emoji = duration < 500 ? '✅' : duration < 1500 ? '⚠️' : '🚨';
+    console.log(`${emoji} API DONE: ${url}`);
+    console.log(`⏱️  Time: ${duration}ms ${duration > 1500 ? '← TOO SLOW!' : ''}`);
+    console.log(`📦 Status: ${response.status}`);
+    return response;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.log(`❌ API FAILED: ${url}`);
+    console.log(`⏱️  Time: ${duration}ms`);
+    console.log(`💥 Error: ${error.message}`);
+    throw error;
+  }
+};
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -62,6 +86,7 @@ const HomeStack = () => (
     <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
+    <Stack.Screen name="GlobalSearch" component={GlobalSearchScreen} />
     <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
     <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
   </Stack.Navigator>
@@ -81,6 +106,7 @@ const MarketplaceStack = () => (
     <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
     <Stack.Screen name="Notifications" component={NotificationsScreen} />
+    <Stack.Screen name="GlobalSearch" component={GlobalSearchScreen} />
     <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
     <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
   </Stack.Navigator>
@@ -136,7 +162,7 @@ const AppTabs = () => {
           else if (route.name === 'Market') IconComponent = ShoppingBag;
           else if (route.name === 'Messages') IconComponent = MessageCircle;
           else if (route.name === 'Me') IconComponent = UserIcon;
-          
+
           return (
             <View>
               <IconComponent color={color} size={size} />
@@ -147,25 +173,25 @@ const AppTabs = () => {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Market" component={MarketplaceStack} />
-      <Tab.Screen 
-        name="Messages" 
-        component={MessagesStack} 
-        options={{ 
+      <Tab.Screen
+        name="Messages"
+        component={MessagesStack}
+        options={{
           tabBarBadge: unreadCount > 0 ? unreadCount : null,
           tabBarBadgeStyle: { backgroundColor: '#ef4444', fontSize: 10 }
         }}
       />
-      <Tab.Screen 
-        name="Me" 
+      <Tab.Screen
+        name="Me"
         component={
-          user?.role?.toUpperCase() === 'SELLER' 
-            ? SellerDashboardDrawer 
+          user?.role?.toUpperCase() === 'SELLER'
+            ? SellerDashboardDrawer
             : user?.role?.toUpperCase() === 'AGENT'
               ? AgentDashboardDrawer
               : user?.role?.toUpperCase() === 'COURIER'
                 ? CourierDashboardDrawer
                 : BuyerDashboardDrawer
-        } 
+        }
       />
     </Tab.Navigator>
   );
@@ -177,7 +203,7 @@ const RootNavigator = () => {
   const { loading, user, logout } = useAuth();
   const { cartCount } = useCart();
   const { unreadCount } = useNotifications();
-  
+
   const inactivityTimer = React.useRef(null);
   const backgroundTime = React.useRef(null);
   const [showWarning, setShowWarning] = React.useState(false);
@@ -187,7 +213,7 @@ const RootNavigator = () => {
   const resetTimer = React.useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     setShowWarning(false);
-    
+
     if (!user) return; // Only track logged-in users
 
     inactivityTimer.current = setTimeout(() => {
@@ -259,11 +285,11 @@ const RootNavigator = () => {
   };
 
   return (
-    <View 
+    <View
       style={{ flex: 1 }}
       onStartShouldSetResponderCapture={() => {
         if (!showWarning) resetTimer();
-        return false; 
+        return false;
       }}
       onPanResponderCapture={() => {
         if (!showWarning) resetTimer();
@@ -282,11 +308,11 @@ const RootNavigator = () => {
           )}
         </Stack.Navigator>
       </NavigationContainer>
-      
-      <AutoLogoutWarningModal 
-        visible={showWarning} 
-        onDismiss={resetTimer} 
-        onLogout={handleLogout} 
+
+      <AutoLogoutWarningModal
+        visible={showWarning}
+        onDismiss={resetTimer}
+        onLogout={handleLogout}
       />
     </View>
   );

@@ -33,10 +33,20 @@ const CartScreen = ({ navigation }) => {
   }, [cartItems]);
 
   const toggleSelection = (itemId) => {
-    if (selectedItemIds.includes(itemId)) {
-      setSelectedItemIds(selectedItemIds.filter(id => id !== itemId));
+    setSelectedItemIds(prev => {
+      if (prev.includes(itemId)) {
+        return prev.filter(id => id !== itemId);
+      } else {
+        return [...prev, itemId];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedItemIds.length === cartItems.length) {
+      setSelectedItemIds([]);
     } else {
-      setSelectedItemIds([...selectedItemIds, itemId]);
+      setSelectedItemIds(cartItems.map(item => item.id));
     }
   };
 
@@ -83,12 +93,14 @@ const CartScreen = ({ navigation }) => {
         <TouchableOpacity 
           style={styles.checkboxContainer}
           onPress={() => toggleSelection(item.id)}
+          activeOpacity={0.7}
         >
-          {selectedItemIds.includes(item.id) ? (
-            <CheckSquare size={24} color={colors.primary} />
-          ) : (
-            <Square size={24} color={colors.muted} />
-          )}
+          <View style={[
+            styles.checkboxBase, 
+            selectedItemIds.includes(item.id) ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.muted }
+          ]}>
+            {selectedItemIds.includes(item.id) && <CheckSquare size={16} color="#FFF" />}
+          </View>
         </TouchableOpacity>
         
         <Image source={{ uri: imageUrl }} style={styles.productImage} />
@@ -192,6 +204,24 @@ const CartScreen = ({ navigation }) => {
         </View>
       ) : (
         <>
+          <View style={[styles.selectAllContainer, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity 
+              style={styles.selectAllRow}
+              onPress={handleSelectAll}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.checkboxBase, 
+                selectedItemIds.length === cartItems.length ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.muted }
+              ]}>
+                {selectedItemIds.length === cartItems.length && <CheckSquare size={14} color="#FFF" />}
+              </View>
+              <CustomText style={[styles.selectAllText, { color: colors.foreground }]}>
+                {selectedItemIds.length === cartItems.length ? t('deselectAll') : t('selectAll')} ({cartItems.length})
+              </CustomText>
+            </TouchableOpacity>
+          </View>
+
           <FlatList
             data={cartItems}
             renderItem={renderCartItem}
@@ -304,32 +334,61 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 32,
   },
+  selectAllContainer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.01)',
+  },
+  selectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  checkboxBase: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   listContent: {
     padding: 24,
+    paddingTop: 12,
     paddingBottom: 40,
   },
   cartItem: {
     flexDirection: 'row',
-    borderRadius: 20,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 20,
     borderWidth: 1,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   checkboxContainer: {
     marginRight: 12,
     padding: 4,
   },
   productImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.03)',
   },
   itemInfo: {
     flex: 1,
-    marginLeft: 16,
-    justifyContent: 'space-between',
+    marginLeft: 14,
+    justifyContent: 'center',
   },
   itemHeader: {
     flexDirection: 'row',
@@ -356,8 +415,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   priceText: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: -0.5,
   },
   qtyControl: {
     flexDirection: 'row',
@@ -376,16 +436,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   summaryBox: {
-    padding: 24,
-    paddingBottom: 40,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingBottom: 32,
     borderTopWidth: 1,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 10,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   summaryLabel: {
     fontSize: 14,
@@ -400,13 +466,13 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    marginVertical: 16,
+    marginVertical: 10,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   checkoutBtn: {
     width: '100%',

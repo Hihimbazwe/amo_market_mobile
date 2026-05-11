@@ -16,13 +16,13 @@
       "supportsTablet": true
     },
     "android": {
-  "package": "com.ihyacinthe.amo_mobile_market",
-  "adaptiveIcon": {
-    "foregroundImage": "./assets/adaptive-icon.png",
-    "backgroundColor": "#ffffff"
-  },
-  "edgeToEdgeEnabled": true
-},
+      "package": "com.ihyacinthe.amo_mobile_market",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
     "notification": {
       "icon": "./assets/logo.png",
       "color": "#e67e22"
@@ -35,6 +35,9 @@
         "projectId": "49b11845-df80-45c9-884b-44a4cbcd4258"
       }
     },
-    "owner": "ihyacinthe"
+    "owner": "ihyacinthe",
+    "plugins": [
+      "expo-video"
+    ]
   }
 }

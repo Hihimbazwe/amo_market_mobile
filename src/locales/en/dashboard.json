@@ -103,6 +103,8 @@
   "selectItemToCheckout": "Please select at least one item to proceed to checkout.",
   "clearCart": "Clear Cart",
   "clearCartConfirm": "Are you sure you want to remove all items?",
+  "selectAll": "Select All",
+  "deselectAll": "Deselect All",
   "sellerDashboard": "Seller Dashboard",
   "searchSellerPlaceholder": "Search products, orders, analytics...",
   "storeOverview": "Store Overview",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
-import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone, CheckCircle2, ClipboardList, KeyRound } from 'lucide-react-native';
+import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone, CheckCircle2, ClipboardList, KeyRound, Store, Clock } from 'lucide-react-native';
 import { TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -237,9 +237,17 @@ const SellerOrdersScreen = () => {
             <PackageIcon size={12} color={colors.primary} />
             <CustomText style={[styles.ref, { color: colors.primary }]}>#{item.id.slice(-8).toUpperCase()}</CustomText>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(item.status?.toLowerCase())}</CustomText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {item.pickupType === 'PICKUP' && (
+              <View style={[styles.statusBadge, { backgroundColor: 'rgba(249, 115, 22, 0.1)', borderColor: 'rgba(249, 115, 22, 0.3)' }]}>
+                <Store size={10} color="#f97316" />
+                <CustomText style={[styles.badgeText, { color: '#f97316' }]}>PICKUP</CustomText>
+              </View>
+            )}
+            <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+              <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(item.status?.toLowerCase())}</CustomText>
+            </View>
           </View>
         </View>
 
@@ -253,10 +261,24 @@ const SellerOrdersScreen = () => {
             <View style={styles.locationInfo}>
               <CustomText style={[styles.locationLabel, { color: colors.muted }]}>{t('recipient')}</CustomText>
               <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
-                {item.recipientName || t('unknownBuyer')}
+                {item.recipientName || t('unknownBuyer')} {item.phoneNumber ? `• ${item.phoneNumber}` : ''}
               </CustomText>
             </View>
           </View>
+
+          {item.pickupType === 'PICKUP' && item.pickupSlot && (
+            <View style={[styles.locationContainer, { paddingTop: 0, paddingBottom: 8 }]}>
+              <View style={[styles.locationIconBox, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
+                <Clock color="#f97316" size={16} />
+              </View>
+              <View style={styles.locationInfo}>
+                <CustomText style={[styles.locationLabel, { color: '#f97316' }]}>SCHEDULED PICKUP TIME</CustomText>
+                <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
+                  {item.pickupSlot}
+                </CustomText>
+              </View>
+            </View>
+          )}
 
           <View style={styles.priceRow}>
             <View style={styles.itemsBadge}>
@@ -402,7 +424,7 @@ const SellerOrdersScreen = () => {
                         }}
                       >
                         <Truck size={18} color={colors.primary} />
-                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.Courier ? t('changeCourier') : t('assignCourier')}</CustomText>
+                        <CustomText style={styles.actionMenuText}>{selectedOrderForActions.Courier ? t('changeCourier') : t('hand over to Courier')}</CustomText>
                       </TouchableOpacity>
                     )}
                   </>

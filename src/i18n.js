@@ -47,6 +47,7 @@ const languageDetector = {
 
 // Dev-only auto-translation using LibreTranslate
 const autoTranslate = async (key, lng) => {
+  return; // LibreTranslate disabled for now
   if (!__DEV__) return;
 
   console.warn(`[i18n] Missing key: "${key}" for language: "${lng}". Attempting auto-translation...`);

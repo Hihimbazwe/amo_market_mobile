@@ -10,9 +10,10 @@ import {
   Alert, 
   Image, 
   KeyboardAvoidingView, 
-  Platform 
+  Platform,
+  FlatList 
 } from 'react-native';
-import { X, Upload, Image as ImageIcon, Flame, ChevronDown, Video, Plus, Check, Star } from 'lucide-react-native';
+import { X, Upload, Image as ImageIcon, Flame, ChevronDown, Video, Plus, Check, Star, CheckCircle2 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import CustomText from './CustomText';
@@ -121,6 +122,13 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
   const [attributes, setAttributes] = useState([]);
   const [variants, setVariants] = useState([]);
   const [images, setImages] = useState([]);
+  
+  // Picker Modal State
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerData, setPickerData] = useState([]);
+  const [pickerTitle, setPickerTitle] = useState('');
+  const [onSelectCallback, setOnSelectCallback] = useState(null);
+  const [pickerSearchQuery, setPickerSearchQuery] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -254,6 +262,94 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
     }
   };
 
+  const openPicker = (label, options, onSelect) => {
+    if (!options || options.length === 0) {
+      Alert.alert('No Data', `No ${label.toLowerCase()}s found.`);
+      return;
+    }
+    setPickerTitle(`Select ${label}`);
+    setPickerData(options);
+    setOnSelectCallback(() => onSelect);
+    setPickerSearchQuery('');
+    setPickerVisible(true);
+  };
+
+  const renderDropdown = (label, value, onValueChange, options, disabled) => (
+    <View style={[styles.inputGroup, disabled && { opacity: 0.5 }]}>
+      <CustomText style={styles.label}>{label} *</CustomText>
+      <TouchableOpacity 
+        style={[styles.input, styles.dropdownTrigger, { backgroundColor: colors.glass, borderColor: colors.border }]}
+        disabled={disabled}
+        onPress={() => openPicker(label, options, onValueChange)}
+      >
+        <CustomText style={[styles.dropdownValue, { color: value ? colors.foreground : colors.muted }]}>
+          {value || `Select ${label}`}
+        </CustomText>
+        <ChevronDown size={14} color={colors.muted} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderPickerModal = () => {
+    const filteredData = pickerData.filter(item => 
+      item.toLowerCase().includes(pickerSearchQuery.toLowerCase())
+    );
+
+    return (
+      <Modal
+        visible={pickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <View style={styles.modalOverlayPicker}>
+          <View style={[styles.modalContentPicker, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={[styles.modalHeaderPicker, { borderBottomColor: colors.border }]}>
+              <CustomText style={{ color: colors.foreground, fontSize: 18, fontWeight: 'bold' }}>{pickerTitle}</CustomText>
+              <TouchableOpacity onPress={() => setPickerVisible(false)} style={styles.closeBtnPicker}>
+                <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>Done</CustomText>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={[styles.searchWrapperPicker, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.searchInputPicker, { color: colors.foreground }]}
+                placeholder="Search..."
+                placeholderTextColor={colors.muted}
+                value={pickerSearchQuery}
+                onChangeText={setPickerSearchQuery}
+              />
+            </View>
+
+            <FlatList
+              data={filteredData}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.pickerItem, { borderBottomColor: colors.border }]}
+                  onPress={() => {
+                    onSelectCallback(item);
+                    setPickerVisible(false);
+                  }}
+                >
+                  <CustomText style={{ color: colors.foreground, fontSize: 16 }}>{item}</CustomText>
+                  {form[pickerTitle.replace('Select ', '').toLowerCase()] === item && (
+                    <CheckCircle2 size={18} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={() => (
+                <View style={styles.emptyPicker}>
+                  <CustomText style={{ color: colors.muted }}>No results found</CustomText>
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
   };
@@ -335,30 +431,11 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
             </View>
 
             <View style={styles.row}>
-              <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                <CustomText style={styles.label}>Province *</CustomText>
-                <TouchableOpacity style={[styles.input, styles.dropdownTrigger]} onPress={() => {}}>
-                  <CustomText style={form.province ? { color: colors.foreground } : { color: colors.muted }}>
-                    {form.province || 'Select...'}
-                  </CustomText>
-                </TouchableOpacity>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScrollMini}>
-                  {PROVINCES.map(p => (
-                    <TouchableOpacity key={p} onPress={() => updateForm('province', p)} style={[styles.chipMini, form.province === p && styles.chipActive]}>
-                      <CustomText style={[styles.chipTextMini, form.province === p && styles.chipTextActive]}>{p}</CustomText>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                {renderDropdown('Province', form.province, v => updateForm('province', v), PROVINCES)}
               </View>
-              <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                <CustomText style={styles.label}>District *</CustomText>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScrollMini}>
-                  {(DISTRICTS[form.province] || []).map(d => (
-                    <TouchableOpacity key={d} onPress={() => updateForm('district', d)} style={[styles.chipMini, form.district === d && styles.chipActive]}>
-                      <CustomText style={[styles.chipTextMini, form.district === d && styles.chipTextActive]}>{d}</CustomText>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                {renderDropdown('District', form.district, v => updateForm('district', v), DISTRICTS[form.province] || [], !form.province)}
               </View>
             </View>
 
@@ -600,6 +677,7 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      {renderPickerModal()}
     </Modal>
   );
 };
@@ -657,7 +735,18 @@ const styles = StyleSheet.create({
   publishBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   publishText: { color: '#ffffff', fontWeight: 'bold', fontSize: 15 },
   charCount: { fontSize: 10, color: '#94a3b8' },
-  dropdownTrigger: { justifyContent: 'center' }
+  dropdownTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dropdownValue: { fontSize: 14 },
+  
+  // Picker Modal Styles
+  modalOverlayPicker: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContentPicker: { borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '70%', padding: 20, borderWidth: 1 },
+  modalHeaderPicker: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1 },
+  closeBtnPicker: { padding: 4 },
+  searchWrapperPicker: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 12, height: 44, marginBottom: 16, borderWidth: 1 },
+  searchInputPicker: { flex: 1, fontSize: 14 },
+  pickerItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1 },
+  emptyPicker: { padding: 40, alignItems: 'center' }
 });
 
 export default AddProductModal;

@@ -24,7 +24,7 @@ const LightTheme = {
 };
 
 const DarkTheme = {
-  background: '#030712',
+  background: '#0b1120',
   foreground: '#e2e8f0',
   muted: '#94a3b8',
   primary: '#e67e22',
@@ -38,8 +38,8 @@ const DarkTheme = {
   inputBorder: 'rgba(255, 255, 255, 0.1)',
   white: '#ffffff',
   black: '#000000',
-  card: '#0b101b',
-  border: 'rgba(255,255,255,0.05)',
+  card: '#111827',
+  border: 'rgba(255,255,255,0.07)',
   success: '#10B981',
   error: '#EF4444',
 };

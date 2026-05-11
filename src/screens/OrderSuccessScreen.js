@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, SafeAreaView, Dimensions } from 'react-native';
-import { CheckCircle, Package, ArrowRight, Home } from 'lucide-react-native';
+import { CheckCircle, Package, ArrowRight, Home, ShoppingBag } from 'lucide-react-native';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
 import { useTheme } from '../context/ThemeContext';
@@ -46,22 +46,26 @@ const OrderSuccessScreen = ({ route, navigation }) => {
           title="Track Order"
           style={styles.trackBtn}
           onPress={() => {
-            navigation.navigate('Me');
+            // Navigate to Me tab and the OrderTracking screen within it
+            navigation.navigate('Me', { 
+              screen: 'OrderTracking', 
+              params: { orderId } 
+            });
           }}
         >
           <ArrowRight size={20} color="#FFF" style={{ marginLeft: 8 }} />
         </CustomButton>
 
         <CustomButton
-          title="Back to Home"
+          title="Back to Marketplace"
           variant="outline"
           style={[styles.homeBtn, { borderColor: colors.border }]}
           textStyle={{ color: colors.foreground }}
           onPress={() => {
-            navigation.navigate('HomeMain');
+            navigation.navigate('Market');
           }}
         >
-          <Home size={20} color={colors.foreground} style={{ marginRight: 8 }} />
+          <ShoppingBag size={20} color={colors.foreground} style={{ marginRight: 8 }} />
         </CustomButton>
       </View>
     </SafeAreaView>

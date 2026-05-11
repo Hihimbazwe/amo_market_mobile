@@ -103,116 +103,15 @@ const HomeScreen = ({ navigation }) => {
     fetchFeatured(true);
   }, []);
 
-  const toggleSearch = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIsSearchMode(!isSearchMode);
-    if (isSearchMode) setSearchQuery('');
-  };
-
-  const handleSearchSubmit = () => {
-    if (searchQuery.trim()) {
-      navigation.navigate('Market', { search: searchQuery });
-      toggleSearch();
-    }
+  const handleSearchPress = () => {
+    navigation.navigate('GlobalSearch');
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
-      {/* Search Overlay */}
-      {isSearchMode && (
-        <View style={[styles.searchOverlay, { backgroundColor: colors.background }]}>
-          <View style={[styles.searchOverlayHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={toggleSearch} style={[styles.closeSearchBtnOverlay, { backgroundColor: colors.glass }]}>
-              <X color={colors.foreground} size={24} />
-            </TouchableOpacity>
-            <View style={[styles.searchInputWrapperOverlay, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-              <TextInput
-                style={[styles.searchInputOverlay, { color: colors.foreground }]}
-                placeholder={t('searchPlaceholder')}
-                placeholderTextColor={colors.muted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoFocus
-                onSubmitEditing={handleSearchSubmit}
-              />
-              <TouchableOpacity onPress={handleSearchSubmit}>
-                <Search color={colors.primary} size={20} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <ScrollView style={styles.searchOverlayContent} showsVerticalScrollIndicator={false}>
-            {/* Trending Section */}
-            {!searchQuery && (
-              <View style={styles.searchSection}>
-                <View style={styles.searchSectionHeader}>
-                  <TrendingUp size={14} color={colors.muted} />
-                  <CustomText style={[styles.searchSectionTitle, { color: colors.muted }]}>{t('trendingSearches')}</CustomText>
-                </View>
-                <View style={styles.trendingGrid}>
-                  {trendingSearches.map((t, idx) => (
-                    <TouchableOpacity 
-                      key={idx} 
-                      style={[styles.trendingItem, { backgroundColor: colors.glass, borderColor: colors.border }]}
-                      onPress={() => {
-                        setSearchQuery(t);
-                        navigation.navigate('Market', { search: t });
-                        toggleSearch();
-                      }}
-                    >
-                      <Zap size={14} color={colors.primary} style={{ marginRight: 8 }} />
-                      <CustomText style={[styles.trendingText, { color: colors.foreground }]}>{t}</CustomText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Categories Section */}
-            {!searchQuery && (
-              <View style={styles.searchSection}>
-                <View style={styles.searchSectionHeader}>
-                  <Tag size={14} color={colors.muted} />
-                  <CustomText style={[styles.searchSectionTitle, { color: colors.muted }]}>{t('browseCategories')}</CustomText>
-                </View>
-                <View style={styles.searchCategoriesGrid}>
-                  {categories.map((cat, index) => (
-                    <TouchableOpacity 
-                      key={index} 
-                      style={[styles.searchCategoryCard, { backgroundColor: colors.glass, borderColor: colors.border }]}
-                      onPress={() => {
-                        navigation.navigate('Market', { category: cat.label });
-                        toggleSearch();
-                      }}
-                    >
-                      <View style={[styles.searchCategoryIcon, { backgroundColor: cat.color + '15' }]}>
-                        <cat.icon size={22} color={cat.color} />
-                      </View>
-                      <CustomText style={[styles.searchCategoryLabel, { color: colors.foreground }]}>{cat.label}</CustomText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Quick Result Action */}
-            {searchQuery.length > 0 && (
-              <View style={styles.searchSection}>
-                <TouchableOpacity 
-                  style={[styles.searchResultItem, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
-                  onPress={handleSearchSubmit}
-                >
-                  <Search size={18} color={colors.muted} style={{ marginRight: 12 }} />
-                  <CustomText style={[styles.searchResultText, { color: colors.foreground }]}>{t('searchFor', { query: searchQuery })}</CustomText>
-                  <ArrowUpRight size={16} color={colors.primary} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      )}
+      {/* Removed Search Overlay */}
 
       {/* Main Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
@@ -246,7 +145,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={toggleSearch} style={[styles.iconButton, { backgroundColor: colors.glass, marginRight: 8 }]}>
+          <TouchableOpacity onPress={handleSearchPress} style={[styles.iconButton, { backgroundColor: colors.glass, marginRight: 8 }]}>
             <Search color={colors.foreground} size={20} />
           </TouchableOpacity>
           <NotificationIcon />

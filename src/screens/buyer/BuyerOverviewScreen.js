@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
-import { Menu, Search, Zap, ShoppingBag, Wallet, ShieldAlert, Bell, Clock } from 'lucide-react-native';
+import { Menu, Search, Zap, ShoppingBag, Wallet, ShieldAlert, Bell, Clock, Store } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
@@ -9,8 +9,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { orderService } from '../../api/orderService';
 import { disputeService } from '../../api/disputeService';
-import { Loader2 } from 'lucide-react-native';
+import { Loader2, Package } from 'lucide-react-native';
 import { useLanguage } from '../../context/LanguageContext';
+import { Alert } from 'react-native';
 
 
 const mockOrders = [
@@ -29,6 +30,8 @@ const BuyerOverviewScreen = () => {
   const [orders, setOrders] = useState([]);
   const [disputes, setDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [upcomingPickupOrder, setUpcomingPickupOrder] = useState(null);
+  const [hoursRemaining, setHoursRemaining] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,6 +51,51 @@ const BuyerOverviewScreen = () => {
     };
     fetchData();
   }, [user?.id]);
+
+  const parsePickupSlot = (slotStr) => {
+    if (!slotStr) return null;
+    try {
+      const parts = slotStr.split(' at ');
+      if (parts.length !== 2) return null;
+      const now = new Date();
+      // Try to parse with the current year
+      const dateStr = `${parts[0]}, ${now.getFullYear()} ${parts[1]}`;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      return d;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    if (!orders || orders.length === 0) return;
+    let soonest = null;
+    let minDiff = Infinity;
+
+    orders.forEach(order => {
+      if (order.pickupType === 'PICKUP' && order.pickupSlot && ['PENDING', 'PAID', 'PREPARED'].includes(order.status?.toUpperCase())) {
+        const slotDate = parsePickupSlot(order.pickupSlot);
+        if (slotDate) {
+          const diffMs = slotDate.getTime() - new Date().getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
+          
+          // Show if within 4 hours upcoming OR up to 2 hours LATE
+          if (diffHours >= -2 && diffHours <= 4 && diffHours < minDiff) {
+            minDiff = diffHours;
+            soonest = order;
+          }
+        }
+      }
+    });
+
+    if (soonest) {
+      setUpcomingPickupOrder(soonest);
+      setHoursRemaining(minDiff);
+    } else {
+      setUpcomingPickupOrder(null);
+    }
+  }, [orders]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -69,6 +117,26 @@ const BuyerOverviewScreen = () => {
             style={[styles.searchInput, { color: colors.foreground }]}
           />
         </View>
+
+        {/* Pickup Reminder Banner */}
+        {upcomingPickupOrder && (
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Orders')}
+            style={[styles.reminderBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}
+          >
+            <View style={[styles.reminderIconBox, { backgroundColor: colors.primary + '20' }]}>
+              <Store color={colors.primary} size={24} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <CustomText style={{ color: colors.primary, fontWeight: '900', fontSize: 13, marginBottom: 2 }}>
+                {hoursRemaining < 0 ? "PICKUP TIME PASSED" : "UPCOMING PICKUP"}
+              </CustomText>
+              <CustomText style={{ color: colors.foreground, fontSize: 12, lineHeight: 18 }}>
+                Order #{upcomingPickupOrder.id.slice(-8).toUpperCase()} is ready for collection ({upcomingPickupOrder.pickupSlot}).
+              </CustomText>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
@@ -123,7 +191,9 @@ const BuyerOverviewScreen = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('recentOrders')}</CustomText>
-            <TouchableOpacity><CustomText style={[styles.seeAllText, { color: colors.primary }]}>{t('viewAll')}</CustomText></TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Orders')}>
+              <CustomText style={[styles.seeAllText, { color: colors.primary }]}>{t('viewAll')}</CustomText>
+            </TouchableOpacity>
           </View>
           {loading ? (
             <View style={{ alignItems: 'center', padding: 20 }}>
@@ -213,6 +283,22 @@ const styles = StyleSheet.create({
   promoSub: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 'bold', marginBottom: 4 },
   promoTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
   promoDesc: { fontSize: 12, lineHeight: 18 },
+  reminderBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 24,
+    borderStyle: 'dashed',
+  },
+  reminderIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
 export default BuyerOverviewScreen;

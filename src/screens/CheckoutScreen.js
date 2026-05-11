@@ -32,7 +32,14 @@ import {
   Wallet,
   MapPin,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Store,
+  Clock,
+  X,
+  Package,
+  ArrowRight,
+  Home,
+  ShoppingBag
 } from 'lucide-react-native';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
@@ -76,6 +83,8 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState(null);
 
   // Recipient Details
   const [recipientName, setRecipientName] = useState('');
@@ -85,7 +94,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   // Delivery Method
   const [pickupType, setPickupType] = useState('DELIVERY');
   const [pickupLocationId, setPickupLocationId] = useState('');
-  const [pickupSlot, setPickupSlot] = useState('');
+  const [sellerPickupSlots, setSellerPickupSlots] = useState({}); // { [sellerId]: slot_string }
   const [pickupLocations, setPickupLocations] = useState([]);
   const [landmark, setLandmark] = useState('');
 
@@ -113,6 +122,12 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [cardholderName, setCardholderName] = useState('');
+  
+  // Custom Date/Time Picker State
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [activeSellerId, setActiveSellerId] = useState(null); // For which seller are we choosing a time?
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTime, setSelectedTime] = useState('10:00 AM');
 
   // Fees
   const deliveryFee = useMemo(() => (pickupType === 'PICKUP' ? 0 : 1000), [pickupType]);
@@ -193,6 +208,27 @@ const CheckoutScreen = ({ route, navigation }) => {
     try {
       const address = [loc.village, loc.cell, loc.sector, loc.district, loc.province].filter(Boolean).join(', ');
       
+      // Construct sellerPickups array if it's a pickup order
+      const sellerPickups = [];
+      if (pickupType === 'PICKUP') {
+        const sellerGroups = {};
+        checkoutItems.forEach(item => {
+          const seller = item.product?.seller;
+          const sellerId = seller?.id || 'unknown';
+          if (!sellerGroups[sellerId]) {
+            sellerGroups[sellerId] = {
+              sellerId,
+              address: seller?.locationAddress || 
+                       (item.product?.district && item.product?.province 
+                         ? `${item.product.district}, ${item.product.province}`
+                         : 'Location not set'),
+              slot: sellerPickupSlots[sellerId] || ''
+            };
+          }
+        });
+        Object.values(sellerGroups).forEach(group => sellerPickups.push(group));
+      }
+
       const orderData = {
         recipientName,
         phoneNumber,
@@ -200,8 +236,9 @@ const CheckoutScreen = ({ route, navigation }) => {
         pickupType,
         address: pickupType === 'DELIVERY' ? address : '',
         agentId: selectedAgentId || undefined,
-        pickupLocationId: pickupType === 'PICKUP' ? pickupLocationId : undefined,
-        pickupSlot: pickupType === 'PICKUP' ? pickupSlot : undefined,
+        pickupLocationId: (pickupType === 'PICKUP' && pickupLocationId) ? pickupLocationId : undefined,
+        pickupSlot: pickupType === 'PICKUP' ? Object.values(sellerPickupSlots)[0] : undefined, // Fallback for single slot
+        sellerPickups: pickupType === 'PICKUP' ? sellerPickups : undefined,
         shippingCost: deliveryFee,
         items: checkoutItems.map(item => ({
           productId: item.product.id,
@@ -230,7 +267,8 @@ const CheckoutScreen = ({ route, navigation }) => {
         clearCart();
       }
 
-      navigation.navigate('OrderSuccess', { orderId: order.id });
+      setLastOrderId(order.id);
+      setSuccessModalVisible(true);
     } catch (error) {
       Alert.alert('Order Failed', error.message || 'Something went wrong while placing your order.');
     } finally {
@@ -381,6 +419,74 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={{ width: 44 }} />
       </View>
 
+      {/* Order Success Modal */}
+      <Modal
+        visible={successModalVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.successModalOverlay}>
+          <View style={[styles.successModalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.successModalBody}>
+              <View style={[styles.successIconContainer, { backgroundColor: colors.primary + '20' }]}>
+                <CheckCircle2 size={64} color={colors.primary} />
+              </View>
+
+              <CustomText variant="h1" style={[styles.successTitle, { color: colors.foreground }]}>
+                Order Placed!
+              </CustomText>
+              
+              <CustomText style={[styles.successSubtitle, { color: colors.muted }]}>
+                Your order has been placed successfully and is now being processed.
+              </CustomText>
+
+              {lastOrderId && (
+                <View style={[styles.orderCard, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                  <View style={styles.orderCardIcon}>
+                    <Package size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.orderCardContent}>
+                    <CustomText style={[styles.orderLabel, { color: colors.muted }]}>Order ID</CustomText>
+                    <CustomText style={[styles.orderIdText, { color: colors.foreground }]}>
+                      #{lastOrderId.slice(-8).toUpperCase()}
+                    </CustomText>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={[styles.successFooter, { borderTopColor: colors.border }]}>
+              <CustomButton
+                title="Track Order"
+                style={styles.modalTrackBtn}
+                onPress={() => {
+                  setSuccessModalVisible(false);
+                  navigation.navigate('Me', { 
+                    screen: 'OrderTracking', 
+                    params: { orderId: lastOrderId } 
+                  });
+                }}
+              >
+                <ArrowRight size={20} color="#FFF" style={{ marginLeft: 8 }} />
+              </CustomButton>
+
+              <CustomButton
+                title="Back to Marketplace"
+                variant="outline"
+                style={[styles.modalHomeBtn, { borderColor: colors.border }]}
+                textStyle={{ color: colors.foreground }}
+                onPress={() => {
+                  setSuccessModalVisible(false);
+                  navigation.navigate('Market');
+                }}
+              >
+                <ShoppingBag size={20} color={colors.foreground} style={{ marginRight: 8 }} />
+              </CustomButton>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -470,47 +576,76 @@ const CheckoutScreen = ({ route, navigation }) => {
               </View>
             ) : (
               <View style={styles.form}>
-                {renderLabel('SELECT PICKUP STORE')}
-                {pickupLocations.map(location => (
-                  <TouchableOpacity 
-                    key={location.id} 
-                    onPress={() => setPickupLocationId(location.id)}
-                    style={[
-                      styles.pickupLocationItem, 
-                      { backgroundColor: colors.glass, borderColor: pickupLocationId === location.id ? colors.primary : colors.border }
-                    ]}
-                  >
-                    <View style={styles.pickupHeader}>
-                      <MapPin size={16} color={colors.primary} />
-                      <CustomText style={[styles.pickupName, { color: colors.foreground }]}>{location.name}</CustomText>
-                      {pickupLocationId === location.id && <CheckCircle2 size={16} color={colors.primary} />}
-                    </View>
-                    <CustomText style={[styles.pickupAddress, { color: colors.muted }]}>{location.address}</CustomText>
-                    <CustomText style={[styles.pickupHours, { color: colors.muted }]}>Hours: {location.openTime} - {location.closeTime}</CustomText>
-                  </TouchableOpacity>
-                ))}
-                
-                {pickupLocationId && (
-                  <View style={{ marginTop: 12 }}>
-                    {renderLabel('PICKUP TIME SLOT')}
-                     <TouchableOpacity 
-                      style={[styles.dropdownTrigger, { backgroundColor: colors.glass, borderColor: colors.border }]}
-                      onPress={() => {
-                        Alert.alert("Select Time Slot", "", [
-                          { text: "Tomorrow 10:00 AM", onPress: () => setPickupSlot("Tomorrow 10:00 AM") },
-                          { text: "Tomorrow 2:00 PM", onPress: () => setPickupSlot("Tomorrow 2:00 PM") },
-                          { text: "Next Friday 11:00 AM", onPress: () => setPickupSlot("Next Friday 11:00 AM") },
-                          { text: 'Cancel', style: 'cancel' }
-                        ]);
-                      }}
+                {renderLabel('SELLER PICKUP LOCATIONS')}
+                {(() => {
+                  const sellerGroups = {};
+                  checkoutItems.forEach(item => {
+                    const seller = item.product?.seller;
+                    const sellerId = seller?.id || 'unknown';
+                    if (!sellerGroups[sellerId]) {
+                      sellerGroups[sellerId] = {
+                        name: seller?.user?.name || 'Store',
+                        location: seller?.locationAddress || 
+                                  (item.product?.district && item.product?.province 
+                                    ? `${item.product.district}, ${item.product.province}`
+                                    : 'Location not set'),
+                        items: []
+                      };
+                    }
+                    sellerGroups[sellerId].items.push(item);
+                  });
+
+                  return Object.entries(sellerGroups).map(([id, group]) => (
+                    <View 
+                      key={id} 
+                      style={[
+                        styles.sellerPickupCard, 
+                        { backgroundColor: colors.glass, borderColor: colors.border, marginBottom: 16 }
+                      ]}
                     >
-                      <CustomText style={[styles.dropdownValue, { color: pickupSlot ? colors.foreground : colors.muted }]}>
-                        {pickupSlot || "Select time slot"}
-                      </CustomText>
-                      <ChevronDown size={14} color={colors.muted} />
-                    </TouchableOpacity>
-                  </View>
-                )}
+                      <View style={styles.pickupHeader}>
+                        <View style={[styles.storeIconBox, { backgroundColor: colors.primary + '15' }]}>
+                          <Store size={18} color={colors.primary} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <CustomText style={[styles.pickupName, { color: colors.foreground }]}>{group.name}</CustomText>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <MapPin size={12} color={colors.muted} />
+                            <CustomText style={[styles.pickupAddress, { color: colors.muted }]}>{group.location}</CustomText>
+                          </View>
+                        </View>
+                      </View>
+                      
+                      <View style={[styles.divider, { backgroundColor: colors.border, marginVertical: 12 }]} />
+                      
+                      <View style={styles.pickupItemsList}>
+                        {group.items.map((gi, idx) => (
+                          <CustomText key={idx} style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>
+                            • {gi.product.title} (x{gi.quantity})
+                          </CustomText>
+                        ))}
+                      </View>
+
+                      <View style={{ marginTop: 12 }}>
+                        <CustomText style={{ fontSize: 10, color: colors.muted, fontWeight: 'bold', marginBottom: 8 }}>PICKUP TIME</CustomText>
+                        <TouchableOpacity 
+                          style={[styles.dropdownTrigger, { backgroundColor: colors.background, borderColor: colors.border, height: 44 }]}
+                          onPress={() => {
+                            setActiveSellerId(id);
+                            setTimePickerVisible(true);
+                          }}
+                        >
+                          <Clock size={14} color={colors.muted} style={{ marginRight: 8 }} />
+                          <CustomText style={[styles.dropdownValue, { color: sellerPickupSlots[id] ? colors.foreground : colors.muted, fontSize: 13 }]}>
+                            {sellerPickupSlots[id] || "Choose time"}
+                          </CustomText>
+                          <ChevronDown size={14} color={colors.muted} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ));
+                })()}
+
               </View>
             )}
           </View>
@@ -701,7 +836,112 @@ const CheckoutScreen = ({ route, navigation }) => {
       </View>
       </KeyboardAvoidingView>
       {renderPickerModal()}
+      
+      {/* Custom Pickup Time Picker Modal */}
+      <Modal
+        visible={timePickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setTimePickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.timePickerContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border, paddingTop: 24, paddingHorizontal: 24 }]}>
+              <CustomText variant="h3" style={{ color: colors.foreground }}>Schedule Pickup</CustomText>
+              <TouchableOpacity onPress={() => setTimePickerVisible(false)}>
+                <X size={20} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 20 }}>
+              <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>SELECT DATE</CustomText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateList}>
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const date = new Date();
+                  date.setDate(date.getDate() + i);
+                  const isSelected = selectedDate.toDateString() === date.toDateString();
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => setSelectedDate(date)}
+                      style={[
+                        styles.datePill,
+                        { borderColor: colors.border, backgroundColor: colors.glass },
+                        isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
+                      ]}
+                    >
+                      <CustomText style={[styles.dateDay, { color: isSelected ? '#FFF' : colors.muted }]}>
+                        {i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' })}
+                      </CustomText>
+                      <CustomText style={[styles.dateNum, { color: isSelected ? '#FFF' : colors.foreground }]}>
+                        {date.getDate()}
+                      </CustomText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <CustomText style={[styles.sectionLabel, { color: colors.muted, marginTop: 24 }]}>SELECT TIME</CustomText>
+              <View style={styles.timeGrid}>
+                {['08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM'].filter((time) => {
+                  const today = new Date();
+                  if (selectedDate.toDateString() !== today.toDateString()) return true;
+                  const [timeStr, period] = time.split(' ');
+                  let hour = parseInt(timeStr.split(':')[0], 10);
+                  if (period === 'PM' && hour !== 12) hour += 12;
+                  if (period === 'AM' && hour === 12) hour = 0;
+                  return hour > today.getHours();
+                }).map((time) => {
+                  const isSelected = selectedTime === time;
+                  return (
+                    <TouchableOpacity
+                      key={time}
+                      onPress={() => setSelectedTime(time)}
+                      style={[
+                        styles.timePill,
+                        { borderColor: colors.border, backgroundColor: colors.glass },
+                        isSelected && { backgroundColor: colors.primary + '20', borderColor: colors.primary }
+                      ]}
+                    >
+                      <CustomText style={[styles.timeText, { color: isSelected ? colors.primary : colors.foreground }]}>
+                        {time}
+                      </CustomText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {['08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM'].filter((time) => {
+                  const today = new Date();
+                  if (selectedDate.toDateString() !== today.toDateString()) return true;
+                  const [timeStr, period] = time.split(' ');
+                  let hour = parseInt(timeStr.split(':')[0], 10);
+                  if (period === 'PM' && hour !== 12) hour += 12;
+                  if (period === 'AM' && hour === 12) hour = 0;
+                  return hour > today.getHours();
+              }).length === 0 && (
+                <CustomText style={{ color: '#ef4444', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+                  No more pickup slots available for today. Please select tomorrow.
+                </CustomText>
+              )}
+
+              <CustomButton
+                title="Confirm Schedule"
+                style={{ marginTop: 32 }}
+                onPress={() => {
+                  const dateStr = selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                  const slot = `${dateStr} at ${selectedTime}`;
+                  if (activeSellerId) {
+                    setSellerPickupSlots(prev => ({ ...prev, [activeSellerId]: slot }));
+                  }
+                  setTimePickerVisible(false);
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+
   );
 };
 
@@ -839,14 +1079,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
   },
-  dropdownValue: {
-    fontSize: 14,
-  },
-  pickupLocationItem: {
+  sellerPickupCard: {
+    borderRadius: 20,
     padding: 16,
-    borderRadius: 16,
-    borderWidth: 2,
-    marginBottom: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  storeIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pickupHeader: {
     flexDirection: 'row',
@@ -1083,7 +1327,144 @@ const styles = StyleSheet.create({
   emptyPicker: {
     padding: 40,
     alignItems: 'center',
-  }
+  },
+  timePickerContent: {
+    width: '100%',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderWidth: 1,
+    paddingBottom: 40,
+    position: 'absolute',
+    bottom: 0,
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginBottom: 12,
+  },
+  dateList: {
+    flexDirection: 'row',
+  },
+  datePill: {
+    width: 64,
+    height: 74,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dateDay: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  dateNum: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: '31%',
+    alignItems: 'center',
+  },
+  timeText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  successModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  successModalContent: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 32,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  successModalBody: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  successIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  successTitle: {
+    fontSize: 26,
+    marginBottom: 12,
+    textAlign: 'center',
+    fontWeight: '900',
+  },
+  successSubtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+    paddingHorizontal: 10,
+  },
+  orderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    width: '100%',
+  },
+  orderCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(230, 126, 34, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  orderCardContent: {
+    flex: 1,
+  },
+  orderLabel: {
+    fontSize: 10,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    fontWeight: 'bold',
+  },
+  orderIdText: {
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  successFooter: {
+    padding: 24,
+    paddingTop: 0,
+    gap: 12,
+  },
+  modalTrackBtn: {
+    width: '100%',
+  },
+  modalHomeBtn: {
+    width: '100%',
+  },
 });
 
 export default CheckoutScreen;
