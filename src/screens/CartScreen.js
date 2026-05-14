@@ -8,7 +8,8 @@ import {
   FlatList,
   Image,
   ActivityIndicator,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
 import { ShoppingBag, Trash2, Plus, Minus, ArrowRight, ChevronLeft, CheckSquare, Square } from 'lucide-react-native';
 import CustomText from '../components/CustomText';
@@ -204,55 +205,46 @@ const CartScreen = ({ navigation }) => {
         </View>
       ) : (
         <>
-          <View style={[styles.selectAllContainer, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity 
-              style={styles.selectAllRow}
-              onPress={handleSelectAll}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.checkboxBase, 
-                selectedItemIds.length === cartItems.length ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.muted }
-              ]}>
-                {selectedItemIds.length === cartItems.length && <CheckSquare size={14} color="#FFF" />}
-              </View>
-              <CustomText style={[styles.selectAllText, { color: colors.foreground }]}>
-                {selectedItemIds.length === cartItems.length ? t('deselectAll') : t('selectAll')} ({cartItems.length})
-              </CustomText>
-            </TouchableOpacity>
-          </View>
-
           <FlatList
             data={cartItems}
             renderItem={renderCartItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={[styles.selectAllContainer, { borderBottomColor: 'transparent' }]}>
+                <TouchableOpacity 
+                  style={styles.selectAllRow}
+                  onPress={handleSelectAll}
+                  activeOpacity={0.7}
+                >
+                  <View style={[
+                    styles.checkboxBase, 
+                    selectedItemIds.length === cartItems.length ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.muted }
+                  ]}>
+                    {selectedItemIds.length === cartItems.length && <CheckSquare size={14} color="#FFF" />}
+                  </View>
+                  <CustomText style={[styles.selectAllText, { color: colors.foreground }]}>
+                    {selectedItemIds.length === cartItems.length ? t('deselectAll') : t('selectAll')} ({cartItems.length})
+                  </CustomText>
+                </TouchableOpacity>
+              </View>
+            }
           />
           
-          {/* Summary Section */}
-          <View style={[styles.summaryBox, { backgroundColor: colors.glass, borderTopColor: colors.border }]}>
-            <View style={styles.summaryRow}>
-              <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>{t('subtotal')} ({selectedItemIds.length} items)</CustomText>
-              <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
-            </View>
-            <View style={styles.summaryRow}>
-              <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>{t('delivery')}</CustomText>
-              <CustomText style={[styles.freeText, { color: colors.muted }]}>{t('calculatedAtCheckout')}</CustomText>
-            </View>
-            
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            
+          {/* Sticky Bottom Checkout Bar */}
+          <View style={[styles.summaryBox, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
             <View style={styles.totalRow}>
-              <CustomText variant="h3" style={{ color: colors.foreground }}>{t('total')}</CustomText>
-              <CustomText variant="h2" style={{ color: colors.primary }}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
+              <View>
+                <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 2 }}>{t('total')}</CustomText>
+                <CustomText variant="h2" style={{ color: colors.primary }}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
+              </View>
+              <CustomButton 
+                title={t('checkout')}
+                style={styles.checkoutBtn}
+                onPress={handleCheckout}
+              />
             </View>
-            
-            <CustomButton 
-              title={t('proceedToCheckout')}
-              style={styles.checkoutBtn}
-              onPress={handleCheckout}
-            />
           </View>
         </>
       )}
@@ -335,10 +327,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   selectAllContainer: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    backgroundColor: 'rgba(0,0,0,0.01)',
+    paddingHorizontal: 0,
+    paddingVertical: 12,
+    marginBottom: 8,
   },
   selectAllRow: {
     flexDirection: 'row',
@@ -436,46 +427,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   summaryBox: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    paddingBottom: 32,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
     borderTopWidth: 1,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 14,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  freeText: {
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  divider: {
-    height: 1,
-    marginVertical: 10,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 20,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
   },
   checkoutBtn: {
-    width: '100%',
+    paddingHorizontal: 32,
+    height: 50,
   },
 });
 

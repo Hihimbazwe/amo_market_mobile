@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Switch, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { Menu, Bell, Lock, Shield, Globe, Moon, User, ChevronRight, XCircle } from 'lucide-react-native';
+import { Menu, Bell, Lock, Shield, Globe, Moon, User, ChevronRight, XCircle, ShieldCheck, CreditCard } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
@@ -93,7 +93,7 @@ const SellerSettingsScreen = () => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      
+
       // Auto-logout after password change
       setTimeout(() => {
         logout();
@@ -129,6 +129,32 @@ const SellerSettingsScreen = () => {
               </View>
               <ChevronRight color={colors.muted} size={18} />
             </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('SellerKYC')} activeOpacity={0.7}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
+                <ShieldCheck color={colors.muted} size={20} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('kycVerification')}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{t('verifyYourIdentity')}</CustomText>
+              </View>
+              <ChevronRight color={colors.muted} size={18} />
+            </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('SellerMembership')} activeOpacity={0.7}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
+                <CreditCard color={colors.muted} size={20} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('membership')}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{t('manageSubscription')}</CustomText>
+              </View>
+              <ChevronRight color={colors.muted} size={18} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -150,13 +176,13 @@ const SellerSettingsScreen = () => {
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow icon={Shield} title={t('twoFactorAuth')} subtitle={t('enhanceSecurity')} value={marketing} onValueChange={setMarketing} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow 
-              icon={Shield} 
-              title={t('hideAvailability')} 
-              subtitle={t('hideAvailabilityDesc')} 
-              value={hideAvailability} 
-              onValueChange={toggleAvailability} 
-              colors={colors} 
+            <SettingRow
+              icon={Shield}
+              title={t('hideAvailability')}
+              subtitle={t('hideAvailabilityDesc')}
+              value={hideAvailability}
+              onValueChange={toggleAvailability}
+              colors={colors}
             />
           </View>
         </View>
@@ -165,7 +191,7 @@ const SellerSettingsScreen = () => {
         <View style={styles.section}>
           <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('store')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Globe} title={t('marketplaceVisibility')} subtitle={t('showProductsToBuyers')} value={true} onValueChange={() => {}} colors={colors} />
+            <SettingRow icon={Globe} title={t('marketplaceVisibility')} subtitle={t('showProductsToBuyers')} value={true} onValueChange={() => { }} colors={colors} />
           </View>
         </View>
 
@@ -193,8 +219,8 @@ const SellerSettingsScreen = () => {
                   <XCircle color={colors.muted} size={24} />
                 </TouchableOpacity>
               </View>
-  
-              <ScrollView 
+
+              <ScrollView
                 style={styles.modalBody}
                 showsVerticalScrollIndicator={false}
               >
@@ -221,9 +247,9 @@ const SellerSettingsScreen = () => {
                   onChangeText={setConfirmPassword}
                   secureTextEntry
                 />
-                
+
                 <View style={{ height: 32 }} />
-                
+
                 <CustomButton
                   title={t('updatePassword')}
                   onPress={handleChangePassword}

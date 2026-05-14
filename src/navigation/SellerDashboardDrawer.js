@@ -24,7 +24,6 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import SellerOverviewScreen from '../screens/seller/SellerOverviewScreen';
-import SellerProductsScreen from '../screens/seller/SellerProductsScreen';
 import SellerOrdersScreen from '../screens/seller/SellerOrdersScreen';
 import SellerShipmentScreen from '../screens/seller/SellerShipmentScreen';
 import SellerWalletScreen from '../screens/seller/SellerWalletScreen';
@@ -40,6 +39,7 @@ import SellerInventoryScreen from '../screens/seller/SellerInventoryScreen';
 import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
+import SellerProductDetailScreen from '../screens/seller/SellerProductDetailScreen';
 
 // Buyer features for navigation parity
 import ProductDetailScreen from '../screens/ProductDetailScreen';
@@ -57,7 +57,6 @@ const NAV_GROUPS = (t) => [
     label: t('store'),
     items: [
       { name: t('dashboard'), icon: Home, screen: 'SellerOverview' },
-      { name: t('myProducts'), icon: PackageIcon, screen: 'SellerProducts' },
       { name: t('inventory'), icon: PackageIcon, screen: 'SellerInventory' },
       { name: t('orders'), icon: ShoppingBag, screen: 'SellerOrders' },
       { name: t('shipping'), icon: Truck, screen: 'SellerShipment' },
@@ -68,13 +67,11 @@ const NAV_GROUPS = (t) => [
     label: t('finance'),
     items: [
       { name: t('wallet'), icon: Wallet, screen: 'SellerWallet' },
-      { name: t('membership'), icon: CreditCard, screen: 'SellerMembership' },
     ],
   },
   {
     label: t('ACCOUNT'),
     items: [
-      { name: t('kycVerification'), icon: ShieldCheck, screen: 'SellerKYC' },
       { name: t('settings'), icon: Settings, screen: 'SellerSettings' },
     ],
   },
@@ -157,12 +154,12 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
 
             {/* User info — only email, no avatar */}
             <View style={styles.userInfo}>
-              <View style={{ 
-                width: 36, 
-                height: 36, 
-                borderRadius: 18, 
-                backgroundColor: 'rgba(255,255,255,0.05)', 
-                alignItems: 'center', 
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 10,
                 borderWidth: 1,
@@ -236,7 +233,6 @@ export default function SellerDashboardDrawer({ navigation }) {
       <View style={{ flex: 1 }}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="SellerOverview" component={SellerOverviewScreen} />
-          <Stack.Screen name="SellerProducts" component={SellerProductsScreen} />
           <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} />
           <Stack.Screen name="SellerShipment" component={SellerShipmentScreen} />
           <Stack.Screen name="SellerReplacements" component={SellerReplacementsScreen} />
@@ -250,7 +246,8 @@ export default function SellerDashboardDrawer({ navigation }) {
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
           <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
-          
+          <Stack.Screen name="SellerProductDetail" component={SellerProductDetailScreen} />
+
           {/* Parity Screens */}
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
@@ -262,7 +259,7 @@ export default function SellerDashboardDrawer({ navigation }) {
         <CustomDrawer
           visible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
-          navigation={navigation?.navigate ? navigation : { navigate: () => {} }}
+          navigation={navigation?.navigate ? navigation : { navigate: () => { } }}
         />
       </View>
     </SellerDrawerContext.Provider>

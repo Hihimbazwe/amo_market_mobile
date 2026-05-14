@@ -74,7 +74,7 @@ const BuyerReplacementsScreen = () => {
     try {
       const data = await orderService.getOrders(user.id);
       // Usually, only DELIVERED or COMPLETED orders can be replaced.
-      const eligibleOrders = data.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED');
+      const eligibleOrders = data.filter(o => (o.status === 'DELIVERED' || o.status === 'COMPLETED') && o.pickupType !== 'PICKUP');
       setOrders(eligibleOrders);
     } catch (error) {
       console.error('Fetch orders to replace error:', error);

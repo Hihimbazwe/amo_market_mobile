@@ -167,7 +167,7 @@ export default function SellerMembershipScreen() {
             <Star color="#F97316" size={12} fill="#F97316" />
             <CustomText style={[styles.heroBadgeText, { color: '#F97316' }]}>MEMBERSHIP PLANS</CustomText>
           </LinearGradient>
-          <CustomText style={styles.heroTitle}>Unlock Your Selling {'\n'}<CustomText style={{ color: '#F97316' }}>Potential</CustomText></CustomText>
+          <CustomText style={[styles.heroTitle, { color: colors.foreground }]}>Unlock Your Selling {'\n'}<CustomText style={{ color: '#F97316' }}>Potential</CustomText></CustomText>
           <CustomText style={styles.heroSub}>Upgrade your plan to access premium features and grow your business on AMO.</CustomText>
         </View>
 
@@ -178,7 +178,7 @@ export default function SellerMembershipScreen() {
                 <item.icon color="#F97316" size={18} />
               </View>
               <View style={{ flex: 1 }}>
-                <CustomText style={styles.highlightLabel}>{item.label}</CustomText>
+                <CustomText style={[styles.highlightLabel, { color: colors.foreground }]}>{item.label}</CustomText>
                 <CustomText style={styles.highlightDesc}>{item.desc}</CustomText>
               </View>
             </View>
@@ -250,7 +250,7 @@ export default function SellerMembershipScreen() {
                   {plan.features.map((f, i) => (
                     <View key={i} style={styles.featureRow}>
                        <View style={styles.checkIcon}><Check color="#10B981" size={12} /></View>
-                       <CustomText style={styles.featureText}>{f}</CustomText>
+                       <CustomText style={[styles.featureText, { color: colors.foreground }]}>{f}</CustomText>
                     </View>
                   ))}
                   {plan.disabled?.map((f, i) => (
@@ -287,7 +287,7 @@ export default function SellerMembershipScreen() {
         <TouchableOpacity style={[styles.comparisonCard, { backgroundColor: colors.glass, borderColor: colors.border }]}>
           <Users color={colors.muted} size={20} />
           <View style={{ flex: 1, marginLeft: 16 }}>
-             <CustomText style={styles.comparisonTitle}>Full Feature Comparison</CustomText>
+             <CustomText style={[styles.comparisonTitle, { color: colors.foreground }]}>Full Feature Comparison</CustomText>
              <CustomText style={styles.comparisonSub}>Detailed breakdown of all listing perks</CustomText>
           </View>
           <ChevronRight color={colors.muted} size={20} />
@@ -353,13 +353,13 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', marginBottom: 32, marginTop: 10 },
   heroBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, marginBottom: 12 },
   heroBadgeText: { fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
-  heroTitle: { fontSize: 32, fontWeight: '900', textAlign: 'center', color: 'white', lineHeight: 40 },
+  heroTitle: { fontSize: 32, fontWeight: '900', textAlign: 'center', lineHeight: 40 },
   heroSub: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 12, maxWidth: '85%', lineHeight: 20 },
 
   highlightsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
   highlightCard: { width: '48%', padding: 16, borderRadius: 24, borderWidth: 1, gap: 12 },
   highlightIconBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  highlightLabel: { fontSize: 14, fontWeight: 'bold', color: '#F1F5F9' },
+  highlightLabel: { fontSize: 14, fontWeight: 'bold' },
   highlightDesc: { fontSize: 11, color: '#64748B', marginTop: 4, lineHeight: 16 },
 
   billingToggleContainer: { alignItems: 'center', marginBottom: 32 },
@@ -386,12 +386,12 @@ const styles = StyleSheet.create({
   planBody: { padding: 28, gap: 20 },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   checkIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(16,185,129,0.15)', alignItems: 'center', justifyContent: 'center' },
-  featureText: { fontSize: 14, color: '#E2E8F0' },
+  featureText: { fontSize: 14 },
   actionBtn: { height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
   actionBtnText: { fontSize: 16, fontWeight: 'bold' },
 
   comparisonCard: { flexDirection: 'row', alignItems: 'center', padding: 24, borderRadius: 28, borderWidth: 1 },
-  comparisonTitle: { fontSize: 16, fontWeight: 'bold', color: 'white' },
+  comparisonTitle: { fontSize: 16, fontWeight: 'bold' },
   comparisonSub: { fontSize: 13, color: '#94A3B8', marginTop: 4 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },

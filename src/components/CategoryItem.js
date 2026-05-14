@@ -32,8 +32,8 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     width: '25%', // 4 columns
-    marginBottom: 16,
-    padding: 8,
+    marginBottom: 10,
+    padding: 4,
   },
   iconContainer: {
     padding: 12,

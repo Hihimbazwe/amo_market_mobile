@@ -44,6 +44,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { sellerService } from '../api/sellerService';
 import { productService } from '../api/productService';
+import { orderService } from '../api/orderService';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
@@ -84,6 +85,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [loadingSocial, setLoadingSocial] = useState(true);
   
+  // Review form states
+  const [eligibleOrderId, setEligibleOrderId] = useState(null);
+  const [userRating, setUserRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  
   const isFavorite = routeProduct?.id ? isInWishlist(routeProduct.id) : false;
   const media = routeProduct?.media || [];
   const hasImages = media.length > 0;
@@ -105,6 +112,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
       { label: 'Condition', value: routeProduct?.condition || 'New' },
       { label: 'Stock', value: routeProduct?.stock > 0 ? `${routeProduct.stock} units available` : 'Out of Stock' },
       ...(routeProduct?.weight ? [{ label: 'Weight', value: `${routeProduct.weight} kg` }] : []),
+      ...(routeProduct?.deliveryOptions ? [{ label: 'Delivery', value: routeProduct.deliveryOptions }] : []),
+      ...(routeProduct?.attributes?.length ? routeProduct.attributes.map(attr => ({ label: attr.name, value: attr.value })) : []),
     ],
     seller: {
       id: routeProduct?.sellerId || routeProduct?.seller?.id,
@@ -137,7 +146,20 @@ const ProductDetailScreen = ({ route, navigation }) => {
       }
     };
     loadSocialData();
-  }, [product.id]);
+
+    // Check review eligibility
+    if (user?.id && product.id) {
+      orderService.getBuyerOrders(user.id)
+        .then(orders => {
+          const eligible = orders.find(o => 
+            o.status === 'COMPLETED' && 
+            o.items?.some(i => i.productId === product.id)
+          );
+          if (eligible) setEligibleOrderId(eligible.id);
+        })
+        .catch(err => console.log('[DEBUG] Error checking review eligibility:', err));
+    }
+  }, [product.id, user?.id]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -218,12 +240,21 @@ const ProductDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  const openWhatsApp = () => {
-    const phone = '250780000000';
-    const message = `Hello, I am interested in your product "${product.title}" on AMO Marketplace.`;
-    const url = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
-    Share.share({ message: url }).catch(() => {
-      Alert.alert("Error", "WhatsApp is not installed on this device.");
+  const handleChatWithSeller = () => {
+    if (!user) {
+      Alert.alert("Login Required", "Please login to chat with sellers.");
+      navigation.navigate('Login');
+      return;
+    }
+    navigation.navigate('ChatDetail', { 
+      conversation: {
+        id: `temp_${product.seller.id}`, // Temporary or existing ID
+        otherUser: {
+          id: product.seller.userId || product.seller.id,
+          name: product.seller.name,
+          image: product.seller.image
+        }
+      }
     });
   };
 
@@ -326,6 +357,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
                     <CustomText style={styles.verifiedText}>Verified Seller</CustomText>
                   </View>
                 )}
+                {routeProduct?.isAuthentic && (
+                  <View style={[styles.verifiedBadge, { backgroundColor: 'rgba(96, 165, 250, 0.1)' }]}>
+                    <ShieldCheck size={14} color="#60a5fa" />
+                    <CustomText style={[styles.verifiedText, { color: '#60a5fa' }]}>Authentic Product</CustomText>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -385,13 +422,38 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 <CustomText variant="caption" style={styles.locationText}>{product.location}</CustomText>
               </View>
             </View>
-            <TouchableOpacity 
-              style={[styles.visitShopBtn, { borderColor: colors.primary }]}
-              onPress={() => navigation.navigate('SellerStore', { sellerId: product.seller.id, sellerName: product.seller.name })}
-            >
-               <Store size={14} color={colors.primary} />
-               <CustomText style={[styles.visitShopText, { color: colors.primary }]}>VISIT SHOP</CustomText>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity 
+                style={[styles.visitShopBtn, { borderColor: colors.primary }]}
+                onPress={() => navigation.navigate('SellerStore', { sellerId: product.seller.id, sellerName: product.seller.name })}
+              >
+                 <Store size={14} color={colors.primary} />
+                 <CustomText style={[styles.visitShopText, { color: colors.primary }]}>VISIT</CustomText>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[
+                  styles.visitShopBtn, 
+                  { 
+                    backgroundColor: isFollowing ? colors.primary + '15' : colors.primary,
+                    borderColor: colors.primary 
+                  }
+                ]}
+                onPress={handleFollow}
+                disabled={followLoading}
+              >
+                {followLoading ? (
+                  <ActivityIndicator size="small" color={isFollowing ? colors.primary : "#fff"} />
+                ) : (
+                  <>
+                    <Heart size={14} color={isFollowing ? colors.primary : "#fff"} fill={isFollowing ? colors.primary : "transparent"} />
+                    <CustomText style={[styles.visitShopText, { color: isFollowing ? colors.primary : "#fff" }]}>
+                      {isFollowing ? 'FOLLOWING' : 'FOLLOW'}
+                    </CustomText>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.statsGrid}>
@@ -527,6 +589,43 @@ const ProductDetailScreen = ({ route, navigation }) => {
               )}
               {activeTab === 2 && (
                 <View>
+                   {eligibleOrderId && (
+                     <View style={[styles.reviewForm, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '20' }]}>
+                       <CustomText variant="h3" style={{ marginBottom: 12 }}>Leave a Review</CustomText>
+                       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                         {[1, 2, 3, 4, 5].map((s) => (
+                           <TouchableOpacity key={s} onPress={() => setUserRating(s)}>
+                             <Star 
+                               size={28} 
+                               color={s <= userRating ? "#FBBF24" : colors.muted} 
+                               fill={s <= userRating ? "#FBBF24" : "none"} 
+                             />
+                           </TouchableOpacity>
+                         ))}
+                       </View>
+                       <CustomInput 
+                         placeholder="What did you like or dislike? Your feedback helps others."
+                         value={reviewComment}
+                         onChangeText={setReviewComment}
+                         multiline
+                         numberOfLines={3}
+                         containerStyle={{ marginBottom: 16 }}
+                       />
+                       <TouchableOpacity 
+                         style={[styles.submitReviewBtn, { backgroundColor: colors.primary }]}
+                         onPress={handlePostReview}
+                         disabled={submittingReview || !userRating}
+                       >
+                         {submittingReview ? <ActivityIndicator size="small" color="white" /> : (
+                           <>
+                             <Star size={16} color="white" />
+                             <CustomText style={{ color: 'white', fontWeight: 'bold', marginLeft: 8 }}>Post Review</CustomText>
+                           </>
+                         )}
+                       </TouchableOpacity>
+                     </View>
+                   )}
+
                    {loadingSocial ? <ActivityIndicator color={colors.primary} /> : reviews.length > 0 ? (
                      reviews.map((r, i) => (
                        <View key={i} style={styles.reviewItem}>
@@ -535,12 +634,20 @@ const ProductDetailScreen = ({ route, navigation }) => {
                              {[...Array(5)].map((_, si) => <Star key={si} size={10} color="#FBBF24" fill={si < r.rating ? "#FBBF24" : "none"} />)}
                            </View>
                            <CustomText variant="caption" style={{ marginLeft: 8 }}>{new Date(r.createdAt).toLocaleDateString()}</CustomText>
+                           <View style={styles.verifiedPurchaseBadge}>
+                             <CustomText style={styles.verifiedPurchaseText}>Verified Purchase</CustomText>
+                           </View>
                          </View>
-                         <CustomText style={{ fontSize: 13, color: colors.muted }}>{r.comment}</CustomText>
+                         {r.comment ? <CustomText style={{ fontSize: 13, color: colors.muted }}>{r.comment}</CustomText> : null}
                        </View>
                      ))
                    ) : (
-                     <CustomText style={styles.tabContent}>No reviews yet. Be the first to review after purchase!</CustomText>
+                     <View style={{ alignItems: 'center', py: 20 }}>
+                       <Star size={32} color={colors.muted} style={{ opacity: 0.3, marginBottom: 8 }} />
+                       <CustomText style={[styles.tabContent, { textAlign: 'center' }]}>
+                         No reviews yet. {eligibleOrderId ? "Be the first to review!" : "Complete a purchase of this product to leave a review."}
+                       </CustomText>
+                     </View>
                    )}
                 </View>
               )}
@@ -604,14 +711,14 @@ const ProductDetailScreen = ({ route, navigation }) => {
              });
            }}
          >
-           <CustomText style={styles.buyNowText}>BUY NOW — FAST DELIVERY</CustomText>
+           <CustomText style={styles.buyNowText}>BUY NOW</CustomText>
            <ChevronRight color="#fff" size={20} />
          </TouchableOpacity>
          <TouchableOpacity 
-           style={[styles.whatsappBtn, { backgroundColor: '#25D366' }]}
-           onPress={openWhatsApp}
+           style={[styles.chatBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}
+           onPress={handleChatWithSeller}
          >
-           <Phone color="#fff" size={20} />
+           <MessageCircle color={colors.primary} size={24} />
          </TouchableOpacity>
       </View>
     </View>
@@ -771,16 +878,16 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   visitShopBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   visitShopText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
   },
   statsGrid: {
@@ -1006,8 +1113,8 @@ const styles = StyleSheet.create({
   },
   buyNowBtn: {
     flex: 1,
-    height: 56,
-    borderRadius: 18,
+    height: 50,
+    borderRadius: 15,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1016,12 +1123,13 @@ const styles = StyleSheet.create({
   buyNowText: {
     color: '#fff',
     fontWeight: '900',
-    fontSize: 14,
+    fontSize: 13,
   },
-  whatsappBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
+  chatBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1070,7 +1178,33 @@ const styles = StyleSheet.create({
   paginationDotActive: {
     width: 20,
     backgroundColor: '#fff',
-  }
+  },
+  reviewForm: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  submitReviewBtn: {
+    height: 48,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifiedPurchaseBadge: {
+    marginLeft: 12,
+    backgroundColor: 'rgba(74, 222, 128, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  verifiedPurchaseText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#4ade80',
+    textTransform: 'uppercase',
+  },
 });
 
 export default ProductDetailScreen;

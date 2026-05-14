@@ -11,7 +11,8 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  RefreshControl
 } from 'react-native';
 import { 
   Menu, 
@@ -23,15 +24,25 @@ import {
   X, 
   Pencil,
   Save,
-  ArrowRight
+  ArrowRight,
+  Plus,
+  Eye,
+  EyeOff,
+  Trash2,
+  MoreVertical,
+  Flame,
+  Tag,
+  Globe
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomText from '../../components/CustomText';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { sellerService } from '../../api/sellerService';
+import { productService } from '../../api/productService';
 import { useTheme } from '../../context/ThemeContext';
 import NotificationIcon from '../../components/NotificationIcon';
+import AddProductModal from '../../components/AddProductModal';
 import { useTranslation } from 'react-i18next';
 
 const StatCard = ({ label, value, icon: Icon, color, backgroundColor }) => (
@@ -62,7 +73,7 @@ const StockBadge = ({ stock, t }) => {
   );
 };
 
-const SellerInventoryScreen = () => {
+const SellerInventoryScreen = ({ navigation }) => {
   const { toggleDrawer } = useContext(SellerDrawerContext);
   const { user } = useAuth();
   const { colors } = useTheme();
@@ -76,13 +87,24 @@ const SellerInventoryScreen = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [editStock, setEditStock] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+
+  // New states for actions
+  const [actionMenuProduct, setActionMenuProduct] = useState(null);
+  const [discountModalVisible, setDiscountModalVisible] = useState(false);
+  const [discountInput, setDiscountInput] = useState('');
 
   const fetchInventory = async () => {
     if (!user?.id) return;
     setLoading(true);
     try {
       const data = await sellerService.getInventory(user.id);
-      setItems(data);
+      // Deduplicate by ID
+      const uniqueItems = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setItems(uniqueItems);
     } catch (error) {
       Alert.alert(t('error'), t('failedToFetchProducts'));
       console.error(error);
@@ -159,6 +181,132 @@ const SellerInventoryScreen = () => {
     }
   };
 
+  const handleEditProductClick = async (product) => {
+    try {
+      setLoading(true);
+      const fullProduct = await productService.getProductById(product.id, user.id);
+      setEditingProduct(fullProduct);
+      setModalVisible(true);
+    } catch (error) {
+      console.error('Error fetching product for edit:', error);
+      // Fallback to the partial data from the list if fetch fails
+      setEditingProduct(product);
+      setModalVisible(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setEditingProduct(null);
+    setModalVisible(false);
+  };
+
+  const handleAddProduct = async (productData, mediaFiles) => {
+    if (!user || !user.id) return;
+    setIsSubmitting(true);
+    try {
+      if (editingProduct) {
+        const mediaUrls = [];
+        for (const media of mediaFiles) {
+          if (media.isExisting) {
+            mediaUrls.push({ url: media.uri, type: media.type });
+          } else {
+            const url = await productService.uploadToCloudinary(media);
+            mediaUrls.push({ url, type: media.type });
+          }
+        }
+        const finalData = { ...productData, media: mediaUrls };
+        await productService.updateProduct(user.id, editingProduct.id, finalData);
+        Alert.alert(t('success'), t('productUpdatedSuccess'));
+      } else {
+        const mediaUrls = [];
+        for (const media of mediaFiles) {
+          const url = await productService.uploadToCloudinary(media);
+          mediaUrls.push({ url, type: media.type });
+        }
+        const finalProductData = { ...productData, media: mediaUrls };
+        await productService.createProduct(user.id, finalProductData);
+        Alert.alert(t('success'), productData.published ? t('productPublishedSuccess') : t('productDraftSuccess'));
+      }
+      handleCloseModal();
+      fetchInventory();
+    } catch (error) {
+      Alert.alert(t('error'), error.message || t('failedToSaveProduct'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = (productId) => {
+    Alert.alert(
+      t('deleteProduct'),
+      t('deleteProductConfirm'),
+      [
+        { text: t('cancel'), style: "cancel" },
+        { text: t('delete'), style: "destructive", onPress: async () => {
+            try {
+              await productService.deleteProduct(user.id, productId);
+              fetchInventory();
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Failed to delete product');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleTogglePublish = async (productId, currentStatus) => {
+    try {
+      await productService.updateProduct(user.id, productId, { published: !currentStatus });
+      fetchInventory();
+    } catch (err) {
+      Alert.alert(t('error'), err.message || t('failedToUpdateVisibility'));
+    }
+  };
+
+  const handleToggleHotDeal = async (product) => {
+    try {
+      await productService.updateProduct(user.id, product.id, { isHotDeal: !product.isHotDeal });
+      Alert.alert(t('success'), product.isHotDeal ? t('hotDealRemoved') : t('hotDealAdded'));
+      fetchInventory();
+    } catch (err) {
+      Alert.alert(t('error'), err.message || t('failedToUpdateProduct'));
+    }
+  };
+
+  const handleApplyDiscount = async () => {
+    if (!actionMenuProduct) return;
+    const pct = parseInt(discountInput, 10);
+    if (isNaN(pct) || pct < 1 || pct > 90) {
+      Alert.alert(t('error'), t('invalidDiscountPercent'));
+      return;
+    }
+    setDiscountModalVisible(false);
+    try {
+      await productService.updateProduct(user.id, actionMenuProduct.id, { isDiscount: true, discountPercent: pct });
+      Alert.alert(t('success'), t('discountApplied'));
+      fetchInventory();
+    } catch (err) {
+      Alert.alert(t('error'), err.message || t('failedToApplyDiscount'));
+    }
+  };
+
+  const handleRemoveDiscount = async (product) => {
+    try {
+      await productService.updateProduct(user.id, product.id, { isDiscount: false, discountPercent: null });
+      Alert.alert(t('success'), t('discountRemoved'));
+      fetchInventory();
+    } catch (err) {
+      Alert.alert(t('error'), err.message || t('failedToRemoveDiscount'));
+    }
+  };
+
+  const formatPrice = (price) => {
+    return 'Rwf ' + (price || 0).toLocaleString();
+  };
+
   const renderItem = ({ item }) => {
     const hasVariants = item.variants && item.variants.length > 0;
     const totalStock = hasVariants ? item.variants.reduce((s, v) => s + (v.stock || 0), 0) : item.stock;
@@ -177,8 +325,29 @@ const SellerInventoryScreen = () => {
           <View style={styles.itemInfo}>
             <CustomText style={styles.itemTitle} numberOfLines={1}>{item.title}</CustomText>
             <CustomText variant="caption" style={{ color: colors.muted }}>{item.category}</CustomText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>{formatPrice(item.price)}</CustomText>
+              {item.isHotDeal && (
+                <View style={styles.hotDealBadge}>
+                  <Flame size={10} color="#EF4444" />
+                  <CustomText style={styles.hotDealText}>HOT</CustomText>
+                </View>
+              )}
+              {item.isDiscount && item.discountPercent && (
+                <View style={styles.discountBadge}>
+                  <CustomText style={styles.discountText}>-{item.discountPercent}%</CustomText>
+                </View>
+              )}
+            </View>
           </View>
-          <StockBadge stock={totalStock} t={t} />
+          <View style={{ alignItems: 'flex-end', gap: 6 }}>
+            <View style={[styles.pubBadge, { backgroundColor: item.published ? 'rgba(16, 185, 129, 0.1)' : colors.glass }]}>
+              <CustomText style={[styles.pubText, { color: item.published ? '#10B981' : colors.muted }]}>
+                {item.published ? t('live') : t('draft')}
+              </CustomText>
+            </View>
+            <StockBadge stock={totalStock} t={t} />
+          </View>
         </View>
 
         {!hasVariants ? (
@@ -229,15 +398,20 @@ const SellerInventoryScreen = () => {
           </View>
         )}
 
-        <View style={styles.salesSummary}>
-          <View style={styles.saleItem}>
-            <CustomText variant="caption" style={{ color: colors.muted }}>{t('sold30d')}</CustomText>
-            <CustomText style={styles.saleValue}>{item.soldLast30}</CustomText>
+        <View style={[styles.salesSummary, { justifyContent: 'space-between', alignItems: 'center' }]}>
+          <View style={{ flexDirection: 'row', gap: 24 }}>
+            <View style={styles.saleItem}>
+              <CustomText variant="caption" style={{ color: colors.muted }}>{t('sold30d')}</CustomText>
+              <CustomText style={styles.saleValue}>{item.soldLast30}</CustomText>
+            </View>
+            <View style={styles.saleItem}>
+              <CustomText variant="caption" style={{ color: colors.muted }}>{t('totalSold')}</CustomText>
+              <CustomText style={styles.saleValue}>{item.totalSold}</CustomText>
+            </View>
           </View>
-          <View style={styles.saleItem}>
-            <CustomText variant="caption" style={{ color: colors.muted }}>{t('totalSold')}</CustomText>
-            <CustomText style={styles.saleValue}>{item.totalSold}</CustomText>
-          </View>
+          <TouchableOpacity style={{ padding: 4 }} onPress={() => setActionMenuProduct(item)}>
+            <MoreVertical size={20} color={colors.foreground} />
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -251,15 +425,24 @@ const SellerInventoryScreen = () => {
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
         <CustomText variant="h2" style={{ flex: 1 }}>{t('inventory')}</CustomText>
-        <NotificationIcon style={{ marginRight: 12 }} />
-        <TouchableOpacity onPress={fetchInventory} style={[styles.iconBtn, { backgroundColor: colors.glass }]}>
-          <RefreshCw color={colors.foreground} size={20} />
+        <NotificationIcon style={{ marginRight: 8 }} />
+        <TouchableOpacity onPress={() => setModalVisible(true)} style={[styles.addBtn, { backgroundColor: colors.primary }]}>
+          <Plus color="white" size={16} />
+          <CustomText style={styles.addBtnText}>Add Product</CustomText>
         </TouchableOpacity>
       </View>
 
       <ScrollView 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl 
+            refreshing={loading} 
+            onRefresh={fetchInventory} 
+            tintColor={colors.primary} 
+            colors={[colors.primary]} 
+          />
+        }
       >
         {/* Stats */}
         <View style={styles.statsSection}>
@@ -395,6 +578,148 @@ const SellerInventoryScreen = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+        
+      {/* Action Menu Modal */}
+      <Modal
+        visible={!!actionMenuProduct}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionMenuProduct(null)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setActionMenuProduct(null)}
+        >
+          <View style={[styles.actionMenuContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.actionMenuHeader}>
+              <CustomText variant="h3" numberOfLines={1} style={{ flex: 1 }}>{actionMenuProduct?.title}</CustomText>
+            </View>
+            
+            <TouchableOpacity style={styles.actionMenuItem} onPress={() => {
+              const p = actionMenuProduct;
+              setActionMenuProduct(null);
+              navigation.navigate('SellerProductDetail', { 
+                productId: p.id, 
+                product: p 
+              });
+            }}>
+              <Globe size={18} color={colors.foreground} />
+              <CustomText style={{ marginLeft: 12 }}>{t('view Details')}</CustomText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionMenuItem} onPress={() => {
+              const p = actionMenuProduct;
+              setActionMenuProduct(null);
+              handleEditProductClick(p);
+            }}>
+              <Pencil size={18} color={colors.primary} />
+              <CustomText style={{ marginLeft: 12, color: colors.primary }}>{t('edit Product')}</CustomText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionMenuItem} onPress={() => {
+              const p = actionMenuProduct;
+              setActionMenuProduct(null);
+              handleTogglePublish(p.id, p.published);
+            }}>
+              {actionMenuProduct?.published ? <EyeOff size={18} color={colors.muted} /> : <Eye size={18} color={colors.foreground} />}
+              <CustomText style={{ marginLeft: 12 }}>{actionMenuProduct?.published ? t('unpublish') : t('publish')}</CustomText>
+            </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity style={styles.actionMenuItem} onPress={() => {
+              const p = actionMenuProduct;
+              setActionMenuProduct(null);
+              handleToggleHotDeal(p);
+            }}>
+              <Flame size={18} color={actionMenuProduct?.isHotDeal ? '#EF4444' : colors.muted} />
+              <CustomText style={{ marginLeft: 12, color: actionMenuProduct?.isHotDeal ? '#EF4444' : colors.foreground }}>
+                {actionMenuProduct?.isHotDeal ? t('removeHotDeal') : t('mark As HotDeal')}
+              </CustomText>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionMenuItem} onPress={() => {
+              if (actionMenuProduct?.isDiscount) {
+                const p = actionMenuProduct;
+                setActionMenuProduct(null);
+                handleRemoveDiscount(p);
+              } else {
+                setDiscountInput('10');
+                setDiscountModalVisible(true);
+              }
+            }}>
+              {actionMenuProduct?.isDiscount ? <X size={18} color="#A855F7" /> : <Tag size={18} color={colors.muted} />}
+              <CustomText style={{ marginLeft: 12, color: actionMenuProduct?.isDiscount ? '#A855F7' : colors.foreground }}>
+                {actionMenuProduct?.isDiscount ? t('removeDiscount') : t('add Discount')}
+              </CustomText>
+            </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity style={styles.actionMenuItem} onPress={() => {
+              const p = actionMenuProduct;
+              setActionMenuProduct(null);
+              handleDeleteProduct(p.id);
+            }}>
+              <Trash2 size={18} color="#EF4444" />
+              <CustomText style={{ marginLeft: 12, color: '#EF4444' }}>{t('deleteProduct')}</CustomText>
+            </TouchableOpacity>
+
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Discount Modal */}
+      <Modal
+        visible={discountModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setDiscountModalVisible(false); setActionMenuProduct(null); }}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <CustomText variant="h3">{t('addDiscount')}</CustomText>
+              <TouchableOpacity onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); }}>
+                <X size={24} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <CustomText style={styles.modalItemTitle}>{actionMenuProduct?.title}</CustomText>
+              <CustomText variant="caption" style={{ marginBottom: 16 }}>
+                {t('enterDiscountPercent')} (1-90)
+              </CustomText>
+              <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                <TextInput 
+                  style={[styles.stockInput, { color: colors.foreground }]}
+                  keyboardType="numeric"
+                  value={discountInput}
+                  onChangeText={setDiscountInput}
+                  autoFocus
+                />
+              </View>
+            </View>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn]} onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); }}>
+                <CustomText style={{ fontWeight: '700' }}>{t('cancel')}</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleApplyDiscount}>
+                <Save size={18} color="white" />
+                <CustomText style={{ color: 'white', fontWeight: '700', marginLeft: 8 }}>{t('apply')}</CustomText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+        <AddProductModal 
+          visible={isModalVisible} 
+          onClose={handleCloseModal}
+          onSubmit={handleAddProduct}
+          isSubmitting={isSubmitting}
+          initialData={editingProduct}
+        />
     </SafeAreaView>
   );
 };
@@ -409,6 +734,19 @@ const styles = StyleSheet.create({
     gap: 12
   },
   iconBtn: { padding: 8, borderRadius: 12 },
+  addBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: 12,
+    gap: 4
+  },
+  addBtnText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   scrollContent: { padding: 16 },
   
   // Stats
@@ -560,6 +898,52 @@ const styles = StyleSheet.create({
   },
   saleItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   saleValue: { fontSize: 14, fontWeight: '800' },
+
+  pubBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignItems: 'center' },
+  pubText: { fontSize: 8, fontWeight: 'bold', letterSpacing: 0.5 },
+
+  hotDealBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 4
+  },
+  hotDealText: { fontSize: 8, fontWeight: '900', color: '#EF4444' },
+  discountBadge: {
+    backgroundColor: 'rgba(168, 85, 247, 0.2)',
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  discountText: { fontSize: 9, fontWeight: '900', color: '#A855F7' },
+  
+  actionMenuContainer: {
+    width: '100%',
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+  },
+  actionMenuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  actionMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  divider: { height: 1, opacity: 0.5, marginVertical: 4 },
 });
 
 export default SellerInventoryScreen;

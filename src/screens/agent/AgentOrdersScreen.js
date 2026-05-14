@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, FlatList } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, FlatList, TextInput } from 'react-native';
 import { Truck, Package, MapPin, Search } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -21,6 +21,7 @@ const AgentOrdersScreen = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [actionModalVisible, setActionModalVisible] = useState(false);
     const [updating, setUpdating] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -129,11 +130,35 @@ const AgentOrdersScreen = () => {
                 </TouchableOpacity>
                 <CustomText variant="h2">{t('myOrders')}</CustomText>
             </View>
+
+            <View style={styles.searchSection}>
+                <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                    <Search color={colors.muted} size={20} />
+                    <TextInput
+                        placeholder={t('searchOrders') || "Search by ID or Recipient..."}
+                        placeholderTextColor={colors.muted}
+                        style={[styles.searchInput, { color: colors.foreground }]}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                    {searchQuery !== '' && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                            <X color={colors.muted} size={18} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
             {loading ? (
                 <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
             ) : (
                 <FlatList 
-                    data={orders}
+                    data={orders.filter(order => {
+                        const query = searchQuery.toLowerCase();
+                        return !searchQuery || 
+                               order.id.toLowerCase().includes(query) ||
+                               order.recipientName?.toLowerCase().includes(query) ||
+                               order.items?.some(item => item.product?.title?.toLowerCase().includes(query));
+                    })}
                     renderItem={renderOrderItem}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.list}
@@ -224,6 +249,9 @@ const AgentOrdersScreen = () => {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     header: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
+    searchSection: { paddingHorizontal: 20, paddingVertical: 12 },
+    searchBar: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 14, paddingHorizontal: 12, borderWidth: 1 },
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 14, paddingVertical: 8 },
     menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
     list: { padding: 16 },
     orderCard: { borderRadius: 24, borderWidth: 1, padding: 16, marginBottom: 16, overflow: 'hidden' },

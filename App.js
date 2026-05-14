@@ -1,13 +1,13 @@
 import 'react-native-gesture-handler';
 import './src/i18n';
 import React from 'react';
-import { View, StyleSheet, AppState } from 'react-native';
+import { View, StyleSheet, AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Home, ShoppingBag, MessageCircle, CircleUser as UserIcon, Loader2 } from 'lucide-react-native';
+import { Home, ShoppingBag, MessageCircle, CircleUser as UserIcon, Loader2, ShoppingCart } from 'lucide-react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
 import MarketplaceScreen from './src/screens/MarketplaceScreen';
@@ -40,6 +40,7 @@ import ChatListScreen from './src/screens/shared/ChatListScreen';
 import ChatDetailScreen from './src/screens/shared/ChatDetailScreen';
 import StatusViewerScreen from './src/screens/shared/StatusViewerScreen';
 import CartScreen from './src/screens/CartScreen';
+import AuthOverlay from './src/components/AuthOverlay';
 import AutoLogoutWarningModal from './src/components/modals/AutoLogoutWarningModal';
 import 'react-native-gesture-handler';
 // Network Performance Logger
@@ -160,6 +161,7 @@ const AppTabs = () => {
           let IconComponent;
           if (route.name === 'Home') IconComponent = Home;
           else if (route.name === 'Market') IconComponent = ShoppingBag;
+          else if (route.name === 'Cart') IconComponent = ShoppingCart;
           else if (route.name === 'Messages') IconComponent = MessageCircle;
           else if (route.name === 'Me') IconComponent = UserIcon;
 
@@ -173,6 +175,14 @@ const AppTabs = () => {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Market" component={MarketplaceStack} />
+      <Tab.Screen 
+        name="Cart" 
+        component={CartScreen} 
+        options={{
+          tabBarBadge: cartCount > 0 ? cartCount : null,
+          tabBarBadgeStyle: { backgroundColor: '#e67e22', fontSize: 10 }
+        }}
+      />
       <Tab.Screen
         name="Messages"
         component={MessagesStack}
@@ -207,8 +217,10 @@ const RootNavigator = () => {
   const inactivityTimer = React.useRef(null);
   const backgroundTime = React.useRef(null);
   const [showWarning, setShowWarning] = React.useState(false);
+  const [currentRoute, setCurrentRoute] = React.useState(null);
 
-  const INACTIVITY_LIMIT = 4 * 60 * 1000; // 4 minutes
+  const INACTIVITY_LIMIT = 9 * 60 * 1000; // 9 minutes warning
+  const LOGOUT_LIMIT = 10 * 60 * 1000; // 10 minutes total
 
   const resetTimer = React.useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
@@ -239,7 +251,7 @@ const RootNavigator = () => {
       if (nextAppState === 'active') {
         if (backgroundTime.current && user) {
           const elapsed = Date.now() - backgroundTime.current;
-          if (elapsed >= INACTIVITY_LIMIT + 60000) {
+          if (elapsed >= LOGOUT_LIMIT) {
             handleLogout();
           } else if (elapsed >= INACTIVITY_LIMIT) {
             setShowWarning(true);
@@ -296,17 +308,24 @@ const RootNavigator = () => {
         return false;
       }}
     >
-      <NavigationContainer linking={linking}>
+      <NavigationContainer 
+        linking={linking}
+        onStateChange={(state) => {
+          if (!state) return;
+          let route = state.routes[state.index];
+          while (route.state) {
+            route = route.state.routes[route.state.index];
+          }
+          setCurrentRoute(route.name);
+        }}
+      >
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {user ? (
-            <Stack.Screen name="MainApp" component={AppTabs} />
-          ) : (
-            <>
-              <Stack.Screen name="MainApp" component={AppTabs} />
-              <Stack.Screen name="Auth" component={AuthStack} />
-            </>
+          <Stack.Screen name="MainApp" component={AppTabs} />
+          {!user && (
+            <Stack.Screen name="Auth" component={AuthStack} />
           )}
         </Stack.Navigator>
+        <AuthOverlay currentRoute={currentRoute} />
       </NavigationContainer>
 
       <AutoLogoutWarningModal
@@ -347,9 +366,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#030712',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
-    paddingBottom: 5,
-    paddingTop: 5,
-    height: 60,
+    paddingBottom: Platform.OS === 'ios' ? 25 : 12,
+    paddingTop: 10,
+    height: Platform.OS === 'ios' ? 88 : 70,
   },
   placeholder: {
     flex: 1,

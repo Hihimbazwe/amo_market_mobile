@@ -48,10 +48,10 @@ const SellerOverviewScreen = () => {
           */
 
           setData({
-            revenue: dashboard.revenue || 0,
-            activeProducts: dashboard.activeProducts || 0,
-            pendingShipments: dashboard.pendingOrders || 0,
-            walletBalance: dashboard.walletBalance || 0,
+            revenue: dashboard.summary?.revenue || 0,
+            activeProducts: dashboard.summary?.activeProducts || 0,
+            pendingShipments: dashboard.summary?.pendingOrders || 0,
+            walletBalance: dashboard.summary?.walletBalance || 0,
             recentOrders: dashboard.recentOrders || [],
           });
         } catch (err) {

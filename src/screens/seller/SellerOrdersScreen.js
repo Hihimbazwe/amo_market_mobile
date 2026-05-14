@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
-import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone, CheckCircle2, ClipboardList, KeyRound, Store, Clock } from 'lucide-react-native';
+import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone, CheckCircle2, ClipboardList, KeyRound, Store, Clock, FileText } from 'lucide-react-native';
 import { TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -30,10 +30,15 @@ const SellerOrdersScreen = () => {
   const [agents, setAgents] = useState([]);
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Action Menu Modal State
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState(null);
+
+  // Details Modal State
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState(null);
 
   // Assign courier modal state
   const [showCourierModal, setShowCourierModal] = useState(false);
@@ -164,6 +169,17 @@ const SellerOrdersScreen = () => {
       }
     ]);
   };
+  
+  const handleDownloadInvoice = (orderId) => {
+    setActionModalVisible(false);
+    // Use the API_BASE_URL and pass the user ID as a query param for authentication in browser/PDF viewer
+    const invoiceUrl = `${API_BASE_URL}/api/orders/${orderId}/invoice?userId=${user.id}`;
+    
+    Linking.openURL(invoiceUrl).catch(err => {
+      console.error("Failed to open invoice URL:", err);
+      Alert.alert(t('error'), t('failedToDownloadInvoice') || "Could not download invoice. Please try again.");
+    });
+  };
 
   const handleMarkPrepared = (order) => {
     setActionModalVisible(false);
@@ -216,9 +232,36 @@ const SellerOrdersScreen = () => {
     }
   };
 
-  const filteredOrders = filter === 'ALL' ? orders : orders.filter(o => o.status === filter);
+  const filteredOrders = Array.isArray(orders) ? orders.filter((order) => {
+    const matchesFilter = filter === 'ALL' || order.status === filter;
+    
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      order.id.toLowerCase().includes(query) ||
+      order.user?.name?.toLowerCase().includes(query) ||
+      order.items?.some(item => item.product?.title?.toLowerCase().includes(query));
+      
+    return matchesFilter && matchesSearch;
+  }) : [];
 
   const formatPrice = (val) => 'Rwf ' + (val || 0).toLocaleString();
+
+  const formatPickupSlot = (slotStr) => {
+    if (!slotStr) return '';
+    const slots = slotStr.split(',').map(s => s.trim()).filter(Boolean);
+    if (slots.length > 1) {
+      const dates = slots.map(s => {
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? s.replace('T', ' ') : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      });
+      return [...new Set(dates)].join(', ');
+    } else {
+      const s = slots[0];
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return s.replace('T', ' ');
+      return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+  };
 
   const renderOrderItem = ({ item }) => {
     const orderTitle = item.items && item.items.length > 0 && item.items[0].product ? item.items[0].product.title : t('orderItems');
@@ -228,8 +271,8 @@ const SellerOrdersScreen = () => {
       <TouchableOpacity 
         style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() => {
-          setSelectedOrderForActions(item);
-          setActionModalVisible(true);
+          setSelectedOrderForDetails(item);
+          setDetailsModalVisible(true);
         }}
       >
         <View style={styles.cardHeader}>
@@ -238,12 +281,6 @@ const SellerOrdersScreen = () => {
             <CustomText style={[styles.ref, { color: colors.primary }]}>#{item.id.slice(-8).toUpperCase()}</CustomText>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {item.pickupType === 'PICKUP' && (
-              <View style={[styles.statusBadge, { backgroundColor: 'rgba(249, 115, 22, 0.1)', borderColor: 'rgba(249, 115, 22, 0.3)' }]}>
-                <Store size={10} color="#f97316" />
-                <CustomText style={[styles.badgeText, { color: '#f97316' }]}>PICKUP</CustomText>
-              </View>
-            )}
             <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
               <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
               <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(item.status?.toLowerCase())}</CustomText>
@@ -274,7 +311,7 @@ const SellerOrdersScreen = () => {
               <View style={styles.locationInfo}>
                 <CustomText style={[styles.locationLabel, { color: '#f97316' }]}>SCHEDULED PICKUP TIME</CustomText>
                 <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
-                  {item.pickupSlot}
+                  {formatPickupSlot(item.pickupSlot)}
                 </CustomText>
               </View>
             </View>
@@ -292,9 +329,15 @@ const SellerOrdersScreen = () => {
         </View>
 
         {/* Action Indicator */}
-        <View style={[styles.cardFooterAction, { justifyContent: 'flex-end' }]}>
-          <MoreVertical color={colors.muted} size={16} />
-        </View>
+        <TouchableOpacity 
+          style={[styles.cardFooterAction, { justifyContent: 'flex-end', padding: 10 }]}
+          onPress={() => {
+            setSelectedOrderForActions(item);
+            setActionModalVisible(true);
+          }}
+        >
+          <MoreVertical color={colors.muted} size={18} />
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
@@ -305,8 +348,27 @@ const SellerOrdersScreen = () => {
         <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
           <Menu color={colors.foreground} size={24} />
         </TouchableOpacity>
-        <CustomText variant="h2" style={{ flex: 1 }}>{t('orders')}</CustomText>
+        <CustomText variant="h2" style={{ flex: 1 }}>{t('myOrders')}</CustomText>
         <NotificationIcon />
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchSection}>
+        <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.glassBorder }]}>
+          <Search color={colors.muted} size={20} />
+          <TextInput
+            placeholder={t('searchOrders') || "Search by ID, Buyer, or Product..."}
+            placeholderTextColor={colors.muted}
+            style={[styles.searchInput, { color: colors.foreground }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <X color={colors.muted} size={18} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Replacement Badge Banner */}
@@ -414,8 +476,9 @@ const SellerOrdersScreen = () => {
                       </TouchableOpacity>
                     )}
 
-                    {/* Assign Courier — for delivery orders */}
-                    {['PAID', 'PROCESSING', 'PENDING', 'SHIPPED'].includes(selectedOrderForActions.status?.toUpperCase()) && (
+                    {/* Assign Courier — for delivery orders (not for PICKUP) */}
+                    {['PAID', 'PROCESSING', 'PENDING', 'SHIPPED'].includes(selectedOrderForActions.status?.toUpperCase()) && 
+                      selectedOrderForActions.pickupType !== 'PICKUP' && (
                       <TouchableOpacity
                         style={[styles.actionMenuItem]}
                         onPress={() => {
@@ -425,6 +488,17 @@ const SellerOrdersScreen = () => {
                       >
                         <Truck size={18} color={colors.primary} />
                         <CustomText style={styles.actionMenuText}>{selectedOrderForActions.Courier ? t('changeCourier') : t('hand over to Courier')}</CustomText>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Download Invoice — ONLY for COMPLETED orders */}
+                    {selectedOrderForActions.status?.toUpperCase() === 'COMPLETED' && (
+                      <TouchableOpacity
+                        style={[styles.actionMenuItem]}
+                        onPress={() => handleDownloadInvoice(selectedOrderForActions.id)}
+                      >
+                        <FileText size={18} color={colors.primary} />
+                        <CustomText style={styles.actionMenuText}>{t('downloadInvoice') || "Download Invoice"}</CustomText>
                       </TouchableOpacity>
                     )}
                   </>
@@ -706,6 +780,141 @@ const SellerOrdersScreen = () => {
         </View>
       </Modal>
 
+      {/* Order Details Modal */}
+      <Modal visible={detailsModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <CustomText variant="h2">{t('orderDetails')}</CustomText>
+                {selectedOrderForDetails && (
+                  <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                    #{selectedOrderForDetails.id.toUpperCase()}
+                  </CustomText>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => setDetailsModalVisible(false)} style={styles.closeBtn}>
+                <X color={colors.muted} size={24} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedOrderForDetails && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Status Section */}
+                <View style={[styles.detailSection, { borderBottomColor: colors.border }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View>
+                      <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('status')}</CustomText>
+                      <View style={[styles.statusBadge, { marginTop: 4, backgroundColor: `${statusColors[selectedOrderForDetails.status]?.text}15`, borderColor: `${statusColors[selectedOrderForDetails.status]?.text}30` }]}>
+                        <View style={[styles.statusDot, { backgroundColor: statusColors[selectedOrderForDetails.status]?.text }]} />
+                        <CustomText style={{ color: statusColors[selectedOrderForDetails.status]?.text, fontWeight: 'bold', fontSize: 12 }}>
+                          {t(selectedOrderForDetails.status?.toLowerCase())}
+                        </CustomText>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('date')}</CustomText>
+                      <CustomText style={{ fontWeight: 'bold', marginTop: 4 }}>
+                        {new Date(selectedOrderForDetails.createdAt).toLocaleDateString()}
+                      </CustomText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Items Section */}
+                <View style={[styles.detailSection, { borderBottomColor: colors.border }]}>
+                  <CustomText style={[styles.sectionLabel, { color: colors.muted, marginBottom: 12 }]}>{t('orderItems')}</CustomText>
+                  {selectedOrderForDetails.items.map((item, idx) => (
+                    <View key={idx} style={styles.detailItemRow}>
+                      <View style={[styles.itemImagePlaceholder, { backgroundColor: colors.glass }]}>
+                        <PackageIcon size={20} color={colors.muted} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <CustomText style={{ fontWeight: 'bold', fontSize: 14 }}>{item.product?.title || t('product')}</CustomText>
+                        <CustomText style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>
+                          {item.quantity} x {formatPrice(item.price)}
+                        </CustomText>
+                      </View>
+                      <CustomText style={{ fontWeight: 'bold' }}>{formatPrice(item.price * item.quantity)}</CustomText>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Recipient Section */}
+                <View style={[styles.detailSection, { borderBottomColor: colors.border }]}>
+                  <CustomText style={[styles.sectionLabel, { color: colors.muted, marginBottom: 12 }]}>{t('recipient')}</CustomText>
+                  <View style={{ gap: 8 }}>
+                    <View style={styles.infoRow}>
+                      <User size={16} color={colors.muted} />
+                      <CustomText style={{ flex: 1 }}>{selectedOrderForDetails.recipientName || t('unknownBuyer')}</CustomText>
+                    </View>
+                    {selectedOrderForDetails.phoneNumber && (
+                      <View style={styles.infoRow}>
+                        <Phone size={16} color={colors.muted} />
+                        <CustomText style={{ flex: 1 }}>{selectedOrderForDetails.phoneNumber}</CustomText>
+                      </View>
+                    )}
+                    <View style={styles.infoRow}>
+                      <MapPin size={16} color={colors.muted} />
+                      <CustomText style={{ flex: 1 }}>{selectedOrderForDetails.address || t('noAddress')}</CustomText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Shipping/Pickup Section */}
+                <View style={[styles.detailSection, { borderBottomColor: colors.border }]}>
+                  <CustomText style={[styles.sectionLabel, { color: colors.muted, marginBottom: 12 }]}>{t('delivery')}</CustomText>
+                  <View style={styles.infoRow}>
+                    {selectedOrderForDetails.pickupType === 'PICKUP' ? <Store size={16} color="#F97316" /> : <Truck size={16} color={colors.primary} />}
+                    <View style={{ flex: 1 }}>
+                      <CustomText style={{ fontWeight: 'bold' }}>{selectedOrderForDetails.pickupType || 'DELIVERY'}</CustomText>
+                      {selectedOrderForDetails.pickupSlot && (
+                        <CustomText style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{formatPickupSlot(selectedOrderForDetails.pickupSlot)}</CustomText>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Payment Section */}
+                <View style={[styles.detailSection, { borderBottomColor: 'transparent' }]}>
+                  <CustomText style={[styles.sectionLabel, { color: colors.muted, marginBottom: 12 }]}>{t('finance')}</CustomText>
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <CustomText style={{ color: colors.muted }}>{t('subtotal')}</CustomText>
+                      <CustomText>{formatPrice(selectedOrderForDetails.payment?.amount || selectedOrderForDetails.total)}</CustomText>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <CustomText style={{ fontWeight: 'bold', fontSize: 16 }}>{t('total')}</CustomText>
+                      <CustomText style={{ fontWeight: 'bold', fontSize: 16, color: colors.primary }}>
+                        {formatPrice(selectedOrderForDetails.payment?.amount || selectedOrderForDetails.total)}
+                      </CustomText>
+                    </View>
+                  </View>
+                </View>
+              </ScrollView>
+            )}
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={[styles.cancelBtn, { flex: 1 }]} onPress={() => setDetailsModalVisible(false)}>
+                <CustomText style={{ fontWeight: 'bold' }}>{t('close')}</CustomText>
+              </TouchableOpacity>
+              {selectedOrderForDetails && selectedOrderForDetails.status?.toUpperCase() === 'COMPLETED' && (
+                 <TouchableOpacity 
+                   style={[styles.submitAssignBtn, { backgroundColor: colors.primary, flex: 2 }]} 
+                   onPress={() => {
+                     setDetailsModalVisible(false);
+                     handleDownloadInvoice(selectedOrderForDetails.id);
+                   }}
+                 >
+                   <FileText size={18} color="white" />
+                   <CustomText style={{ fontWeight: 'bold', color: 'white' }}>{t('downloadInvoice')}</CustomText>
+                 </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -716,10 +925,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', padding: 20,
     borderBottomWidth: 1,
   },
+  searchSection: { paddingHorizontal: 20, paddingVertical: 12 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 14, paddingHorizontal: 12, borderWidth: 1 },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 14, paddingVertical: 8 },
   menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
   topFilterSection: {
     paddingBottom: 8,
-    borderBottomWidth: 1,
   },
   pillsRow: { 
     marginVertical: 4,
@@ -807,6 +1018,11 @@ const styles = StyleSheet.create({
   pickupSectionSubtitle: { textAlign: 'center', marginBottom: 32, fontSize: 14, lineHeight: 20 },
   pickupInputWrapper: { width: '100%', height: 64, borderRadius: 16, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
   pickupInput: { fontSize: 24, fontWeight: '900', textAlign: 'center', width: '100%' },
+  detailSection: { paddingVertical: 16, borderBottomWidth: 1 },
+  sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' },
+  detailItemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  itemImagePlaceholder: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
 });
 
 export default SellerOrdersScreen;

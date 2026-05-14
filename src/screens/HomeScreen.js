@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -40,7 +40,6 @@ import {
 import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
-import AuthOverlay from '../components/AuthOverlay';
 import CategoryItem from '../components/CategoryItem';
 import ProductCard from '../components/ProductCard';
 import GlassContainer from '../components/GlassContainer';
@@ -77,6 +76,23 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+  const flatListRef = useRef(null);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    // Start auto-slide timer
+    if (liveProducts.length > 0) {
+      timerRef.current = setInterval(() => {
+        const nextIndex = (activeHeroIndex + 1) % Math.min(liveProducts.length, 5);
+        setActiveHeroIndex(nextIndex);
+        flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      }, 4000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [liveProducts, activeHeroIndex]);
 
   const fetchFeatured = async (showRefresher = false) => {
     if (showRefresher) setRefreshing(true);
@@ -84,7 +100,7 @@ const HomeScreen = ({ navigation }) => {
     
     try {
       const data = await productService.getProducts();
-      setLiveProducts(data.slice(0, 4));
+      setLiveProducts(data.slice(0, 8)); // Get more for the carousel
     } catch (error) {
       console.error('Home fetch error:', error);
     } finally {
@@ -162,27 +178,57 @@ const HomeScreen = ({ navigation }) => {
         }
       >
   
-        {/* Hero Section */}
+        {/* Hero Section - Auto-sliding Carousel */}
         <View style={styles.heroContainer}>
-          <ImageBackground
-            source={{ uri: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200' }}
-            style={styles.heroImage}
-            imageStyle={{ borderRadius: 24 }}
-          >
-            <View style={styles.heroOverlay}>
-              <CustomText variant="h1" style={styles.heroTitle}>
-                {t('heroTitle')}
-              </CustomText>
-              <CustomText variant="subtitle" style={styles.heroSubtitle}>
-                {t('heroSubtitle')}
-              </CustomText>
-              <CustomButton 
-                title={t('shopNow')} 
-                style={styles.heroButton}
-                onPress={() => navigation.navigate('Market')} 
+          <FlatList
+            ref={flatListRef}
+            data={liveProducts.length > 0 ? liveProducts.slice(0, 5) : [null]}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item, index) => item?.id || index.toString()}
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / (width - 32));
+              setActiveHeroIndex(index);
+            }}
+            renderItem={({ item }) => (
+              <View style={styles.heroSlide}>
+                <ImageBackground
+                  source={{ 
+                    uri: item?.media?.[0]?.url || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200' 
+                  }}
+                  style={styles.heroImage}
+                  imageStyle={{ borderRadius: 24 }}
+                >
+                  <View style={styles.heroOverlay}>
+                    <CustomText variant="h1" style={styles.heroTitle}>
+                      {t('heroTitle')}
+                    </CustomText>
+                    <CustomText variant="subtitle" style={styles.heroSubtitle}>
+                      {t('heroSubtitle')}
+                    </CustomText>
+                    <CustomButton 
+                      title={t('shopNow')} 
+                      style={styles.heroButton}
+                      onPress={() => navigation.navigate('Market')} 
+                    />
+                  </View>
+                </ImageBackground>
+              </View>
+            )}
+          />
+          {/* Pagination Dots */}
+          <View style={styles.heroPagination}>
+            {(liveProducts.length > 0 ? liveProducts.slice(0, 5) : [null]).map((_, i) => (
+              <View 
+                key={i} 
+                style={[
+                  styles.heroDot, 
+                  { backgroundColor: activeHeroIndex === i ? colors.primary : 'rgba(255,255,255,0.5)' }
+                ]} 
               />
-            </View>
-          </ImageBackground>
+            ))}
+          </View>
         </View>
 
         {/* Categories Section */}
@@ -271,7 +317,6 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      <AuthOverlay />
     </SafeAreaView>
   );
 };
@@ -403,40 +448,59 @@ const styles = StyleSheet.create({
   },
   heroContainer: {
     padding: 16,
+    position: 'relative',
+  },
+  heroSlide: {
+    width: width - 32,
   },
   heroImage: {
-    height: 380,
+    height: 220,
     width: '100%',
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
     padding: 24,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    borderRadius: 24,
   },
   heroTitle: {
     color: '#ffffff',
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 24,
+    lineHeight: 28,
   },
   heroSubtitle: {
     color: 'rgba(255,255,255,0.8)',
-    marginTop: 12,
+    marginTop: 8,
+    fontSize: 13,
   },
   heroButton: {
-    marginTop: 24,
-    width: 140,
+    marginTop: 16,
+    width: 120,
+    height: 48,
+  },
+  heroPagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  heroDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   section: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   categoriesGrid: {
     flexDirection: 'row',
@@ -444,7 +508,8 @@ const styles = StyleSheet.create({
   },
   trustBar: {
     borderRadius: 20,
-    marginVertical: 10,
+    marginTop: 4,
+    marginBottom: 12,
     marginHorizontal: 20,
     paddingVertical: 16,
     borderWidth: 1,

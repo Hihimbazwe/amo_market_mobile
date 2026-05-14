@@ -25,6 +25,9 @@ export const productService = {
       if (sellerId) {
         url += `&sellerId=${encodeURIComponent(sellerId)}`;
       }
+      if (filters.search) {
+        url += `&search=${encodeURIComponent(filters.search)}`;
+      }
       if (filters.followerId) {
         url += `&followerId=${encodeURIComponent(filters.followerId)}`;
       }
@@ -95,6 +98,40 @@ export const productService = {
     }
   },
 
+  getProductById: async (productId, userId = null) => {
+    try {
+      const headers = { ...commonHeaders };
+      if (userId) {
+        headers['x-user-id'] = userId;
+      }
+
+      const response = await fetch(`${BASE_URL}/api/products/${productId}`, {
+        method: 'GET',
+        headers: headers,
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        if (text?.includes('<html') || text?.includes('<!DOCTYPE')) {
+          throw new Error('Server error: Invalid response format.');
+        }
+        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to fetch product details (${response.status})`);
+      }
+      return data;
+    } catch (error) {
+      console.error('getProductById error:', error);
+      throw error;
+    }
+  },
+
+
   createProduct: async (userId, productData) => {
     try {
       const response = await fetch(`${BASE_URL}/api/products`, {
@@ -115,7 +152,9 @@ export const productService = {
       }
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to create product (${response.status})`);
+        const errorMessage = data.details || data.error || `Failed to create product (${response.status})`;
+        console.error('[createProduct] Server error:', response.status, data);
+        throw new Error(errorMessage);
       }
       return data;
     } catch (error) {
@@ -236,6 +275,28 @@ export const productService = {
     } catch (error) {
       console.error('getReviews error:', error);
       return [];
+    }
+  },
+
+  submitReview: async (productId, userId, reviewData) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/products/${productId}/reviews`, {
+        method: 'POST',
+        headers: {
+          ...commonHeaders,
+          'x-user-id': userId
+        },
+        body: JSON.stringify(reviewData),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit review');
+      }
+      return data;
+    } catch (error) {
+      console.error('submitReview error:', error);
+      throw error;
     }
   },
 

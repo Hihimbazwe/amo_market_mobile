@@ -43,15 +43,9 @@ const LoginScreen = ({ navigation }) => {
       const role = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
       
       if (['SELLER', 'COURIER', 'AGENT'].includes(role)) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainApp', params: { screen: 'Me' } }],
-        });
+        navigation.navigate('MainApp', { screen: 'Me' });
       } else {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
-        });
+        navigation.navigate('MainApp', { screen: 'Home' });
       }
 
     } catch (error) {

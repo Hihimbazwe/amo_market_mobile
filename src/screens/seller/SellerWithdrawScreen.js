@@ -1,40 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
-  View, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+  Platform
 } from 'react-native';
 import {
-  Menu, ArrowDownToLine, Smartphone, Building2, ChevronDown, ChevronRight, Clock,
+  Menu,
+  ArrowUpRight,
+  Smartphone,
+  Building2,
+  Clock,
+  ArrowLeft,
+  CreditCard
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import CustomText from '../../components/CustomText';
 import CustomButton from '../../components/CustomButton';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
-import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
-import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, RefreshControl } from 'react-native';
-import {Text} from 'react-native';
-// Mock data removed
+import { useLanguage } from '../../context/LanguageContext';
+import { sellerService } from '../../api/sellerService';
 
 const METHODS = [
-  { id: 'MOBILE_MONEY', label: 'MTN MOMO', sub: 'Mobile Money', icon: Smartphone, color: '#F59E0B' },
-  { id: 'BANK', label: 'Bank Transfer', sub: 'Local Bank Account', icon: Building2, color: '#3B82F6' },
+  { id: 'MOBILE_MONEY', label: 'MTN MoMo', sub: 'Mobile Money', icon: Smartphone, color: '#f59e0b' },
+  { id: 'BANK', label: 'Bank Transfer', sub: 'Local Bank Account', icon: Building2, color: '#3b82f6' },
 ];
 
-export default function SellerWithdrawScreen() {
-  const { toggleDrawer } = React.useContext(SellerDrawerContext);
+export default function SellerWithdrawScreen({ navigation }) {
+  const { toggleDrawer } = useContext(SellerDrawerContext);
   const { user } = useAuth();
-  const { colors, isDarkMode } = useTheme();
-  const { t } = useTranslation(['dashboard', 'common']);
-  const [amount, setAmount] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState('MOBILE_MONEY');
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+
   const [wallet, setWallet] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState('MOBILE_MONEY');
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchWallet = async () => {
+  const fetchWallet = useCallback(async () => {
     if (!user?.id) return;
     try {
       const data = await sellerService.getWallet(user.id);
@@ -45,11 +59,11 @@ export default function SellerWithdrawScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user?.id]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchWallet();
-  }, [user]);
+  }, [fetchWallet]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -78,6 +92,7 @@ export default function SellerWithdrawScreen() {
       Alert.alert(t('requestSubmitted'), t('withdrawalSubmittedSuccess'));
       setAmount('');
       fetchWallet();
+      navigation.goBack();
     } catch (error) {
       Alert.alert(t('error'), error.message || t('failedToSubmitWithdrawal'));
     } finally {
@@ -85,13 +100,19 @@ export default function SellerWithdrawScreen() {
     }
   };
 
-  const formatPrice = (val) => 'Rwf ' + (val || 0).toLocaleString();
+  if (loading && !wallet) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={toggleDrawer} style={[styles.menuButton, { backgroundColor: colors.glass }]}>
-          <Menu color={colors.foreground} size={24} />
+      <View style={[styles.header, { borderBottomColor: colors.glassBorder }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.glass }]}>
+          <ArrowLeft color={colors.foreground} size={22} />
         </TouchableOpacity>
         <CustomText variant="h2">{t('withdrawFunds')}</CustomText>
       </View>
@@ -99,30 +120,34 @@ export default function SellerWithdrawScreen() {
       <ScrollView 
         contentContainerStyle={styles.content} 
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        {loading && !wallet ? (
-          <View style={{ padding: 40, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (
-          <>
-            {/* Balance Card */}
-            <View style={styles.balanceCard}>
+        {/* Balance Card */}
+        <LinearGradient
+          colors={[colors.primary, '#d35400']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.balanceCard}
+        >
+          <View style={styles.cardHeader}>
+            <View>
               <CustomText style={styles.balanceLabel}>{t('availableBalance')}</CustomText>
-              <CustomText style={styles.balanceAmount}>{formatPrice(wallet?.balance)}</CustomText>
-              <View style={styles.balanceMeta}>
-                <CustomText style={styles.balanceMetaText}>{t('pendingEscrow', { amount: formatPrice(wallet?.pendingEscrow || 0) })}</CustomText>
-              </View>
+              <CustomText style={styles.balanceAmount}>Rwf {(wallet?.balance ?? 0).toLocaleString()}</CustomText>
             </View>
+            <CreditCard color="#fff" size={32} opacity={0.5} />
+          </View>
+          <View style={styles.pendingRow}>
+             <Clock size={12} color="rgba(255,255,255,0.7)" />
+             <CustomText style={styles.pendingText}>
+               {t('pendingEscrow', { amount: `Rwf ${(wallet?.pendingBalance ?? 0).toLocaleString()}` })}
+             </CustomText>
+          </View>
+        </LinearGradient>
 
-        {/* Amount Input */}
-        <View style={styles.inputSection}>
-          <CustomText style={styles.sectionLabel}>{t('withdrawalAmount')}</CustomText>
-          <View style={[styles.amountInputRow, { backgroundColor: colors.glass, borderColor: colors.border }]}>
-            <CustomText style={styles.currencyPrefix}>Rwf</CustomText>
+        <View style={styles.section}>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('withdrawalAmount')}</CustomText>
+          <View style={[styles.amountInputRow, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+            <CustomText style={[styles.currencyPrefix, { color: colors.primary }]}>Rwf</CustomText>
             <TextInput
               style={[styles.amountInput, { color: colors.foreground }]}
               value={amount}
@@ -136,36 +161,41 @@ export default function SellerWithdrawScreen() {
             {[10000, 50000, wallet?.balance || 0].map((q) => (
               <TouchableOpacity
                 key={q}
-                style={[styles.quickChip, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` }]}
+                style={[styles.quickChip, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '25' }]}
                 onPress={() => setAmount(q.toString())}
               >
-                <CustomText style={styles.quickChipText}>Rwf {q.toLocaleString()}</CustomText>
+                <CustomText style={[styles.quickChipText, { color: colors.primary }]}>
+                  {q === wallet?.balance ? 'MAX' : `Rwf ${q.toLocaleString()}`}
+                </CustomText>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Payout Method */}
         <View style={styles.section}>
-          <CustomText style={styles.sectionLabel}>{t('payoutMethod')}</CustomText>
+          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('payoutMethod')}</CustomText>
           {METHODS.map((m) => {
             const Icon = m.icon;
             const selected = selectedMethod === m.id;
             return (
               <TouchableOpacity
                 key={m.id}
-                style={[styles.methodCard, { backgroundColor: colors.card, borderColor: colors.border }, selected && { borderColor: m.color, backgroundColor: `${m.color}10` }]}
+                style={[
+                  styles.methodCard, 
+                  { backgroundColor: colors.card, borderColor: colors.glassBorder },
+                  selected && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }
+                ]}
                 onPress={() => setSelectedMethod(m.id)}
               >
-                <View style={[styles.methodIconBox, { backgroundColor: `${m.color}20` }]}>
+                <View style={[styles.methodIconBox, { backgroundColor: m.color + '20' }]}>
                   <Icon color={m.color} size={22} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 14 }}>
                   <CustomText style={[styles.methodLabel, { color: colors.foreground }]}>{m.label}</CustomText>
-                  <CustomText style={styles.methodSub}>{m.sub}</CustomText>
+                  <CustomText variant="caption" style={{ color: colors.muted }}>{m.sub}</CustomText>
                 </View>
-                <View style={[styles.radio, { borderColor: colors.border }, selected && { borderColor: m.color }]}>
-                  {selected && <View style={[styles.radioDot, { backgroundColor: m.color }]} />}
+                <View style={[styles.radio, { borderColor: colors.glassBorder }, selected && { borderColor: colors.primary }]}>
+                  {selected && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
                 </View>
               </TouchableOpacity>
             );
@@ -179,38 +209,28 @@ export default function SellerWithdrawScreen() {
           style={styles.submitBtn}
         />
 
-        {/* Withdrawal History */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Clock color={colors.primary} size={18} />
-            <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('recentWithdrawals')}</CustomText>
-          </View>
-          <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {(!wallet?.withdrawals || wallet.withdrawals.length === 0) ? (
-              <View style={{ padding: 20, alignItems: 'center' }}>
-                <CustomText style={{ color: colors.muted }}>{t('noWithdrawalHistory')}</CustomText>
-              </View>
-            ) : (
-              wallet.withdrawals.map((item, index) => (
-                <View key={item.id} style={[styles.historyRow, index < wallet.withdrawals.length - 1 && [styles.historyDivider, { borderBottomColor: colors.border }]]}>
-                  <View style={styles.historyLeft}>
+        {/* Withdrawal History Shortlist */}
+        {wallet?.withdrawals?.length > 0 && (
+          <View style={styles.section}>
+             <View style={styles.sectionHeader}>
+                <History color={colors.primary} size={18} />
+                <CustomText style={[styles.sectionTitle, { color: colors.foreground }]}>{t('recentWithdrawals')}</CustomText>
+             </View>
+             {wallet.withdrawals.slice(0, 3).map((item, index) => (
+                <View key={item.id} style={[styles.historyRow, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+                  <View style={{ flex: 1 }}>
                     <CustomText style={[styles.historyId, { color: colors.foreground }]}>#{item.id.slice(-6).toUpperCase()}</CustomText>
-                    <CustomText style={styles.historyMeta}>{item.method.replace('_', ' ')} · {new Date(item.createdAt).toLocaleDateString()}</CustomText>
+                    <CustomText variant="caption" style={{ color: colors.muted }}>{new Date(item.createdAt).toLocaleDateString()}</CustomText>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <CustomText style={styles.historyAmount}>- {formatPrice(item.amount)}</CustomText>
-                    <View style={[styles.statusBadge, { backgroundColor: item.status === 'COMPLETED' ? 'rgba(16,185,129,0.1)' : 'rgba(249,115,22,0.1)' }]}>
-                      <CustomText style={[styles.statusText, { color: item.status === 'COMPLETED' ? '#10B981' : '#F97316' }]}>
-                        {t(item.status?.toLowerCase())}
-                      </CustomText>
-                    </View>
+                    <CustomText style={[styles.historyAmount, { color: colors.foreground }]}>-Rwf {item.amount.toLocaleString()}</CustomText>
+                    <CustomText style={{ color: item.status === 'COMPLETED' ? '#10b981' : '#f59e0b', fontSize: 10, fontWeight: 'bold' }}>
+                      {item.status}
+                    </CustomText>
                   </View>
                 </View>
-              ))
-            )}
+             ))}
           </View>
-        </View>
-        </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -223,54 +243,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', padding: 20,
     borderBottomWidth: 1,
   },
-  menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
+  backButton: { marginRight: 16, padding: 8, borderRadius: 12 },
   content: { padding: 16, paddingBottom: 60 },
   balanceCard: {
-    backgroundColor: '#0284c7', borderRadius: 24, padding: 24, marginBottom: 24,
-    shadowColor: '#0284c7', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
+    borderRadius: 24, padding: 24, marginBottom: 24,
+    elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8,
   },
-  balanceLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 'bold', letterSpacing: 1 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  balanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: 'bold', letterSpacing: 1 },
   balanceAmount: { color: 'white', fontSize: 34, fontWeight: '900', marginTop: 6 },
-  balanceMeta: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  balanceMetaText: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
-  inputSection: { marginBottom: 24 },
-  sectionLabel: { fontSize: 11, fontWeight: 'bold', letterSpacing: 1.5, marginBottom: 12 },
+  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
+  pendingText: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
+  section: { marginBottom: 24 },
+  sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 12, textTransform: 'uppercase' },
   amountInputRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, paddingHorizontal: 20,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20, paddingHorizontal: 20,
+    borderWidth: 1,
   },
-  currencyPrefix: { fontSize: 20, fontWeight: 'bold', marginRight: 8 },
-  amountInput: { flex: 1, fontSize: 28, fontWeight: '900', height: 64 },
+  currencyPrefix: { fontSize: 20, fontWeight: '900', marginRight: 8 },
+  amountInput: { flex: 1, fontSize: 28, fontWeight: '900', height: 72 },
   quickAmounts: { flexDirection: 'row', gap: 10, marginTop: 12 },
   quickChip: {
-    flex: 1, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 10, paddingVertical: 8,
-    alignItems: 'center', borderWidth: 1, borderColor: 'rgba(249,115,22,0.2)',
+    flex: 1, borderRadius: 12, paddingVertical: 10,
+    alignItems: 'center', borderWidth: 1,
   },
-  quickChipText: { color: '#F97316', fontSize: 12, fontWeight: 'bold' },
-  section: { marginBottom: 24 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold' },
+  quickChipText: { fontSize: 11, fontWeight: 'bold' },
   methodCard: {
     flexDirection: 'row', alignItems: 'center', padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, marginBottom: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20, marginBottom: 12,
+    borderWidth: 1,
   },
-  methodCardSelected: { borderColor: '#F97316', backgroundColor: 'rgba(249,115,22,0.05)' },
-  methodIconBox: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  methodIconBox: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   methodLabel: { fontWeight: 'bold', fontSize: 15 },
-  methodSub: { fontSize: 12, marginTop: 2 },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  radioSelected: { borderColor: '#F97316' },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#F97316' },
-  submitBtn: { marginBottom: 32 },
-  historyCard: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 20, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  historyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  historyDivider: { borderBottomWidth: 1 },
-  historyLeft: {},
-  historyId: { fontWeight: 'bold', fontSize: 13 },
-  historyMeta: { fontSize: 11, marginTop: 2 },
-  historyAmount: { color: '#EF4444', fontWeight: '900', fontSize: 14 },
-  statusBadge: { marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  statusText: { fontSize: 9, fontWeight: 'bold' },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  submitBtn: { marginTop: 12, marginBottom: 40 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingHorizontal: 4 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold' },
+  historyRow: { 
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
+    padding: 16, borderRadius: 16, borderWidth: 1, marginBottom: 10 
+  },
+  historyId: { fontWeight: 'bold', fontSize: 14 },
+  historyAmount: { fontWeight: '900', fontSize: 14 },
 });

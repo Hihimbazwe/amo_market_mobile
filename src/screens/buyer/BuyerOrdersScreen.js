@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Linking, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Linking, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   Loader2, 
   Menu, 
   Package, 
   ChevronRight, 
-  Navigation as TrackIcon, 
+  Navigation as TrackIcon,
   AlertTriangle, 
   MoreVertical, 
   QrCode,
@@ -14,12 +14,14 @@ import {
   Edit2,
   FileText,
   RefreshCw,
+  Search as SearchIcon,
   ShoppingBag,
   PackageCheck,
   CheckCircle2,
   X,
   MapPin,
   Store,
+  Clock,
   ChevronDown
 } from 'lucide-react-native';
 import CustomText from '../../components/CustomText';
@@ -59,6 +61,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [upcomingPickupOrder, setUpcomingPickupOrder] = useState(null);
   const [hoursRemaining, setHoursRemaining] = useState(0);
 
@@ -135,9 +138,16 @@ const BuyerOrdersScreen = ({ navigation }) => {
     }
   }, [orders]);
 
-  const filteredOrders = orders.filter(
-    (order) => activeTab === 'All' || order.status?.toUpperCase() === activeTab.toUpperCase()
-  );
+  const filteredOrders = orders.filter(order => {
+    const matchesTab = activeTab === 'All' || order.status?.toUpperCase() === activeTab.toUpperCase();
+    
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      order.id.toLowerCase().includes(query) ||
+      order.items?.some(item => item.product?.title?.toLowerCase().includes(query));
+      
+    return matchesTab && matchesSearch;
+  });
 
   const handleOpenOptions = (order) => {
     setSelectedOrder(order);
@@ -207,6 +217,24 @@ const BuyerOrdersScreen = ({ navigation }) => {
         <CustomText variant="h2" style={{ flex: 1 }}>{t('myOrders')}</CustomText>
         <NotificationIcon />
       </View>
+
+      <View style={styles.searchSection}>
+        <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.glassBorder }]}>
+          <SearchIcon color={colors.muted} size={20} />
+          <TextInput
+            placeholder={t('searchOrders') || "Search by Order ID or Product..."}
+            placeholderTextColor={colors.muted}
+            style={[styles.searchInput, { color: colors.foreground }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <X color={colors.muted} size={18} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
       
       <View style={styles.topFilterSection}>
         <ScrollView 
@@ -274,15 +302,24 @@ const BuyerOrdersScreen = ({ navigation }) => {
             // Group items by seller for pickup orders
             const sellerGroups = {};
             if (isPickup && order.items?.length > 0) {
+              const slots = order.pickupSlot?.split(' | ') || [];
+              const locations = order.address?.split(' | ') || [];
+              
+              const uniqueSellerIds = [];
+              order.items.forEach(item => {
+                const sId = item.product?.seller?.id || item.product?.sellerId || 'unknown';
+                if (!uniqueSellerIds.includes(sId)) uniqueSellerIds.push(sId);
+              });
+
               order.items.forEach(item => {
                 const sellerId = item.product?.seller?.id || item.product?.sellerId || 'unknown';
+                const sellerIndex = uniqueSellerIds.indexOf(sellerId);
+
                 if (!sellerGroups[sellerId]) {
                   sellerGroups[sellerId] = {
                     sellerName: item.product?.seller?.user?.name || item.product?.sellerName || 'Store',
-                    location: item.product?.seller?.locationAddress ||
-                              (item.product?.district && item.product?.province
-                                ? `${item.product.district}, ${item.product.province}`
-                                : item.product?.location || 'Location not set'),
+                    location: (locations[sellerIndex] || item.product?.seller?.locationAddress || 'Location not set').trim(),
+                    pickupTime: (slots[sellerIndex] || order.pickupSlot || 'Time not set').trim(),
                     items: []
                   };
                 }
@@ -296,116 +333,55 @@ const BuyerOrdersScreen = ({ navigation }) => {
                 style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}
                 onPress={() => handleOpenOptions(order)}
               >
-                {/* Card Header — always shown */}
+                {/* Card Header — minimalist */}
                 <View style={styles.cardHeader}>
-                  <View style={[styles.refBadge, { backgroundColor: colors.primary + '15' }]}>
-                    <Package size={12} color={colors.primary} />
-                    <CustomText style={[styles.ref, { color: colors.primary }]}>#{order.id.slice(-8).toUpperCase()}</CustomText>
+                  <View style={[styles.refBadge, { backgroundColor: colors.primary + '10', paddingHorizontal: 6, paddingVertical: 2 }]}>
+                    <CustomText style={[styles.ref, { color: colors.primary, fontSize: 9 }]}>#{order.id.slice(-6).toUpperCase()}</CustomText>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}35` }]}>
-                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                    <CustomText style={[styles.badgeText, { color: statusColor }]}>{t(order.status?.toLowerCase())}</CustomText>
+                  <View style={[styles.statusBadge, { backgroundColor: `${statusColor}10`, borderColor: 'transparent', paddingVertical: 2 }]}>
+                    <View style={[styles.statusDot, { backgroundColor: statusColor, width: 4, height: 4 }]} />
+                    <CustomText style={[styles.badgeText, { color: statusColor, fontSize: 9 }]}>{t(order.status?.toLowerCase())}</CustomText>
                   </View>
                 </View>
 
                 {isPickup && Object.keys(sellerGroups).length > 0 ? (
-                  // ── PICKUP ORDER: grouped by seller ──
                   <View style={styles.cardBody}>
-                    {/* Removed pickup banner per user request */}
-
-                    {/* One section per seller */}
-                    {Object.entries(sellerGroups).map(([sellerId, group], idx) => {
-                      const groupStatusColor = getStatusColor(order.status);
-                      return (
-                        <View
-                          key={sellerId}
-                          style={[
-                            styles.storeGroupFlat,
-                            idx > 0 && { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.glassBorder }
-                          ]}
-                        >
-                          {/* Store header row */}
-                          <View style={styles.storeHeader}>
-                            <View style={[styles.storeIconBox, { backgroundColor: colors.primary + '10' }]}>
-                              <Store size={14} color={colors.primary} />
-                            </View>
-                            <View style={{ flex: 1, marginLeft: 10 }}>
-                              <CustomText style={[styles.storeName, { color: colors.foreground }]} numberOfLines={1}>
-                                {group.sellerName}
-                              </CustomText>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                                <MapPin size={11} color={colors.muted} />
-                                <CustomText style={[styles.storeLocation, { color: colors.muted }]} numberOfLines={1}>
-                                  {group.location}
-                                </CustomText>
-                              </View>
-                            </View>
-                          </View>
-
-                          {/* Products in this store group */}
-                          <View style={styles.storeProducts}>
-                            {group.items.map((item, pIdx) => (
-                              <View key={pIdx} style={[styles.productRow, pIdx < group.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.glassBorder }]}>
-                                <View style={[styles.productQtyBadge, { backgroundColor: colors.primary + '18' }]}>
-                                  <CustomText style={[styles.productQtyText, { color: colors.primary }]}>
-                                    x{item.quantity || 1}
-                                  </CustomText>
-                                </View>
-                                <CustomText style={[styles.productTitle, { color: colors.foreground }]} numberOfLines={1}>
-                                  {item.product?.title || item.product?.name || 'Product'}
-                                </CustomText>
-                                <CustomText style={[styles.productPrice, { color: colors.muted }]}>
-                                  Rwf {((item.price || item.product?.price || 0) * (item.quantity || 1)).toLocaleString()}
-                                </CustomText>
-                              </View>
-                            ))}
-                          </View>
-
-
+                    {Object.entries(sellerGroups).map(([sellerId, group]) => (
+                      <View key={sellerId} style={{ marginBottom: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                          <Store size={10} color={colors.muted} />
+                          <CustomText style={{ fontSize: 12, fontWeight: '700', color: colors.foreground, marginLeft: 4 }}>
+                            {group.sellerName}
+                          </CustomText>
                         </View>
-                      );
-                    })}
-
-                    {/* Total */}
-                    <View style={[styles.priceRow, { borderTopColor: colors.glassBorder }]}>
-                      <CustomText style={{ color: colors.muted, fontSize: 12 }}>{t('totalAmount')}</CustomText>
-                      <CustomText style={{ fontWeight: '900', color: colors.foreground, fontSize: 16 }}>
-                        Rwf {order.totalAmount?.toLocaleString() || order.total?.toLocaleString()}
-                      </CustomText>
-                    </View>
+                        {group.items.map((item, pIdx) => (
+                          <CustomText key={pIdx} style={{ fontSize: 11, color: colors.muted, marginLeft: 14 }}>
+                            {item.quantity}× {item.product?.title || 'Item'}
+                          </CustomText>
+                        ))}
+                      </View>
+                    ))}
                   </View>
                 ) : (
-                  // ── DELIVERY ORDER: existing simple layout ──
                   <View style={styles.cardBody}>
-                    <CustomText variant="h3" style={[styles.name, { color: colors.foreground }]}>
-                      {order.items?.[0]?.product?.title || order.items?.[0]?.product?.name || t('order')}
+                    <CustomText style={{ fontSize: 13, fontWeight: '700', color: colors.foreground }} numberOfLines={1}>
+                      {order.items?.[0]?.product?.title || t('order')}
+                      {order.items.length > 1 && ` + ${order.items.length - 1} more`}
                     </CustomText>
-                    
-                    <View style={styles.locationContainer}>
-                      <View style={[styles.locationIconBox, { backgroundColor: colors.primary + '10' }]}>
-                        <ShoppingBag color={colors.primary} size={16} />
-                      </View>
-                      <View style={styles.locationInfo}>
-                        <CustomText style={[styles.locationLabel, { color: colors.muted }]}>{t('orderItems')}</CustomText>
-                        <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
-                          {t('itemsCount', { count: order.items.length })}
-                        </CustomText>
-                      </View>
-                    </View>
-
-                    <View style={styles.priceRow}>
-                      <CustomText style={{ color: colors.muted, fontSize: 12 }}>{t('totalAmount')}</CustomText>
-                      <CustomText style={{ fontWeight: '900', color: colors.foreground, fontSize: 16 }}>
-                        Rwf {order.totalAmount?.toLocaleString() || order.total?.toLocaleString()}
-                      </CustomText>
-                    </View>
+                    <CustomText style={{ fontSize: 11, color: colors.muted }}>
+                      {order.items.map(i => i.product?.seller?.user?.name || 'Store').filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+                    </CustomText>
                   </View>
                 )}
 
-                {/* Action Indicator */}
-                <View style={styles.cardFooterAction}>
-                  <CustomText style={{ fontSize: 11, color: colors.muted, fontWeight: '600' }}>{t('more Options')}</CustomText>
-                  <MoreVertical color={colors.muted} size={16} />
+                <View style={styles.cardFooter}>
+                  <View style={styles.priceColumn}>
+                    <CustomText style={{ color: colors.muted, fontSize: 10 }}>{t('totalAmount')}</CustomText>
+                    <CustomText style={{ fontWeight: '900', color: colors.foreground, fontSize: 15 }}>
+                      Rwf {order.totalAmount?.toLocaleString() || order.total?.toLocaleString()}
+                    </CustomText>
+                  </View>
+                  <ChevronRight size={16} color={colors.muted} opacity={0.5} />
                 </View>
               </TouchableOpacity>
             );
@@ -512,7 +488,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
                 )}
 
                 {/* Initiate Replacement */}
-                {(selectedOrder?.status === 'DELIVERED' || selectedOrder?.status === 'COMPLETED') && (
+                {(selectedOrder?.status === 'DELIVERED' || selectedOrder?.status === 'COMPLETED') && selectedOrder?.pickupType !== 'PICKUP' && (
                     <TouchableOpacity 
                     style={styles.optionItem}
                     onPress={() => {
@@ -696,14 +672,17 @@ const BuyerOrdersScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
+  searchSection: { paddingHorizontal: 20, paddingVertical: 12 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 14, paddingHorizontal: 12, borderWidth: 1 },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 14, paddingVertical: 8 },
   menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
-  topFilterSection: { paddingBottom: 8, borderBottomWidth: 1 },
+  topFilterSection: { paddingBottom: 8, borderBottomWidth: 0 },
   pillsRow: { marginVertical: 4 },
   pillsScrollContent: { paddingHorizontal: 16, gap: 10, paddingVertical: 8 },
   filterPill: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)' },
   pillText: { fontSize: 14, fontWeight: '700' },
   content: { padding: 16 },
-  orderCard: { borderRadius: 24, borderWidth: 1, padding: 16, marginBottom: 16, overflow: 'hidden' },
+  orderCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 16, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   refBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   ref: { fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 },
@@ -717,6 +696,9 @@ const styles = StyleSheet.create({
   locationInfo: { flex: 1 },
   locationLabel: { fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 2, letterSpacing: 1 },
   addressText: { fontSize: 13, fontWeight: '500' },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  priceColumn: { gap: 2 },
+  optionsHint: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(230, 126, 34, 0.08)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
   cardFooterAction: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 6, marginTop: 12, opacity: 0.6 },
   emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100, paddingHorizontal: 32 },
@@ -768,7 +750,12 @@ const styles = StyleSheet.create({
   pickupProgressLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 10, paddingTop: 4 },
   progressLabel: { fontSize: 8, fontWeight: '700', textAlign: 'center', flex: 1 },
   cancelModalActions: { flexDirection: 'row', gap: 12 },
-  cancelModalBtn: { flex: 1, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }
+  cancelModalBtn: { flex: 1, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  sellerSection: { marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
+  sellerHeader: { flexDirection: 'row', alignItems: 'center' },
+  trackRouteBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  pickupTimeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  pickupTimeText: { fontSize: 10, fontWeight: '800' },
 });
 
 export default BuyerOrdersScreen;

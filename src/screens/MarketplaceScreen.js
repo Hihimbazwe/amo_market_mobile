@@ -16,7 +16,6 @@ import CustomText from '../components/CustomText';
 import { useRef } from 'react';
 import ProductCard from '../components/ProductCard';
 import CustomButton from '../components/CustomButton';
-import AuthOverlay from '../components/AuthOverlay';
 import NotificationIcon from '../components/NotificationIcon';
 import {Text } from 'react-native';
 import { productService } from '../api/productService';
@@ -170,6 +169,7 @@ const MarketplaceScreen = ({ navigation, route }) => {
     try {
       const data = await productService.getProducts({
         ...filters,
+        search: search,
         followerId: user?.id
       });
       setAllProducts(data);
@@ -193,6 +193,15 @@ const MarketplaceScreen = ({ navigation, route }) => {
       fetchProducts();
     }, [filters.category, filters.province, filters.district])
   );
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 500); // Wait 500ms after last keystroke
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Apply local filtering when search or price changes
   const applyLocalFilters = (products, searchTerm, max) => {
@@ -218,16 +227,23 @@ const MarketplaceScreen = ({ navigation, route }) => {
       
       {/* Search Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
-          onPress={() => navigation.navigate('GlobalSearch')}
-          activeOpacity={0.8}
-        >
+        <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
           <Search color={colors.muted} size={20} style={styles.searchIcon} />
-          <CustomText style={[styles.input, { color: colors.muted }]}>
-            {search || t('searchMarketplace')}
-          </CustomText>
-        </TouchableOpacity>
+          <TextInput
+            style={[styles.input, { color: colors.foreground }]}
+            placeholder={t('searchMarketplace')}
+            placeholderTextColor={colors.muted}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            onSubmitEditing={() => fetchProducts()}
+          />
+          {search !== '' && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <X color={colors.muted} size={18} />
+            </TouchableOpacity>
+          )}
+        </View>
         <NotificationIcon />
         <TouchableOpacity 
           style={[styles.filterButton, { backgroundColor: colors.primary }]}
@@ -287,7 +303,6 @@ const MarketplaceScreen = ({ navigation, route }) => {
         />
       )}
 
-      <AuthOverlay />
 
       {showScrollTop && (
         <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={scrollToTop} activeOpacity={0.8}>
@@ -323,6 +338,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 14,
+    paddingVertical: 8,
   },
   filterButton: {
     width: 48,

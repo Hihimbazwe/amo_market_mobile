@@ -8,11 +8,18 @@ import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
-const AuthOverlay = () => {
+const AuthOverlay = ({ currentRoute }) => {
   const navigation = useNavigation();
   const { isAuthenticated } = useAuth();
+  
+  // currentRoute is now passed from App.js to avoid navigation state errors
 
   if (isAuthenticated) return null;
+  
+  // Don't show on login/register screens
+  if (['Login', 'Register', 'VerifyOTP', 'ForgotPassword', 'ResetPassword'].includes(currentRoute)) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
@@ -24,7 +31,7 @@ const AuthOverlay = () => {
           </View>
           <TouchableOpacity 
             style={styles.signInButton}
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
           >
             <LogIn size={18} color="#ffffff" />
             <CustomText style={styles.signInText}>Sign In</CustomText>
@@ -38,7 +45,7 @@ const AuthOverlay = () => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 72,
     width: width,
     paddingHorizontal: 16,
     paddingBottom: 16,

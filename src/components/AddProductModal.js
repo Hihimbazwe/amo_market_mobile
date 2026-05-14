@@ -109,6 +109,58 @@ const CATEGORY_FIELDS = {
   ]
 };
 
+const VARIANT_SUGGESTIONS = {
+  books: [
+    { name: "Format", values: ["Paperback", "Hardcover", "PDF", "eBook"] },
+    { name: "Language", values: ["English", "French", "Kinyarwanda"] },
+    { name: "Edition", values: ["1st Edition", "2nd Edition"] },
+  ],
+  fashion: [
+    { name: "Size", values: ["XS", "S", "M", "L", "XL", "XXL"] },
+    { name: "Color", values: ["Black", "White", "Red", "Blue", "Navy"] },
+    { name: "Style", values: ["Casual", "Formal", "Sport"] },
+    { name: "Gender", values: ["Men", "Women", "Unisex"] },
+  ],
+  electronics: [
+    { name: "Storage", values: ["64GB", "128GB", "256GB", "512GB", "1TB"] },
+    { name: "RAM", values: ["4GB", "8GB", "12GB", "16GB", "32GB"] },
+    { name: "Color", values: ["Black", "Blue", "Silver", "Gold", "Titanium"] },
+    { name: "Condition", values: ["New", "Used", "Refurbished"] },
+  ],
+  "home & living": [
+    { name: "Color", values: ["Brown", "Black", "White", "Grey"] },
+    { name: "Size", values: ["Small", "Medium", "Large"] },
+    { name: "Material Type", values: ["Wood", "Leather", "Fabric", "Metal"] },
+  ],
+  sports: [
+    { name: "Size", values: ["Small", "Medium", "Large"] },
+    { name: "Color", values: ["Black", "White", "Red", "Blue"] },
+    { name: "Weight", values: ["2kg", "5kg", "10kg", "20kg"] },
+  ],
+  beauty: [
+    { name: "Size", values: ["50ml", "100ml", "200ml", "500ml"] },
+    { name: "Shade", values: ["Light", "Medium", "Dark"] },
+    { name: "Skin Type", values: ["Oily", "Dry", "Sensitive", "Combination"] },
+  ],
+  groceries: [
+    { name: "Weight", values: ["500g", "1kg", "2kg", "5kg", "10kg"] },
+    { name: "Flavor", values: ["Vanilla", "Chocolate", "Strawberry", "Original"] },
+  ],
+  toys: [
+    { name: "Age Group", values: ["0-2 Years", "3-5 Years", "6-10 Years", "12+ Years"] },
+    { name: "Color", values: ["Multi-color", "Blue", "Pink", "Red"] },
+  ],
+  vehicles: [
+    { name: "Color", values: ["Black", "White", "Silver", "Grey", "Blue"] },
+    { name: "Fuel Type", values: ["Petrol", "Diesel", "Electric", "Hybrid"] },
+    { name: "Transmission", values: ["Manual", "Automatic"] },
+  ],
+  other: [
+    { name: "Size", values: ["Small", "Medium", "Large"] },
+    { name: "Color", values: ["Black", "White", "Other"] },
+  ]
+};
+
 const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData = null }) => {
   const { colors, isDarkMode } = useTheme();
   const [step, setStep] = useState(1);
@@ -129,6 +181,42 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
   const [pickerTitle, setPickerTitle] = useState('');
   const [onSelectCallback, setOnSelectCallback] = useState(null);
   const [pickerSearchQuery, setPickerSearchQuery] = useState('');
+
+  const isFormDirty = () => {
+    return form.title.trim() !== '' || form.category !== '' || images.length > 0;
+  };
+
+  const handleClose = () => {
+    const dirty = isFormDirty();
+    const isEditingDraft = !!initialData && initialData.published === false;
+    const isNewProduct = !initialData;
+
+    if (dirty && isNewProduct) {
+      // New product with data — prompt to save as draft
+      Alert.alert(
+        'Save as Draft?',
+        'You have unsaved changes. Do you want to save this product as a draft so you can finish it later?',
+        [
+          { text: 'Discard', style: 'destructive', onPress: onClose },
+          { text: 'Save as Draft', onPress: () => handleSubmit(false) },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } else if (isEditingDraft) {
+      // Editing an existing draft — always offer to save changes
+      Alert.alert(
+        'Save Changes?',
+        'Do you want to save the changes you made to this draft?',
+        [
+          { text: 'Discard Changes', style: 'destructive', onPress: onClose },
+          { text: 'Save Draft', onPress: () => handleSubmit(false) },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } else {
+      onClose();
+    }
+  };
 
   useEffect(() => {
     if (visible) {
@@ -355,17 +443,24 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
   };
 
   const handleSubmit = (published) => {
-    const requiredAttributes = (CATEGORY_FIELDS[form.category.toLowerCase()] || []).filter(f => f.required);
-    const missingAttr = requiredAttributes.find(ra => !attributes.find(a => a.name === ra.name)?.value);
-    
-    if (!form.title || !form.category || !form.price || !form.stock || !form.province || !form.district || !form.description || missingAttr) {
-      Alert.alert('Error', 'Please fill in all required fields.');
-      return;
-    }
-    
-    if (images.length === 0) {
-      Alert.alert('Error', 'Please add at least one media file.');
-      return;
+    if (published) {
+      const requiredAttributes = (CATEGORY_FIELDS[form.category.toLowerCase()] || []).filter(f => f.required);
+      const missingAttr = requiredAttributes.find(ra => !attributes.find(a => a.name === ra.name)?.value);
+      
+      if (!form.title || !form.category || !form.price || !form.stock || !form.province || !form.district || !form.description || missingAttr) {
+        Alert.alert('Error', 'Please fill in all required fields to publish.');
+        return;
+      }
+      
+      if (images.length === 0) {
+        Alert.alert('Error', 'Please add at least one media file to publish.');
+        return;
+      }
+    } else {
+      if (!form.title || !form.category) {
+        Alert.alert('Error', 'Please provide at least a title and category to save a draft.');
+        return;
+      }
     }
 
     const submissionData = {
@@ -531,6 +626,29 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
                    <CustomText style={{ color: colors.primary, fontWeight: 'bold', fontSize: 12 }}>Add Type</CustomText>
                 </TouchableOpacity>
               </View>
+
+              {/* Suggestions */}
+              {form.category && VARIANT_SUGGESTIONS[form.category.toLowerCase()] && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  <CustomText style={{ fontSize: 10, color: colors.muted, alignSelf: 'center', marginRight: 4, textTransform: 'uppercase', fontWeight: 'bold' }}>Suggestions:</CustomText>
+                  {VARIANT_SUGGESTIONS[form.category.toLowerCase()].map(suggestion => (
+                    <TouchableOpacity 
+                      key={suggestion.name}
+                      style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+                      onPress={() => {
+                        if (!variants.some(v => v.name.toLowerCase() === suggestion.name.toLowerCase())) {
+                          setVariants(prev => [...prev, {
+                            name: suggestion.name,
+                            values: suggestion.values.map(val => ({ value: val, priceOverride: 0, stock: 0 }))
+                          }]);
+                        }
+                      }}
+                    >
+                      <CustomText style={{ fontSize: 10, color: colors.foreground, fontWeight: 'bold' }}>+ {suggestion.name}</CustomText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
               
               {variants.map((v, vIdx) => (
                 <View key={vIdx} style={styles.variantTypeBox}>
@@ -626,14 +744,14 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}><X color={colors.foreground} size={24} /></TouchableOpacity>
+            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}><X color={colors.foreground} size={24} /></TouchableOpacity>
             <View style={styles.stepIndicator}>
               {[1,2,3].map(s => (
                 <View key={s} style={[styles.stepDot, step >= s && { backgroundColor: colors.primary }, step === s && { width: 20 }]} />
@@ -667,7 +785,7 @@ const AddProductModal = ({ visible, onClose, onSubmit, isSubmitting, initialData
             ) : (
               <View style={{ flex: 2, flexDirection: 'row', gap: 10 }}>
                 <TouchableOpacity style={[styles.publishBtn, { backgroundColor: colors.glass, flex: 1 }]} onPress={() => handleSubmit(false)} disabled={isSubmitting}>
-                  <CustomText style={[styles.publishText, { color: colors.foreground }]}>Draft</CustomText>
+                  {isSubmitting ? <ActivityIndicator color={colors.foreground} /> : <CustomText style={[styles.publishText, { color: colors.foreground }]}>Draft</CustomText>}
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.publishBtn, { backgroundColor: colors.primary, flex: 2 }]} onPress={() => handleSubmit(true)} disabled={isSubmitting}>
                   {isSubmitting ? <ActivityIndicator color="white" /> : <CustomText style={styles.publishText}>Publish</CustomText>}

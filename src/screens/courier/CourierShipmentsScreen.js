@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator,
-  RefreshControl, StatusBar, Alert, Modal, ScrollView, TouchableWithoutFeedback
+  RefreshControl, StatusBar, Alert, Modal, ScrollView, TouchableWithoutFeedback, TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
@@ -44,6 +44,7 @@ export default function CourierShipmentsScreen({ navigation }) {
   const [agentModalVisible, setAgentModalVisible] = useState(false);
   const [assigningAgent, setAssigningAgent] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [confirmingStatus, setConfirmingStatus] = useState(false);
 
@@ -125,7 +126,17 @@ export default function CourierShipmentsScreen({ navigation }) {
     );
   };
 
-  const filtered = filter === 'ALL' ? shipments : shipments.filter(s => s.status === filter);
+  const filtered = shipments.filter(shipment => {
+    const matchesFilter = filter === 'ALL' || shipment.status === filter;
+    
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      shipment.orderId?.toLowerCase().includes(query) ||
+      shipment.recipientName?.toLowerCase().includes(query) ||
+      shipment.address?.toLowerCase().includes(query);
+      
+    return matchesFilter && matchesSearch;
+  });
 
   const renderItem = ({ item }) => {
     const statusColor = STATUS_COLORS[item.status] || '#cbd5e1';
@@ -209,6 +220,25 @@ export default function CourierShipmentsScreen({ navigation }) {
           <ChevronLeft color={colors.foreground} size={22} />
         </TouchableOpacity>
         <CustomText style={[styles.title, { color: colors.foreground }]}>{t('myShipments')}</CustomText>
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchSection}>
+        <View style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+          <Search color={colors.muted} size={20} />
+          <TextInput
+            placeholder={t('searchShipments') || "Search by ID, Name, or Address..."}
+            placeholderTextColor={colors.muted}
+            style={[styles.searchInput, { color: colors.foreground }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <X color={colors.muted} size={18} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Filter chips */}
@@ -329,6 +359,9 @@ export default function CourierShipmentsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, borderBottomWidth: 1 },
+  searchSection: { paddingHorizontal: 16, paddingVertical: 12 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: 14, paddingHorizontal: 12, borderWidth: 1 },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 14, paddingVertical: 8 },
   backBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 18, fontWeight: '900' },
   topFilterSection: {

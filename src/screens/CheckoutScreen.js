@@ -249,14 +249,16 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       const order = await checkoutService.placeOrder(user.id, orderData);
       
-      const paymentData = {
-        orderId: order.id,
-        method: paymentMethod,
-        phone: paymentMethod === 'MOBILE_MONEY' ? phoneNumber : undefined,
-        cardDetails: paymentMethod === 'CARD' ? { cardNumber, expiryDate, cvv, cardholderName } : undefined
-      };
+      if (pickupType !== 'PICKUP') {
+        const paymentData = {
+          orderId: order.id,
+          method: paymentMethod,
+          phone: paymentMethod === 'MOBILE_MONEY' ? phoneNumber : undefined,
+          cardDetails: paymentMethod === 'CARD' ? { cardNumber, expiryDate, cvv, cardholderName } : undefined
+        };
 
-      await checkoutService.processPayment(user.id, paymentData);
+        await checkoutService.processPayment(user.id, paymentData);
+      }
       
       // Remove only the items that were checked out
       if (buyNowProduct) {
@@ -541,7 +543,10 @@ const CheckoutScreen = ({ route, navigation }) => {
 
             <View style={styles.toggleRow}>
               <TouchableOpacity 
-                onPress={() => setPickupType('DELIVERY')}
+                onPress={() => {
+                  setPickupType('DELIVERY');
+                  setPaymentMethod('MOBILE_MONEY');
+                }}
                 style={[
                   styles.toggleBtn, 
                   { backgroundColor: colors.glass, borderColor: colors.border },
@@ -553,7 +558,10 @@ const CheckoutScreen = ({ route, navigation }) => {
               </TouchableOpacity>
               
               <TouchableOpacity 
-                onPress={() => setPickupType('PICKUP')}
+                onPress={() => {
+                  setPickupType('PICKUP');
+                  setPaymentMethod('CASH_ON_DELIVERY');
+                }}
                 style={[
                   styles.toggleBtn, 
                   { backgroundColor: colors.glass, borderColor: colors.border },
@@ -657,90 +665,121 @@ const CheckoutScreen = ({ route, navigation }) => {
               <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
                 <CustomText style={styles.stepCounterText}>3</CustomText>
               </View>
-              <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Payment Method</CustomText>
+              <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>
+                {pickupType === 'PICKUP' ? 'Pay at Store' : 'Payment Method'}
+              </CustomText>
             </View>
 
-            <View style={styles.paymentMethods}>
-              {[
-                { id: 'MOBILE_MONEY', label: 'Mobile Money', icon: Smartphone },
-                { id: 'BANK_TRANSFER', label: 'Bank Transfer', icon: Building },
-                { id: 'CARD', label: 'Card Payment', icon: CreditCard },
-                { id: 'WALLET', label: 'AMO Wallet', icon: Wallet },
-              ].map(method => (
-                 <TouchableOpacity 
-                    key={method.id} 
-                    onPress={() => setPaymentMethod(method.id)}
-                    style={[
-                      styles.paymentMethodItem, 
-                      { backgroundColor: colors.glass, borderColor: paymentMethod === method.id ? colors.primary : colors.border }
-                    ]}
-                  >
-                    <method.icon size={24} color={paymentMethod === method.id ? colors.primary : colors.muted} />
-                    <CustomText style={[styles.paymentMethodLabel, { color: paymentMethod === method.id ? colors.primary : colors.foreground }]}>
-                      {method.label}
+            {pickupType === 'PICKUP' ? (
+              <View style={[styles.paymentForm, { backgroundColor: colors.glass, padding: 20, borderRadius: 16 }]}>
+                <View style={[styles.walletBalance, { backgroundColor: colors.primary + '10', marginBottom: 16 }]}>
+                  <Building2 size={32} color={colors.primary} />
+                  <View style={{ marginLeft: 16, flex: 1 }}>
+                    <CustomText variant="h3" style={{ color: colors.foreground }}>Pay directly at store</CustomText>
+                    <CustomText style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                      No payment is required now. You will pay the seller when you collect your order.
                     </CustomText>
-                    {paymentMethod === method.id && <CheckCircle2 size={18} color={colors.primary} />}
-                  </TouchableOpacity>
-              ))}
-            </View>
-
-            {paymentMethod === 'MOBILE_MONEY' && (
-              <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>You will receive a USSD prompt on your phone to authorize the transaction.</CustomText>
-                {renderLabel('MOBILE NUMBER')}
-                {renderInput(<Smartphone size={18} color={colors.muted} />, '+250 7XX XXX XXX', phoneNumber, setPhoneNumber, 'phone-pad')}
-              </View>
-            )}
-
-            {paymentMethod === 'BANK_TRANSFER' && (
-              <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                <View style={styles.bankInfoRow}>
-                  <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Bank:</CustomText>
-                  <CustomText style={[styles.bankValue, { color: colors.foreground }]}>Bank of Kigali</CustomText>
-                </View>
-                <View style={styles.bankInfoRow}>
-                  <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Account:</CustomText>
-                  <CustomText style={[styles.bankValue, { color: colors.foreground }]}>00040-0123456-78</CustomText>
-                </View>
-                <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Please upload proof of payment after the transfer.</CustomText>
-              </View>
-            )}
-
-            {paymentMethod === 'CARD' && (
-              <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your card details are encrypted and never stored.</CustomText>
-                
-                {renderLabel('CARD NUMBER')}
-                {renderInput(<CreditCard size={18} color={colors.muted} />, '1234 5678 9012 3456', cardNumber, setCardNumber, 'numeric')}
-                
-                <View style={styles.formRow}>
-                  <View style={{ flex: 1, marginRight: 10 }}>
-                    {renderLabel('EXPIRY DATE')}
-                    {renderInput(null, 'MM / YY', expiryDate, setExpiryDate)}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    {renderLabel('CVV')}
-                    {renderInput(null, '•••', cvv, setCvv, 'numeric')}
                   </View>
                 </View>
-                
-                {renderLabel('CARDHOLDER NAME')}
-                {renderInput(<User size={18} color={colors.muted} />, 'Name on card', cardholderName, setCardholderName)}
-              </View>
-            )}
 
-            {paymentMethod === 'WALLET' && (
-              <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                <View style={[styles.walletBalance, { backgroundColor: colors.primary + '10' }]}>
-                  <View>
-                    <CustomText style={[styles.walletLabel, { color: colors.foreground }]}>AMO Wallet Balance</CustomText>
-                    <CustomText style={[styles.walletAmount, { color: colors.primary }]}>Rwf 0</CustomText>
-                  </View>
-                  <Wallet size={32} color={colors.primary} opacity={0.3} />
+                <View style={{ gap: 12 }}>
+                  {[
+                    'Show your pickup code at the store',
+                    'Pay the seller directly (cash or mobile money)',
+                    'Funds go straight to the seller — no escrow hold'
+                  ].map((text, i) => (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <CheckCircle2 size={16} color="#4ade80" />
+                      <CustomText style={{ color: colors.muted, fontSize: 13, marginLeft: 10 }}>{text}</CustomText>
+                    </View>
+                  ))}
                 </View>
-                <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your wallet balance will be deducted upon order confirmation.</CustomText>
               </View>
+            ) : (
+              <>
+                <View style={styles.paymentMethods}>
+                  {[
+                    { id: 'MOBILE_MONEY', label: 'Mobile Money', icon: Smartphone },
+                    { id: 'BANK_TRANSFER', label: 'Bank Transfer', icon: Building },
+                    { id: 'CARD', label: 'Card Payment', icon: CreditCard },
+                    { id: 'WALLET', label: 'AMO Wallet', icon: Wallet },
+                  ].map(method => (
+                     <TouchableOpacity 
+                        key={method.id} 
+                        onPress={() => setPaymentMethod(method.id)}
+                        style={[
+                          styles.paymentMethodItem, 
+                          { backgroundColor: colors.glass, borderColor: paymentMethod === method.id ? colors.primary : colors.border }
+                        ]}
+                      >
+                        <method.icon size={24} color={paymentMethod === method.id ? colors.primary : colors.muted} />
+                        <CustomText style={[styles.paymentMethodLabel, { color: paymentMethod === method.id ? colors.primary : colors.foreground }]}>
+                          {method.label}
+                        </CustomText>
+                        {paymentMethod === method.id && <CheckCircle2 size={18} color={colors.primary} />}
+                      </TouchableOpacity>
+                  ))}
+                </View>
+
+                {paymentMethod === 'MOBILE_MONEY' && (
+                  <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
+                    <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>You will receive a USSD prompt on your phone to authorize the transaction.</CustomText>
+                    {renderLabel('MOBILE NUMBER')}
+                    {renderInput(<Smartphone size={18} color={colors.muted} />, '+250 7XX XXX XXX', phoneNumber, setPhoneNumber, 'phone-pad')}
+                  </View>
+                )}
+
+                {paymentMethod === 'BANK_TRANSFER' && (
+                  <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
+                    <View style={styles.bankInfoRow}>
+                      <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Bank:</CustomText>
+                      <CustomText style={[styles.bankValue, { color: colors.foreground }]}>Bank of Kigali</CustomText>
+                    </View>
+                    <View style={styles.bankInfoRow}>
+                      <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Account:</CustomText>
+                      <CustomText style={[styles.bankValue, { color: colors.foreground }]}>00040-0123456-78</CustomText>
+                    </View>
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                    <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Please upload proof of payment after the transfer.</CustomText>
+                  </View>
+                )}
+
+                {paymentMethod === 'CARD' && (
+                  <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
+                    <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your card details are encrypted and never stored.</CustomText>
+                    
+                    {renderLabel('CARD NUMBER')}
+                    {renderInput(<CreditCard size={18} color={colors.muted} />, '1234 5678 9012 3456', cardNumber, setCardNumber, 'numeric')}
+                    
+                    <View style={styles.formRow}>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        {renderLabel('EXPIRY DATE')}
+                        {renderInput(null, 'MM / YY', expiryDate, setExpiryDate)}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        {renderLabel('CVV')}
+                        {renderInput(null, '•••', cvv, setCvv, 'numeric')}
+                      </View>
+                    </View>
+                    
+                    {renderLabel('CARDHOLDER NAME')}
+                    {renderInput(<User size={18} color={colors.muted} />, 'Name on card', cardholderName, setCardholderName)}
+                  </View>
+                )}
+
+                {paymentMethod === 'WALLET' && (
+                  <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
+                    <View style={[styles.walletBalance, { backgroundColor: colors.primary + '10' }]}>
+                      <View>
+                        <CustomText style={[styles.walletLabel, { color: colors.foreground }]}>AMO Wallet Balance</CustomText>
+                        <CustomText style={[styles.walletAmount, { color: colors.primary }]}>Rwf 0</CustomText>
+                      </View>
+                      <Wallet size={32} color={colors.primary} opacity={0.3} />
+                    </View>
+                    <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your wallet balance will be deducted upon order confirmation.</CustomText>
+                  </View>
+                )}
+              </>
             )}
           </View>
         )}
@@ -803,7 +842,12 @@ const CheckoutScreen = ({ route, navigation }) => {
 
               <View style={[styles.protectionBadge, { backgroundColor: colors.primary + '10' }]}>
                 <ShieldCheck size={18} color="#4ade80" />
-                <CustomText style={[styles.protectionText, { color: colors.muted }]}>Funds held in escrow until delivery is confirmed.</CustomText>
+                <CustomText style={[styles.protectionText, { color: colors.muted }]}>
+                  {pickupType === 'PICKUP' 
+                    ? 'Pay directly at store. Funds go straight to the seller.'
+                    : 'Funds held in escrow until delivery is confirmed.'
+                  }
+                </CustomText>
               </View>
             </View>
           </View>
@@ -823,7 +867,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         )}
         
         <CustomButton
-          title={step === 4 ? (loading ? 'Processing...' : 'Place Order') : 'Continue'}
+          title={step === 4 ? (loading ? 'Processing...' : (pickupType === 'PICKUP' ? 'Confirm Order — Pay at Store' : 'Place Order')) : 'Continue'}
           style={[styles.primaryNavBtn, step === 1 && { flex: 1 }]}
           loading={loading}
           onPress={() => {
@@ -856,7 +900,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={{ padding: 20 }}>
               <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>SELECT DATE</CustomText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateList}>
-                {Array.from({ length: 7 }).map((_, i) => {
+                {Array.from({ length: 2 }).map((_, i) => {
                   const date = new Date();
                   date.setDate(date.getDate() + i);
                   const isSelected = selectedDate.toDateString() === date.toDateString();
@@ -871,7 +915,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                       ]}
                     >
                       <CustomText style={[styles.dateDay, { color: isSelected ? '#FFF' : colors.muted }]}>
-                        {i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' })}
+                        {i === 0 ? 'Today' : 'Tomorrow'}
                       </CustomText>
                       <CustomText style={[styles.dateNum, { color: isSelected ? '#FFF' : colors.foreground }]}>
                         {date.getDate()}
@@ -883,14 +927,24 @@ const CheckoutScreen = ({ route, navigation }) => {
 
               <CustomText style={[styles.sectionLabel, { color: colors.muted, marginTop: 24 }]}>SELECT TIME</CustomText>
               <View style={styles.timeGrid}>
-                {['08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM'].filter((time) => {
+                {[
+                  '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+                  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM',
+                  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+                  '05:00 PM', '05:30 PM', '06:00 PM'
+                ].filter((time) => {
                   const today = new Date();
                   if (selectedDate.toDateString() !== today.toDateString()) return true;
                   const [timeStr, period] = time.split(' ');
-                  let hour = parseInt(timeStr.split(':')[0], 10);
+                  let [hour, minute] = timeStr.split(':').map(n => parseInt(n, 10));
                   if (period === 'PM' && hour !== 12) hour += 12;
                   if (period === 'AM' && hour === 12) hour = 0;
-                  return hour > today.getHours();
+                  
+                  const slotTime = new Date(today);
+                  slotTime.setHours(hour, minute, 0, 0);
+                  
+                  // Must be at least 1 hour from now for "Pro" preparation time
+                  return slotTime.getTime() > (today.getTime() + 60 * 60 * 1000);
                 }).map((time) => {
                   const isSelected = selectedTime === time;
                   return (
@@ -910,14 +964,22 @@ const CheckoutScreen = ({ route, navigation }) => {
                   );
                 })}
               </View>
-              {['08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM'].filter((time) => {
+              {[
+                '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+                '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM',
+                '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+                '05:00 PM', '05:30 PM', '06:00 PM'
+              ].filter((time) => {
                   const today = new Date();
                   if (selectedDate.toDateString() !== today.toDateString()) return true;
                   const [timeStr, period] = time.split(' ');
-                  let hour = parseInt(timeStr.split(':')[0], 10);
+                  let [hour, minute] = timeStr.split(':').map(n => parseInt(n, 10));
                   if (period === 'PM' && hour !== 12) hour += 12;
                   if (period === 'AM' && hour === 12) hour = 0;
-                  return hour > today.getHours();
+                  
+                  const slotTime = new Date(today);
+                  slotTime.setHours(hour, minute, 0, 0);
+                  return slotTime.getTime() > (today.getTime() + 60 * 60 * 1000);
               }).length === 0 && (
                 <CustomText style={{ color: '#ef4444', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
                   No more pickup slots available for today. Please select tomorrow.

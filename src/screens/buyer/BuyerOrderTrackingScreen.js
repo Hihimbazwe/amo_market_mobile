@@ -210,9 +210,19 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const uniqueSellers = useMemo(() => {
     if (!order?.items) return [];
     const map = {};
+    const slots = order.pickupSlot?.split(' | ') || [];
+    const uniqueSellerIds = [];
+    
+    order.items.forEach(item => {
+      const sId = item.product?.seller?.id || item.product?.sellerId;
+      if (sId && !uniqueSellerIds.includes(sId)) uniqueSellerIds.push(sId);
+    });
+
     order.items.forEach(item => {
       const seller = item.product?.seller;
       if (seller) {
+        const sId = seller.id;
+        const sIdx = uniqueSellerIds.indexOf(sId);
         const name = seller.user?.name || 'Store';
         const locName = seller.locationName?.trim() || '';
         const locAddr = seller.locationAddress?.trim() || '';
@@ -230,12 +240,13 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
           }
         }
 
-        map[name] = {
+        map[sId] = {
           name,
           phone: seller.phone || '',
           lat: seller.locationLat,
           lng: seller.locationLng,
           locationName: finalLocation,
+          pickupTime: slots[sIdx] || order.pickupSlot || '',
         };
       }
     });
@@ -560,70 +571,98 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Order Details */}
+        {/* Location & Route Section */}
         <View style={styles.glassCard}>
-          <CustomText style={styles.cardTitle}>ORDER DETAILS</CustomText>
-          <View style={{ marginTop: 12 }}>
-            {uniqueSellers.map((s, i) => (
-              <View key={i} style={{ marginBottom: i < uniqueSellers.length - 1 ? 16 : 0 }}>
-                <View style={styles.detailRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', width: 100 }}>
-                    <Store size={14} color="#6b7280" />
-                    <CustomText style={{ color: '#6b7280', fontSize: 13, marginLeft: 6 }}>Seller</CustomText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(249,115,22,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+              <Navigation size={16} color="#fb923c" />
+            </View>
+            <CustomText style={[styles.cardTitle, { marginBottom: 0, marginLeft: 10 }]}>SELLER LOCATION & ROUTE</CustomText>
+          </View>
+
+          {uniqueSellers.map((s, i) => (
+            <View key={i} style={{ marginBottom: i < uniqueSellers.length - 1 ? 24 : 0 }}>
+              <View style={[styles.sellerRouteHeader, { backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.05)' }]}>
+                <View style={{ flex: 1 }}>
+                  <CustomText style={{ color: '#f3f4f6', fontSize: 15, fontWeight: '800' }}>{s.name}</CustomText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                    <MapPin size={12} color="#6b7280" />
+                    <CustomText style={{ color: '#6b7280', fontSize: 12, marginLeft: 4 }} numberOfLines={1}>{s.locationName || 'Address not available'}</CustomText>
                   </View>
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <CustomText style={{ color: '#f3f4f6', fontSize: 13, fontWeight: '700' }}>{s.name}</CustomText>
-                    {!!s.phone && <CustomText style={{ color: '#9ca3af', fontSize: 11, marginTop: 2 }}>{s.phone}</CustomText>}
-                  </View>
-                </View>
-                {s.lat && s.lng && (
-                  <View style={{ marginTop: 12 }}>
-                    {!!s.locationName && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-                        <MapPin size={12} color="#fb923c" />
-                        <CustomText style={{ color: '#fb923c', fontSize: 12, fontWeight: '700', marginLeft: 6, flex: 1 }}>{s.locationName}</CustomText>
-                      </View>
-                    )}
-                    
-                    <View style={{ height: 160, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                      <WebView 
-                        source={{ 
-                          html: `<html><body style="margin:0;padding:0;"><iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://maps.google.com/maps?${buyerLocation ? `saddr=${buyerLocation.lat},${buyerLocation.lng}&daddr=${s.lat},${s.lng}` : `q=${s.lat},${s.lng}`}&z=15&output=embed" allowfullscreen></iframe></body></html>` 
-                        }} 
-                        style={{ flex: 1 }} 
-                        scrollEnabled={false}
-                      />
+                  {!!s.pickupTime && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                      <Clock size={12} color="#fb923c" />
+                      <CustomText style={{ color: '#fb923c', fontSize: 12, fontWeight: '700', marginLeft: 4 }}>Pickup: {s.pickupTime}</CustomText>
                     </View>
-                    
-                    <TouchableOpacity 
-                      onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`)}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f97316', paddingVertical: 10, borderRadius: 12, marginTop: 8 }}
-                    >
-                      <Navigation size={14} color="#fff" />
-                      <CustomText style={{ color: '#fff', fontWeight: '800', fontSize: 12, marginLeft: 8 }}>Open in Maps for turn-by-turn Navigation</CustomText>
-                    </TouchableOpacity>
-                  </View>
+                  )}
+                </View>
+                {!!s.phone && (
+                  <TouchableOpacity 
+                    onPress={() => Linking.openURL(`tel:${s.phone}`)}
+                    style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(34,197,94,0.1)', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Phone size={18} color="#4ade80" />
+                  </TouchableOpacity>
                 )}
               </View>
-            ))}
-            <View style={styles.detailRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', width: 100 }}>
-                <MapPin size={14} color="#6b7280" style={{ marginTop: 2 }} />
-                <CustomText style={{ color: '#6b7280', fontSize: 13, marginLeft: 6 }}>Address</CustomText>
-              </View>
-              <CustomText style={{ color: '#f3f4f6', fontSize: 13, fontWeight: '700', flex: 1, textAlign: 'right', lineHeight: 20 }}>{order.address}</CustomText>
-            </View>
-            {order.pickupSlot && (
-              <View style={styles.detailRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', width: 100 }}>
-                  <Clock size={14} color="#6b7280" />
-                  <CustomText style={{ color: '#6b7280', fontSize: 13, marginLeft: 6 }}>Pickup Time</CustomText>
+
+              {s.lat && s.lng ? (
+                <View style={{ marginTop: 16 }}>
+                  <View style={{ height: 220, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                    <WebView 
+                      source={{ 
+                        html: `<html><body style="margin:0;padding:0;"><iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://maps.google.com/maps?${buyerLocation ? `saddr=${buyerLocation.lat},${buyerLocation.lng}&daddr=${s.lat},${s.lng}` : `q=${s.lat},${s.lng}`}&z=14&output=embed" allowfullscreen></iframe></body></html>` 
+                      }} 
+                      style={{ flex: 1 }} 
+                      scrollEnabled={false}
+                    />
+                    {!buyerLocation && (
+                      <View style={{ position: 'absolute', bottom: 12, left: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.8)', padding: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center' }}>
+                        <ActivityIndicator size="small" color="#fb923c" />
+                        <CustomText style={{ color: '#9ca3af', fontSize: 10, marginLeft: 8 }}>Waiting for your location to calculate route...</CustomText>
+                      </View>
+                    )}
+                  </View>
+                  
+                  <TouchableOpacity 
+                    onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`)}
+                    style={[styles.mapActionBtn, { backgroundColor: '#f97316' }]}
+                  >
+                    <ExternalLink size={16} color="#fff" />
+                    <CustomText style={{ color: '#fff', fontWeight: '900', fontSize: 13, marginLeft: 8 }}>Get Directions in Google Maps</CustomText>
+                  </TouchableOpacity>
                 </View>
-                <CustomText style={{ color: '#f3f4f6', fontSize: 13, fontWeight: '700', flex: 1, textAlign: 'right' }}>{order.pickupSlot}</CustomText>
+              ) : (
+                <View style={{ marginTop: 12, padding: 16, backgroundColor: 'rgba(239,68,68,0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(239,68,68,0.1)', flexDirection: 'row', alignItems: 'center' }}>
+                  <AlertTriangle size={16} color="#f87171" />
+                  <CustomText style={{ color: '#f87171', fontSize: 12, marginLeft: 10 }}>Seller hasn't set their precise GPS location yet.</CustomText>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+
+        {/* Order Info Details */}
+        <View style={styles.glassCard}>
+          <CustomText style={styles.cardTitle}>ORDER ITEMS</CustomText>
+          <View style={{ marginTop: 4 }}>
+            {order.items?.map((item, idx) => (
+              <View key={idx} style={[styles.detailRow, { alignItems: 'flex-start' }]}>
+                <View style={{ flex: 1 }}>
+                  <CustomText style={{ color: '#f3f4f6', fontSize: 13, fontWeight: '700' }}>
+                    {item.product?.title || 'Item'}
+                  </CustomText>
+                  <CustomText style={{ color: '#9ca3af', fontSize: 11, marginTop: 2 }}>
+                    Qty: {item.quantity} × Rwf {(item.price || 0).toLocaleString()}
+                  </CustomText>
+                </View>
+                <CustomText style={{ color: '#f3f4f6', fontSize: 13, fontWeight: '700' }}>
+                  Rwf {((item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                </CustomText>
               </View>
-            )}
+            ))}
             <View style={[styles.detailRow, { borderBottomWidth: 0, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
-              <CustomText style={{ color: '#9ca3af', fontSize: 14 }}>Total</CustomText>
+              <CustomText style={{ color: '#9ca3af', fontSize: 14 }}>Order Total</CustomText>
               <CustomText style={{ color: '#fb923c', fontSize: 16, fontWeight: '900' }}>Rwf {order.totalAmount.toLocaleString()}</CustomText>
             </View>
           </View>
@@ -702,10 +741,12 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
               <CustomText style={{ color: '#f87171', fontWeight: '800', fontSize: 13, marginLeft: 8 }}>Cancel Order</CustomText>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => navigation.navigate('Replacements', { initiateReplacementForOrderId: order.id })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingVertical: 16, borderRadius: 16 }}>
-            <Package size={16} color="#9ca3af" />
-            <CustomText style={{ color: '#9ca3af', fontWeight: '800', fontSize: 13, marginLeft: 8 }}>Replacement</CustomText>
-          </TouchableOpacity>
+          {!isPickup && (
+            <TouchableOpacity onPress={() => navigation.navigate('Replacements', { initiateReplacementForOrderId: order.id })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingVertical: 16, borderRadius: 16 }}>
+              <Package size={16} color="#9ca3af" />
+              <CustomText style={{ color: '#9ca3af', fontWeight: '800', fontSize: 13, marginLeft: 8 }}>Replacement</CustomText>
+            </TouchableOpacity>
+          )}
           {!canCancel && (
             <TouchableOpacity onPress={() => navigation.navigate('Disputes', { orderId: order.id })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239,68,68,0.05)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', paddingVertical: 16, borderRadius: 16 }}>
               <AlertTriangle size={16} color="#f87171" />
@@ -728,6 +769,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 10, fontWeight: '900', color: '#6b7280', letterSpacing: 1.5, marginBottom: 16 },
   iconBox: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
+  sellerRouteHeader: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, borderWidth: 1 },
+  mapActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 16, marginTop: 12 },
 });
 
 export default BuyerOrderTrackingScreen;
