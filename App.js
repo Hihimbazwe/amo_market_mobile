@@ -160,7 +160,6 @@ const AppTabs = () => {
         tabBarIcon: ({ color, size }) => {
           let IconComponent;
           if (route.name === 'Home') IconComponent = Home;
-          else if (route.name === 'Market') IconComponent = ShoppingBag;
           else if (route.name === 'Cart') IconComponent = ShoppingCart;
           else if (route.name === 'Messages') IconComponent = MessageCircle;
           else if (route.name === 'Me') IconComponent = UserIcon;
@@ -174,7 +173,6 @@ const AppTabs = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen name="Market" component={MarketplaceStack} />
       <Tab.Screen 
         name="Cart" 
         component={CartScreen} 

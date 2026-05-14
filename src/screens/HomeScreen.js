@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -76,8 +76,10 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const flatListRef = useRef(null);
+  const mainScrollRef = useRef(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -100,7 +102,7 @@ const HomeScreen = ({ navigation }) => {
     
     try {
       const data = await productService.getProducts();
-      setLiveProducts(data.slice(0, 8)); // Get more for the carousel
+      setLiveProducts(data); // Show all products
     } catch (error) {
       console.error('Home fetch error:', error);
     } finally {
@@ -114,6 +116,21 @@ const HomeScreen = ({ navigation }) => {
       fetchFeatured();
     }, [])
   );
+
+  const filteredProducts = useMemo(() => {
+    let list = liveProducts;
+    if (selectedCategory !== 'All') {
+      list = list.filter(p => p.category === selectedCategory);
+    }
+    if (searchQuery) {
+      list = list.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return list;
+  }, [liveProducts, selectedCategory, searchQuery]);
+
+  const scrollToProducts = () => {
+    mainScrollRef.current?.scrollTo({ y: 320, animated: true });
+  };
 
   const onRefresh = useCallback(() => {
     fetchFeatured(true);
@@ -172,6 +189,7 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       <ScrollView 
+        ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
@@ -210,7 +228,7 @@ const HomeScreen = ({ navigation }) => {
                     <CustomButton 
                       title={t('shopNow')} 
                       style={styles.heroButton}
-                      onPress={() => navigation.navigate('Market')} 
+                      onPress={scrollToProducts} 
                     />
                   </View>
                 </ImageBackground>
@@ -235,21 +253,31 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <CustomText variant="h2">{t('popularCategories')}</CustomText>
-            <TouchableOpacity onPress={() => navigation.navigate('Market')}>
-              <CustomText variant="subtitle" style={{ color: colors.primary }}>{t('viewAll')}</CustomText>
+          </View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScroll}
+          >
+            <TouchableOpacity 
+              style={[styles.categoryPill, selectedCategory === 'All' && styles.activeCategoryPill]} 
+              onPress={() => setSelectedCategory('All')}
+            >
+              <CustomText style={[styles.categoryPillText, selectedCategory === 'All' && styles.activeCategoryPillText]}>All</CustomText>
             </TouchableOpacity>
-          </View>
-          <View style={styles.categoriesGrid}>
             {categories.map((cat, index) => (
-              <CategoryItem 
+              <TouchableOpacity 
                 key={index}
-                label={cat.label}
-                icon={cat.icon}
-                color={cat.color}
-                onPress={() => navigation.navigate('Market', { category: cat.label })}
-              />
+                style={[styles.categoryPill, selectedCategory === cat.label && styles.activeCategoryPill]}
+                onPress={() => setSelectedCategory(cat.label)}
+              >
+                <cat.icon size={16} color={selectedCategory === cat.label ? 'white' : cat.color} />
+                <CustomText style={[styles.categoryPillText, selectedCategory === cat.label && styles.activeCategoryPillText, { marginLeft: 6 }]}>
+                  {cat.label}
+                </CustomText>
+              </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
         </View>
 
         {/* Trust Bar */}
@@ -277,10 +305,7 @@ const HomeScreen = ({ navigation }) => {
         {/* Featured Products */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <CustomText variant="h2">{t('featuredProducts')}</CustomText>
-            <TouchableOpacity onPress={() => navigation.navigate('Market')}>
-              <CustomText variant="subtitle" style={{ color: colors.primary }}>{t('seeAll')}</CustomText>
-            </TouchableOpacity>
+            <CustomText variant="h2">{selectedCategory === 'All' ? t('All Products') : selectedCategory}</CustomText>
           </View>
           <View style={styles.productsGrid}>
             {loading ? (
@@ -288,7 +313,7 @@ const HomeScreen = ({ navigation }) => {
                 <ActivityIndicator color={colors.primary} />
               </View>
             ) : (
-              liveProducts.map((item) => (
+              filteredProducts.map((item) => (
                 <ProductCard key={item.id} product={item} onPress={() => navigation.navigate('ProductDetail', { product: item })} />
               ))
             )}
@@ -502,9 +527,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  categoriesGrid: {
+  categoriesScroll: {
+    paddingVertical: 10,
+    gap: 12,
+  },
+  categoryPill: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  activeCategoryPill: {
+    backgroundColor: '#e67e22',
+    borderColor: '#e67e22',
+  },
+  categoryPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  activeCategoryPillText: {
+    color: 'white',
   },
   trustBar: {
     borderRadius: 20,
