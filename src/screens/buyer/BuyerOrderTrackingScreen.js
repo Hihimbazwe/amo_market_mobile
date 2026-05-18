@@ -8,7 +8,7 @@ import {
   ArrowLeft, CheckCircle2, Truck, MapPin, Package, Store,
   Phone, Star, AlertTriangle, RefreshCw, QrCode, RotateCcw,
   ExternalLink, Navigation, Clock, ShieldCheck, Wifi, WifiOff,
-  ZoomIn, ZoomOut, User
+  ZoomIn, ZoomOut, User, Edit2, X
 } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -24,10 +24,10 @@ const { width } = Dimensions.get('window');
 // ─── Status helpers ───────────────────────────────────────────────
 const FORWARD_STEPS = [
   { key: 'PENDING',          label: 'Order Placed',         icon: Package },
-  { key: 'SHIPPED',          label: 'Shipped',              icon: Truck },
+  // { key: 'SHIPPED',          label: 'Shipped',              icon: Truck },
   { key: 'IN_TRANSIT',       label: 'In Transit',           icon: Navigation },
   { key: 'OUT_FOR_DELIVERY', label: 'Ready for Collection', icon: MapPin },
-  { key: 'DELIVERED',        label: 'Delivered',            icon: CheckCircle2 },
+  // { key: 'DELIVERED',        label: 'Delivered',            icon: CheckCircle2 },
 ];
 const PICKUP_STEPS = [
   { key: 'PENDING',   label: 'Order Placed',    icon: Package },
@@ -109,21 +109,21 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const [cancelling, setCancelling] = useState(false);
   const [buyerLocation, setBuyerLocation] = useState(null);
 
+  const [editingPickup, setEditingPickup] = useState(null);
+  const [editSlot, setEditSlot] = useState('');
+  const [editLocationId, setEditLocationId] = useState('');
+  const [allLocations, setAllLocations] = useState([]);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const [savingPickup, setSavingPickup] = useState(false);
+
   useEffect(() => {
     let locationSubscription = null;
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
-
       locationSubscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 10000,
-          distanceInterval: 10,
-        },
-        (loc) => {
-          setBuyerLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-        }
+        { accuracy: Location.Accuracy.Balanced, timeInterval: 10000, distanceInterval: 50 },
+        (loc) => setBuyerLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude })
       );
     })();
 
@@ -240,13 +240,23 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
           }
         }
 
+        let pTime = slots[sIdx] || order.pickupSlot || '';
+        // Strip sellerId: prefix if present
+        if (pTime.includes(':') && pTime.indexOf(':') < 30) {
+          const parts = pTime.split(':');
+          if (parts.length > 1 && (parts[0].startsWith('c') || parts[0].length >= 10)) {
+            pTime = parts.slice(1).join(':');
+          }
+        }
+
         map[sId] = {
+          id: sId,
           name,
           phone: seller.phone || '',
           lat: seller.locationLat,
           lng: seller.locationLng,
           locationName: finalLocation,
-          pickupTime: slots[sIdx] || order.pickupSlot || '',
+          pickupTime: pTime,
         };
       }
     });
@@ -271,6 +281,20 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
       fetchOrder();
     } catch (e) { Alert.alert("Error", e.message || "Failed to cancel order"); }
     finally { setCancelling(false); }
+  };
+
+  const handleEditPickupSave = async () => {
+    if (!editingPickup) return;
+    setSavingPickup(true);
+    try {
+      await orderService.updatePickupTime(user.id, order.id, editLocationId || null, editSlot);
+      setEditingPickup(null);
+      fetchOrder();
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to update pickup time");
+    } finally {
+      setSavingPickup(false);
+    }
   };
 
   if (loading) {
@@ -335,6 +359,81 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
               <TouchableOpacity onPress={handleCancelOrder} disabled={cancelling} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#ef4444', alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
                 {cancelling ? <ActivityIndicator size="small" color="#fff" /> : <AlertTriangle size={16} color="#fff" />}
                 <CustomText style={{ color: '#fff', fontWeight: '800', marginLeft: 8 }}>Yes, Cancel</CustomText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Pickup Modal */}
+      <Modal visible={!!editingPickup} transparent animationType="fade" onRequestClose={() => setEditingPickup(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#111827', borderRadius: 24, padding: 24, width: '100%', borderWidth: 1, borderColor: '#1f2937' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Edit2 size={20} color="#fb923c" style={{ marginRight: 12 }} />
+                <CustomText style={{ fontSize: 18, fontWeight: '900', color: '#f3f4f6' }}>Edit Pickup Time</CustomText>
+              </View>
+              <TouchableOpacity onPress={() => setEditingPickup(null)}>
+                <X size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+
+            <CustomText style={{ color: '#9ca3af', fontSize: 13, marginBottom: 16 }}>
+              Store: {editingPickup?.name}
+            </CustomText>
+
+            {/* Location Picker */}
+            <CustomText style={{ fontSize: 11, fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1 }}>Pickup Location</CustomText>
+            <TouchableOpacity 
+              style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 14, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+              onPress={() => setLocationPickerVisible(!locationPickerVisible)}
+            >
+              <CustomText style={{ color: editLocationId ? '#f3f4f6' : '#6b7280', fontSize: 14 }}>
+                {editLocationId 
+                  ? allLocations.find(l => l.id === editLocationId)?.name || "Select location..."
+                  : "Select location..."}
+              </CustomText>
+              <CustomText style={{ color: '#6b7280' }}>▼</CustomText>
+            </TouchableOpacity>
+
+            {locationPickerVisible && (
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 16, maxHeight: 150 }}>
+                <ScrollView nestedScrollEnabled>
+                  {allLocations.map((loc) => (
+                    <TouchableOpacity 
+                      key={loc.id} 
+                      style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}
+                      onPress={() => {
+                        setEditLocationId(loc.id);
+                        setLocationPickerVisible(false);
+                      }}
+                    >
+                      <CustomText style={{ color: '#f3f4f6', fontSize: 13, fontWeight: 'bold' }}>{loc.name}</CustomText>
+                      <CustomText style={{ color: '#9ca3af', fontSize: 11, marginTop: 2 }}>{loc.address}</CustomText>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Time Input */}
+            <CustomText style={{ fontSize: 11, fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1 }}>Pickup Slot</CustomText>
+            <TextInput
+              style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, color: '#f3f4f6', padding: 14, fontSize: 14, marginBottom: 24 }}
+              placeholder="e.g. 2026-05-15 14:00"
+              placeholderTextColor="#6b7280"
+              value={editSlot}
+              onChangeText={setEditSlot}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => setEditingPickup(null)} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: '#374151', alignItems: 'center' }}>
+                <CustomText style={{ color: '#d1d5db', fontWeight: '800' }}>Cancel</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleEditPickupSave} disabled={savingPickup || (!editSlot.trim() && !editLocationId)} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#fb923c', alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
+                {savingPickup ? <ActivityIndicator size="small" color="#fff" /> : null}
+                <CustomText style={{ color: '#fff', fontWeight: '800', marginLeft: savingPickup ? 8 : 0 }}>Save</CustomText>
               </TouchableOpacity>
             </View>
           </View>
@@ -593,6 +692,11 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                       <Clock size={12} color="#fb923c" />
                       <CustomText style={{ color: '#fb923c', fontSize: 12, fontWeight: '700', marginLeft: 4 }}>Pickup: {s.pickupTime}</CustomText>
+                      {isPickup && !["PICKED_UP", "COMPLETED", "CANCELLED"].includes(order.status) && (
+                        <TouchableOpacity onPress={() => { setEditingPickup(s); setEditSlot(s.pickupTime); setEditLocationId(order.pickupLocationId || ''); }} style={{ marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 6 }}>
+                          <CustomText style={{ color: '#fb923c', fontSize: 10, fontWeight: '700' }}>Edit</CustomText>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   )}
                 </View>

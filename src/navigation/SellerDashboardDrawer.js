@@ -59,7 +59,7 @@ const NAV_GROUPS = (t) => [
       { name: t('dashboard'), icon: Home, screen: 'SellerOverview' },
       { name: t('inventory'), icon: PackageIcon, screen: 'SellerInventory' },
       { name: t('orders'), icon: ShoppingBag, screen: 'SellerOrders' },
-      { name: t('shipping'), icon: Truck, screen: 'SellerShipment' },
+      // { name: t('shipping'), icon: Truck, screen: 'SellerShipment' },
       { name: t('disputes'), icon: AlertCircle, screen: 'SellerDisputes' },
     ],
   },

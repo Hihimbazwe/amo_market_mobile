@@ -73,6 +73,33 @@ export const orderService = {
     }
   },
 
+  getPickupLocations: async (userId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/pickup-locations`, {
+        method: 'GET',
+        headers: buildHeaders(userId),
+      });
+      return await handleResponse(response, 'Failed to fetch pickup locations');
+    } catch (error) {
+      console.error('getPickupLocations error:', error);
+      throw error;
+    }
+  },
+
+  updatePickupTime: async (userId, orderId, pickupLocationId, slot) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ pickupLocationId, pickupSlot: slot }),
+      });
+      return await handleResponse(response, 'Failed to update pickup time');
+    } catch (error) {
+      console.error('updatePickupTime error:', error);
+      throw error;
+    }
+  },
+
   rateAgent: async (userId, ratingData) => {
     try {
       const response = await fetch(`${BASE_URL}/api/agent/ratings`, {

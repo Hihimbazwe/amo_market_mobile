@@ -11,14 +11,12 @@ const NotificationIcon = ({ style, color }) => {
   const { colors } = useTheme();
   const navigation = useNavigation();
 
-  return null; // Notification bell hidden as requested
-  /*
   return (
     <TouchableOpacity 
       style={[styles.container, { backgroundColor: colors.glass }, style]}
       onPress={() => navigation.navigate('Notifications')}
     >
-      <Bell color={color || colors.foreground} size={22} />
+      <Bell color={color || colors.foreground} size={20} />
       {unreadCount > 0 && (
         <View style={[styles.badge, { backgroundColor: '#ef4444', borderColor: colors.background }]}>
           <CustomText style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</CustomText>
@@ -26,12 +24,11 @@ const NotificationIcon = ({ style, color }) => {
       )}
     </TouchableOpacity>
   );
-  */
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 10,
+    padding: 8,
     borderRadius: 12,
     position: 'relative',
     justifyContent: 'center',

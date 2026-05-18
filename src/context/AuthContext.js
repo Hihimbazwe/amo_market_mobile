@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const AuthContext = createContext();
 
@@ -8,8 +7,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  
-  const { expoPushToken } = usePushNotifications();
 
 
   useEffect(() => {
@@ -42,11 +39,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async () => {
+  const logout = async (isManual = true) => {
     try {
       setUser(null);
       setIsAuthenticated(false);
       await AsyncStorage.removeItem('@auth_user');
+      if (isManual) {
+        await AsyncStorage.removeItem('@auto_logout_redirect');
+      }
     } catch (e) {
       console.error('Failed to clear auth state', e);
     }

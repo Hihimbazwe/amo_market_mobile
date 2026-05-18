@@ -11,6 +11,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
 import { useTranslation } from 'react-i18next';
+import { useNotifications } from '../../context/NotificationContext';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -40,7 +41,7 @@ const AgentSettingsScreen = () => {
   const { user, logout } = useAuth();
   const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
-  const [notifs, setNotifs] = useState(true);
+  const { pushNotificationsEnabled, togglePushNotifications } = useNotifications();
   const [autoAccept, setAutoAccept] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -101,7 +102,7 @@ const AgentSettingsScreen = () => {
         <View style={styles.section}>
           <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('delivery')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Bell} title={t('deliveryAlerts')} subtitle={t('newDeliveryRequestNotifs')} value={notifs} onValueChange={setNotifs} colors={colors} />
+            <SettingRow icon={Bell} title={t('deliveryAlerts')} subtitle={t('newDeliveryRequestNotifs')} value={pushNotificationsEnabled} onValueChange={togglePushNotifications} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow icon={Settings} title={t('autoAccept')} subtitle={t('autoAcceptDesc')} value={autoAccept} onValueChange={setAutoAccept} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />

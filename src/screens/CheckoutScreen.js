@@ -51,6 +51,13 @@ import { checkoutService } from '../api/checkoutService';
 import {Text, } from 'react-native';
 const { width } = Dimensions.get('window');
 
+const validateRwandaPhoneNumber = (phone) => {
+  if (!phone) return false;
+  const cleaned = phone.replace(/[^+\d]/g, '');
+  const rwandaRegex = /^(?:\+250|250|0)?(7[23789]\d{7})$/;
+  return rwandaRegex.test(cleaned);
+};
+
 const CheckoutScreen = ({ route, navigation }) => {
   const { cartItems, cartTotal, clearCart, removeFromCart } = useCart();
   
@@ -92,7 +99,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [giftMessage, setGiftMessage] = useState('');
 
   // Delivery Method
-  const [pickupType, setPickupType] = useState('DELIVERY');
+  const [pickupType, setPickupType] = useState('PICKUP');
   const [pickupLocationId, setPickupLocationId] = useState('');
   const [sellerPickupSlots, setSellerPickupSlots] = useState({}); // { [sellerId]: slot_string }
   const [pickupLocations, setPickupLocations] = useState([]);
@@ -192,8 +199,17 @@ const CheckoutScreen = ({ route, navigation }) => {
   };
 
   const handlePlaceOrder = async () => {
-    if (!recipientName || !phoneNumber) {
+    if (!recipientName.trim() || !phoneNumber.trim()) {
       Alert.alert('Missing Details', 'Please fill in the recipient details.');
+      setStep(1);
+      return;
+    }
+
+    if (!validateRwandaPhoneNumber(phoneNumber)) {
+      Alert.alert(
+        'Invalid Phone Number',
+        'Please enter a valid Rwanda phone number (e.g., +250 78X XXX XXX or 078X XXX XXX).'
+      );
       setStep(1);
       return;
     }
@@ -218,6 +234,7 @@ const CheckoutScreen = ({ route, navigation }) => {
           if (!sellerGroups[sellerId]) {
             sellerGroups[sellerId] = {
               sellerId,
+              locationId: 'default', // Added to satisfy backend schema
               address: seller?.locationAddress || 
                        (item.product?.district && item.product?.province 
                          ? `${item.product.district}, ${item.product.province}`
@@ -463,9 +480,12 @@ const CheckoutScreen = ({ route, navigation }) => {
                 style={styles.modalTrackBtn}
                 onPress={() => {
                   setSuccessModalVisible(false);
-                  navigation.navigate('Me', { 
-                    screen: 'OrderTracking', 
-                    params: { orderId: lastOrderId } 
+                  navigation.navigate('MainApp', { 
+                    screen: 'Me',
+                    params: {
+                      screen: 'OrderTracking', 
+                      params: { orderId: lastOrderId } 
+                    }
                   });
                 }}
               >
@@ -538,11 +558,11 @@ const CheckoutScreen = ({ route, navigation }) => {
               <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
                 <CustomText style={styles.stepCounterText}>2</CustomText>
               </View>
-              <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Delivery Method</CustomText>
+              <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Pickup Locations</CustomText>
             </View>
 
             <View style={styles.toggleRow}>
-              <TouchableOpacity 
+              {/* <TouchableOpacity 
                 onPress={() => {
                   setPickupType('DELIVERY');
                   setPaymentMethod('MOBILE_MONEY');
@@ -555,7 +575,7 @@ const CheckoutScreen = ({ route, navigation }) => {
               >
                 <Truck size={20} color={pickupType === 'DELIVERY' ? colors.primary : colors.muted} />
                 <CustomText style={[styles.toggleText, { color: pickupType === 'DELIVERY' ? colors.primary : colors.muted }]}>Delivery</CustomText>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
               
               <TouchableOpacity 
                 onPress={() => {
@@ -574,14 +594,15 @@ const CheckoutScreen = ({ route, navigation }) => {
             </View>
 
             {pickupType === 'DELIVERY' ? (
-              <View style={styles.form}>
+              /* <View style={styles.form}>
                 {locLoading && <ActivityIndicator color={colors.primary} size="small" style={{ marginBottom: 12 }} />}
                 {renderDropdown('PROVINCE', loc.province, onProvinceChange, provinces)}
                 {renderDropdown('DISTRICT', loc.district, onDistrictChange, districts, !loc.province)}
                 {renderDropdown('SECTOR', loc.sector, onSectorChange, sectors, !loc.district)}
                 {renderDropdown('CELL', loc.cell, onCellChange, cells, !loc.sector)}
                 {renderDropdown('VILLAGE', loc.village, onVillageChange, villages, !loc.cell)}
-              </View>
+              </View> */
+              null
             ) : (
               <View style={styles.form}>
                 {renderLabel('SELLER PICKUP LOCATIONS')}
@@ -871,8 +892,43 @@ const CheckoutScreen = ({ route, navigation }) => {
           style={[styles.primaryNavBtn, step === 1 && { flex: 1 }]}
           loading={loading}
           onPress={() => {
-            if (step < 4) setStep(step + 1);
-            else handlePlaceOrder();
+            if (step === 1) {
+              if (!recipientName.trim()) {
+                Alert.alert('Invalid Input', 'Please enter the recipient name.');
+                return;
+              }
+              if (!phoneNumber.trim()) {
+                Alert.alert('Invalid Input', 'Please enter the phone number.');
+                return;
+              }
+              if (!validateRwandaPhoneNumber(phoneNumber)) {
+                Alert.alert(
+                  'Invalid Phone Number',
+                  'Please enter a valid Rwanda phone number (e.g., +250 78X XXX XXX or 078X XXX XXX).'
+                );
+                return;
+              }
+              setStep(2);
+            } else if (step === 3) {
+              if (paymentMethod === 'MOBILE_MONEY' && pickupType !== 'PICKUP') {
+                if (!phoneNumber.trim()) {
+                  Alert.alert('Invalid Input', 'Please enter the mobile number for payment.');
+                  return;
+                }
+                if (!validateRwandaPhoneNumber(phoneNumber)) {
+                  Alert.alert(
+                    'Invalid Phone Number',
+                    'Please enter a valid Rwanda phone number for payment (e.g., +250 78X XXX XXX or 078X XXX XXX).'
+                  );
+                  return;
+                }
+              }
+              setStep(4);
+            } else if (step < 4) {
+              setStep(step + 1);
+            } else {
+              handlePlaceOrder();
+            }
           }}
         >
           {step < 4 && <ChevronRight size={20} color="#FFF" style={{ marginLeft: 4 }} />}

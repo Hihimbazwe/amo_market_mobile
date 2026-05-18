@@ -116,7 +116,7 @@ const RegisterScreen = ({ navigation }) => {
               {[
                 { id: 'BUYER', icon: ShoppingBag, label: 'Buy' },
                 { id: 'SELLER', icon: Store, label: 'Sell' },
-                { id: 'AGENT', icon: UserCheck, label: 'Agent' },
+                // { id: 'AGENT', icon: UserCheck, label: 'Agent' },
               ].map((item) => (
                 <TouchableOpacity 
                   key={item.id}
@@ -184,6 +184,10 @@ const RegisterScreen = ({ navigation }) => {
               onPress={handleRegister} 
               style={styles.button}
             />
+
+            <CustomText style={[styles.dataAssurance, { color: colors.muted }]}>
+              Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
+            </CustomText>
 
             <View style={styles.separator}>
               <View style={[styles.line, { backgroundColor: colors.border }]} />
@@ -301,6 +305,13 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 14,
+  },
+  dataAssurance: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 16,
+    paddingHorizontal: 10,
   },
   separator: {
     flexDirection: 'row',

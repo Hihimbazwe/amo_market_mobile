@@ -72,11 +72,10 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   const routes = [
     { name: 'Dashboard', label: t('dashboard'), icon: Home },
     { name: 'Orders', label: t('orders'), icon: ShoppingBag },
-    { name: 'Profile', label: t('profile'), icon: UserIcon },
     { name: 'Wishlist', label: t('wishlist'), icon: Heart },
     { name: 'Wallet', label: t('wallet'), icon: Wallet },
     { name: 'Disputes', label: t('disputes'), icon: AlertCircle },
-    { name: 'Replacements', label: t('replacements'), icon: RefreshCcw },
+    { name: 'Replacements', label: 'After-Sales', icon: RefreshCcw },
     { name: 'Settings', label: t('settings'), icon: Settings },
   ];
 

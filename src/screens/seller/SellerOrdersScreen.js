@@ -247,20 +247,26 @@ const SellerOrdersScreen = () => {
   const formatPrice = (val) => 'Rwf ' + (val || 0).toLocaleString();
 
   const formatPickupSlot = (slotStr) => {
-    if (!slotStr) return '';
-    const slots = slotStr.split(',').map(s => s.trim()).filter(Boolean);
-    if (slots.length > 1) {
-      const dates = slots.map(s => {
-        const d = new Date(s);
-        return isNaN(d.getTime()) ? s.replace('T', ' ') : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      });
-      return [...new Set(dates)].join(', ');
-    } else {
-      const s = slots[0];
-      const d = new Date(s);
-      if (isNaN(d.getTime())) return s.replace('T', ' ');
+    if (!slotStr) return [];
+    const rawSlots = slotStr.split(/[|]/).map(s => s.trim()).filter(Boolean);
+    const formattedSlots = rawSlots.map(s => {
+      // Strip sellerId: prefix if present
+      let finalSlot = s;
+      if (s.includes(':')) {
+        const parts = s.split(':');
+        // Check if the part before : is a cuid (starts with c) or a potential seller ID
+        if (parts.length > 1 && parts[0].length >= 10) {
+          finalSlot = parts.slice(1).join(':');
+        }
+      }
+      
+      const d = new Date(finalSlot);
+      if (isNaN(d.getTime())) return finalSlot.replace('T', ' ');
       return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
-    }
+    });
+
+    // Deduplicate identical formatted times
+    return [...new Set(formattedSlots)];
   };
 
   const renderOrderItem = ({ item }) => {
@@ -310,8 +316,8 @@ const SellerOrdersScreen = () => {
               </View>
               <View style={styles.locationInfo}>
                 <CustomText style={[styles.locationLabel, { color: '#f97316' }]}>SCHEDULED PICKUP TIME</CustomText>
-                <CustomText style={[styles.addressText, { color: colors.foreground }]} numberOfLines={1}>
-                  {formatPickupSlot(item.pickupSlot)}
+                <CustomText style={[styles.addressText, { color: colors.foreground }]}>
+                  {formatPickupSlot(item.pickupSlot).join('\n')}
                 </CustomText>
               </View>
             </View>
@@ -401,7 +407,9 @@ const SellerOrdersScreen = () => {
           contentContainerStyle={styles.pillsScrollContent}
           style={styles.pillsRow}
         >
-          {['ALL', 'PENDING', 'PROCESSING', 'PAID', 'SHIPPED', 'DELIVERED'].map((f) => (
+          {['ALL', 'PENDING', 'PROCESSING', 'PAID'
+          // , 'SHIPPED', 'DELIVERED'
+        ].map((f) => (
             <TouchableOpacity 
               key={f} 
               onPress={() => setFilter(f)}
@@ -869,7 +877,9 @@ const SellerOrdersScreen = () => {
                     <View style={{ flex: 1 }}>
                       <CustomText style={{ fontWeight: 'bold' }}>{selectedOrderForDetails.pickupType || 'DELIVERY'}</CustomText>
                       {selectedOrderForDetails.pickupSlot && (
-                        <CustomText style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>{formatPickupSlot(selectedOrderForDetails.pickupSlot)}</CustomText>
+                        <CustomText style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                          {formatPickupSlot(selectedOrderForDetails.pickupSlot).join('\n')}
+                        </CustomText>
                       )}
                     </View>
                   </View>

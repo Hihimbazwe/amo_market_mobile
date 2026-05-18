@@ -36,12 +36,12 @@ export const replacementService = {
     }
   },
 
-  requestReplacement: async (userId, orderId, reason, description, evidence = []) => {
+  requestReplacement: async (userId, orderId, type, reason, description, evidence = []) => {
     try {
       const response = await fetch(`${BASE_URL}/api/replacements`, {
         method: 'POST',
         headers: buildHeaders(userId),
-        body: JSON.stringify({ orderId, reason, description, evidence })
+        body: JSON.stringify({ orderId, type, reason, description, evidence })
       });
       
       const text = await response.text();

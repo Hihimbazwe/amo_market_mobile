@@ -39,7 +39,7 @@ const Stack = createNativeStackNavigator();
 const { width } = Dimensions.get('window');
 
 const NAV_GROUPS = (t) => [
-  {
+  /* {
     label: t('delivery'),
     items: [
       { name: t('dashboard'), icon: Home, screen: 'AgentDashboard' },
@@ -47,7 +47,7 @@ const NAV_GROUPS = (t) => [
       { name: t('myOrders'), icon: Package, screen: 'AgentOrders' },
       { name: t('verifyCode'), icon: ShieldCheck, screen: 'AgentVerifyCode' },
     ],
-  },
+  }, */
   {
     label: t('ACCOUNT'),
     items: [

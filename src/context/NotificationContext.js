@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '@env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─────────────────────────────────────────────────────────
 // In-app API polling was disabled for performance, but 
@@ -26,8 +27,35 @@ export const NotificationProvider = ({ children }) => {
   const [expoPushToken, setExpoPushToken] = useState('');
   const [notification, setNotification] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState(true);
   const notificationListener = useRef();
   const responseListener = useRef();
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@push_enabled');
+        if (stored !== null) {
+          setPushNotificationsEnabled(JSON.parse(stored));
+        }
+      } catch (err) {
+        console.warn('Failed to load push settings', err);
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const togglePushNotifications = async (val) => {
+    setPushNotificationsEnabled(val);
+    try {
+      await AsyncStorage.setItem('@push_enabled', JSON.stringify(val));
+    } catch (err) {
+      console.error('Failed to save push setting', err);
+    }
+  };
 
   const fetchUnread = async () => {
     if (!user?.id) return;
@@ -52,54 +80,69 @@ export const NotificationProvider = ({ children }) => {
 
   // Register push notifications when a user logs in
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || loadingSettings) return;
 
-    console.log('[PUSH] Attempting registration for user:', user.id);
-    registerForPushNotificationsAsync().then(token => {
-      if (token) {
-        console.log('[PUSH] Token acquired:', token);
-        setExpoPushToken(token);
-        // Send the token to the backend
-        fetch(`${API_BASE_URL}/api/mobile/push-token`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true',
-            'x-user-id': user.id,
-          },
-          body: JSON.stringify({ token }),
-        })
-        .then(res => res.json())
-        .then(data => console.log('[PUSH] Backend sync response:', data))
-        .catch(err => {
-          console.error('[PUSH] Failed to sync push token with backend', err);
-          Alert.alert('Push Sync Error', 'Could not save token to server: ' + err.message);
-        });
-      } else {
-        console.warn('[PUSH] No token returned from registration');
-      }
-    }).catch(err => {
-      console.error('[PUSH] Registration error:', err);
-      Alert.alert('Push Registration Error', err.message);
-    });
+    if (pushNotificationsEnabled) {
+      console.log('[PUSH] Attempting registration for user:', user.id);
+      registerForPushNotificationsAsync().then(token => {
+        if (token) {
+          console.log('[PUSH] Token acquired:', token);
+          setExpoPushToken(token);
+          // Send the token to the backend
+          fetch(`${API_BASE_URL}/api/mobile/push-token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+              'x-user-id': user.id,
+            },
+            body: JSON.stringify({ token }),
+          })
+          .then(res => res.json())
+          .then(data => console.log('[PUSH] Backend sync response:', data))
+          .catch(err => {
+            console.error('[PUSH] Failed to sync push token with backend', err);
+          });
+        } else {
+          console.warn('[PUSH] No token returned from registration');
+        }
+      }).catch(err => {
+        console.error('[PUSH] Registration error:', err);
+      });
+    } else {
+      // Tell backend to delete push token when notifications are disabled
+      console.log('[PUSH] Push notifications disabled. Telling server to unregister token...');
+      fetch(`${API_BASE_URL}/api/mobile/push-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ token: 'DISABLED', enabled: false }),
+      })
+      .then(res => res.json())
+      .then(data => console.log('[PUSH] Backend unregister response:', data))
+      .catch(err => {
+        console.error('[PUSH] Failed to unregister push token on backend', err);
+      });
+    }
 
     // Handle notifications received while app is running foreground
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
-      // Optional: Add to an internal state array if you want an in-app inbox
     });
 
     // Handle user tapping the notification
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       console.log(response);
-      // Optional: Navigate to a specific screen based on response.notification.request.content.data
     });
 
     return () => {
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
-  }, [user?.id]);
+  }, [user?.id, pushNotificationsEnabled]);
 
   return (
     <NotificationContext.Provider value={{ 
@@ -108,6 +151,8 @@ export const NotificationProvider = ({ children }) => {
       refreshUnread: fetchUnread,
       loading: false, 
       expoPushToken,
+      pushNotificationsEnabled,
+      togglePushNotifications,
       fetchNotifications: () => {},
       markAllAsRead: () => {},
       deleteNotification: () => {},

@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Home, ShoppingBag, MessageCircle, CircleUser as UserIcon, Loader2, ShoppingCart } from 'lucide-react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MarketplaceScreen from './src/screens/MarketplaceScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 // Cart removed from tabs
@@ -216,6 +217,7 @@ const RootNavigator = () => {
   const backgroundTime = React.useRef(null);
   const [showWarning, setShowWarning] = React.useState(false);
   const [currentRoute, setCurrentRoute] = React.useState(null);
+  const [currentRouteObj, setCurrentRouteObj] = React.useState(null);
 
   const INACTIVITY_LIMIT = 9 * 60 * 1000; // 9 minutes warning
   const LOGOUT_LIMIT = 10 * 60 * 1000; // 10 minutes total
@@ -231,11 +233,19 @@ const RootNavigator = () => {
     }, INACTIVITY_LIMIT);
   }, [user]);
 
-  const handleLogout = React.useCallback(() => {
+  const handleLogout = React.useCallback(async () => {
     setShowWarning(false);
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    logout();
-  }, [logout]);
+    if (user && currentRouteObj) {
+      try {
+        await AsyncStorage.setItem('@auto_logout_redirect', JSON.stringify(currentRouteObj));
+        console.log('[AUTO_LOGOUT] Preserved route:', currentRouteObj.name);
+      } catch (err) {
+        console.error('Failed to save auto logout route', err);
+      }
+    }
+    logout(false);
+  }, [logout, user, currentRouteObj]);
 
   React.useEffect(() => {
     resetTimer();
@@ -310,15 +320,34 @@ const RootNavigator = () => {
         linking={linking}
         onStateChange={(state) => {
           if (!state) return;
-          let route = state.routes[state.index];
-          while (route.state) {
-            route = route.state.routes[route.state.index];
+          try {
+            let route = state.routes[state.index];
+            while (route && route.state && typeof route.state.index === 'number') {
+              const nextRoute = route.state.routes[route.state.index];
+              if (nextRoute) {
+                route = nextRoute;
+              } else {
+                break;
+              }
+            }
+            if (route && route.name) {
+              const ignoredRoutes = ['Login', 'Register', 'VerifyOTP', 'ForgotPassword', 'ResetPassword', 'Auth'];
+              if (!ignoredRoutes.includes(route.name)) {
+                setCurrentRoute(route.name);
+                if (user) {
+                  setCurrentRouteObj({ name: route.name, params: route.params });
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('[NAVIGATION] Error tracking route state', err);
           }
-          setCurrentRoute(route.name);
         }}
       >
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="MainApp" component={AppTabs} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} />
+          <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
           {!user && (
             <Stack.Screen name="Auth" component={AuthStack} />
           )}

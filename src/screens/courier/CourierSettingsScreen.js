@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
 import { chatService } from '../../api/chatService';
 import { useTranslation } from 'react-i18next';
+import { useNotifications } from '../../context/NotificationContext';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors, t }) => (
   <View style={styles.settingRow}>
@@ -41,7 +42,7 @@ export default function CourierSettingsScreen() {
   const { user, logout } = useAuth();
   const navigation = useNavigation();
   const { t } = useTranslation(['dashboard', 'common']);
-  const [notifs, setNotifs] = useState(true);
+  const { pushNotificationsEnabled, togglePushNotifications } = useNotifications();
   const [hideAvailability, setHideAvailability] = useState(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
 
@@ -129,7 +130,7 @@ export default function CourierSettingsScreen() {
         <View style={styles.section}>
           <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('PREFERENCES')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Bell} title={t('deliveryAlerts')} subtitle={t('deliveryAlertsDesc')} value={notifs} onValueChange={setNotifs} colors={colors} t={t} />
+            <SettingRow icon={Bell} title={t('deliveryAlerts')} subtitle={t('deliveryAlertsDesc')} value={pushNotificationsEnabled} onValueChange={togglePushNotifications} colors={colors} t={t} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow icon={Moon} title={t('darkMode')} subtitle={t('easierOnEyes')} value={isDarkMode} onValueChange={toggleTheme} colors={colors} t={t} />
           </View>

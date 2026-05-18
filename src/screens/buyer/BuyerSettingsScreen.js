@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
 import { chatService } from '../../api/chatService';
 import { useTranslation } from 'react-i18next';
+import { useNotifications } from '../../context/NotificationContext';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -43,7 +44,7 @@ const BuyerSettingsScreen = () => {
   const changeLanguage = (lng) => i18n.changeLanguage(lng);
   const language = i18n.language;
   const navigation = useNavigation();
-  const [notifs, setNotifs] = useState(true);
+  const { pushNotificationsEnabled, togglePushNotifications } = useNotifications();
   const [hideAvailability, setHideAvailability] = useState(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
@@ -135,7 +136,7 @@ const BuyerSettingsScreen = () => {
         <View style={styles.section}>
           <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('PREFERENCES')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Bell} title={t('pushNotifications')} subtitle={t('notifsDesc')} value={notifs} onValueChange={setNotifs} colors={colors} />
+            <SettingRow icon={Bell} title={t('pushNotifications')} subtitle={t('notifsDesc')} value={pushNotificationsEnabled} onValueChange={togglePushNotifications} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow icon={Moon} title={t('darkMode')} subtitle={t('darkModeDesc')} value={isDarkMode} onValueChange={toggleTheme} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />

@@ -182,9 +182,6 @@ const HomeScreen = ({ navigation }) => {
             <Search color={colors.foreground} size={20} />
           </TouchableOpacity>
           <NotificationIcon />
-          <TouchableOpacity onPress={() => navigation.navigate('Cart')} style={[styles.iconButton, { backgroundColor: colors.glass, marginLeft: 8 }]}>
-            <ShoppingCart color={colors.foreground} size={20} />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -289,7 +286,7 @@ const HomeScreen = ({ navigation }) => {
         >
           {[
             { icon: ShieldCheck, title: t('buyerProtection') },
-            { icon: Truck, title: t('verifiedCouriers') },
+            // { icon: Truck, title: t('verifiedCouriers') },
             { icon: Headphones, title: t('support247') },
             { icon: Star, title: t('verifiedSellers') }
           ].map((item, index) => (

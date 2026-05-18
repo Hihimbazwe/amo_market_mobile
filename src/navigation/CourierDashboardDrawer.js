@@ -40,8 +40,8 @@ const { width } = Dimensions.get('window');
 // Exactly mirrors the web COURIER sidebar items
 const NAV_ITEMS = (t) => [
   { name: t('dashboard'),   icon: LayoutDashboard, screen: 'CourierDashboard' },
-  { name: t('shipments'),   icon: Package,         screen: 'CourierShipments' },
-  { name: t('earnings'),    icon: Wallet,           screen: 'CourierEarnings'  },
+  // { name: t('shipments'),   icon: Package,         screen: 'CourierShipments' },
+  // { name: t('earnings'),    icon: Wallet,           screen: 'CourierEarnings'  },
   { name: t('profile'),  icon: UserIcon,         screen: 'CourierProfile'   },
   { name: t('settings'),    icon: Settings,         screen: 'CourierSettings'  },
 ];

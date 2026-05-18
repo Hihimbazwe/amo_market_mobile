@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, Image, KeyboardAvoiding
 import { ArrowLeft } from 'lucide-react-native';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop, Path, G } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
 import CustomInput from '../components/CustomInput';
@@ -39,6 +40,61 @@ const LoginScreen = ({ navigation }) => {
       const result = await authService.login(email, password);
       await login(result);
       
+      // Check if there is an auto-logout redirect to restore
+      const savedRedirect = await AsyncStorage.getItem('@auto_logout_redirect');
+      if (savedRedirect) {
+        try {
+          const redirectObj = JSON.parse(savedRedirect);
+          await AsyncStorage.removeItem('@auto_logout_redirect');
+          
+          if (redirectObj && redirectObj.name) {
+            console.log('[SESSION_RESTORE] Restoring screen:', redirectObj.name);
+
+            // 1. Root Stacks / Screens outside tabs
+            if (['Checkout', 'ProductDetail', 'OrderSuccess', 'Notifications', 'GlobalSearch', 'ChatDetail', 'StatusViewer'].includes(redirectObj.name)) {
+              navigation.navigate(redirectObj.name, redirectObj.params);
+              return;
+            }
+
+            // 2. Base Tabs
+            if (['Home', 'Cart', 'Messages', 'Me'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', { screen: redirectObj.name, params: redirectObj.params });
+              return;
+            }
+
+            // 3. Nested inside Home Stack
+            if (['HomeMain', 'SellerStore'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', {
+                screen: 'Home',
+                params: { screen: redirectObj.name, params: redirectObj.params }
+              });
+              return;
+            }
+
+            // 4. Nested inside Messages Stack
+            if (['MessagesMain'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', {
+                screen: 'Messages',
+                params: { screen: redirectObj.name, params: redirectObj.params }
+              });
+              return;
+            }
+
+            // 5. Drawer screens inside 'Me'
+            navigation.navigate('MainApp', {
+              screen: 'Me',
+              params: {
+                screen: redirectObj.name,
+                params: redirectObj.params
+              }
+            });
+            return;
+          }
+        } catch (e) {
+          console.error('[SESSION_RESTORE] Failed to parse or restore auto logout redirect', e);
+        }
+      }
+
       // Redirect based on role
       const role = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
       
@@ -142,6 +198,10 @@ const LoginScreen = ({ navigation }) => {
               style={styles.button}
             />
 
+            <CustomText style={[styles.dataAssurance, { color: colors.muted }]}>
+              Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
+            </CustomText>
+
             <View style={styles.separator}>
               <View style={[styles.line, { backgroundColor: colors.border }]} />
               <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
@@ -222,6 +282,13 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 14,
+  },
+  dataAssurance: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 16,
+    paddingHorizontal: 10,
   },
   separator: {
     flexDirection: 'row',
