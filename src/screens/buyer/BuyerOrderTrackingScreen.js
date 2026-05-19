@@ -99,6 +99,10 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const [deliveryCodeVisible, setDeliveryCodeVisible] = useState(false);
   const [pickupCodeVisible, setPickupCodeVisible] = useState(false);
   
+  const [returnCodeData, setReturnCodeData] = useState(null);
+  const [returnCodeVisible, setReturnCodeVisible] = useState(false);
+  const [fetchingReturnCode, setFetchingReturnCode] = useState(false);
+  
   const [ratingScore, setRatingScore] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [ratingDone, setRatingDone] = useState(false);
@@ -146,6 +150,25 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
       setRefreshing(false);
     }
   }, [user?.id, orderId]);
+
+  const fetchReturnCode = useCallback(async () => {
+    if (!user?.id || !orderId) return;
+    setFetchingReturnCode(true);
+    try {
+      const data = await orderService.getReturnCode(user.id, orderId);
+      setReturnCodeData(data);
+    } catch (e) {
+      console.error('Failed to fetch return code:', e);
+    } finally {
+      setFetchingReturnCode(false);
+    }
+  }, [user?.id, orderId]);
+
+  useEffect(() => {
+    if (order && RETURN_STATUSES.includes(order.status) && !returnCodeData && !fetchingReturnCode) {
+      fetchReturnCode();
+    }
+  }, [order?.status, returnCodeData, fetchingReturnCode, fetchReturnCode]);
 
   const fetchAgentLocation = useCallback(async (agentId) => {
     if (!agentId) return;
@@ -508,6 +531,131 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
             </View>
           </View>
         </View>
+
+        {/* Return Code Card */}
+        {isReturn && (
+          <View style={[styles.glassCard, returnCodeData?.returnCode ? { borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.05)' } : { borderColor: 'rgba(255,255,255,0.05)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <View style={[styles.iconBox, returnCodeData?.returnCode ? { backgroundColor: 'rgba(239,68,68,0.2)', borderColor: 'rgba(239,68,68,0.3)' } : { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <QrCode size={20} color={returnCodeData?.returnCode ? "#ef4444" : "#9ca3af"} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <CustomText style={{ fontSize: 15, fontWeight: '800', color: returnCodeData?.returnCode ? '#ef4444' : '#f3f4f6' }}>
+                  Your Return Code
+                </CustomText>
+                <CustomText style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                  Show this code to the seller to complete your return
+                </CustomText>
+              </View>
+            </View>
+
+            {!returnCodeData ? (
+              <TouchableOpacity
+                onPress={fetchReturnCode}
+                disabled={fetchingReturnCode}
+                style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef4444', paddingVertical: 14, borderRadius: 14, gap: 8 }}
+              >
+                {fetchingReturnCode ? <ActivityIndicator size="small" color="#fff" /> : <QrCode size={16} color="#fff" />}
+                <CustomText style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>
+                  {fetchingReturnCode ? "Generating..." : "Get Return Code"}
+                </CustomText>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                {!returnCodeVisible ? (
+                  <TouchableOpacity
+                    onPress={() => setReturnCodeVisible(true)}
+                    style={{ backgroundColor: '#ef4444', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16 }}
+                  >
+                    <CustomText style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Show Return Code</CustomText>
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 24, marginBottom: 16 }}>
+                      <QRCode
+                        value={`ReturnCode:${returnCodeData.returnCode}\nOrder:#${order.id?.slice(-8).toUpperCase()}`}
+                        size={160}
+                        color="#000"
+                        backgroundColor="#fff"
+                      />
+                    </View>
+                    <CustomText style={{ fontSize: 10, color: '#9ca3af', letterSpacing: 1.5, fontWeight: '800', marginBottom: 4 }}>YOUR RETURN CODE</CustomText>
+                    <CustomText style={{ fontSize: 36, fontWeight: '900', letterSpacing: 12, color: '#ef4444' }}>{returnCodeData.returnCode}</CustomText>
+                    {returnCodeData.type && (
+                      <CustomText style={{ fontSize: 12, color: '#9ca3af', marginTop: 8, textTransform: 'capitalize' }}>
+                        {returnCodeData.type.toLowerCase()} request · {returnCodeData.status?.replace(/_/g, ' ').toLowerCase()}
+                      </CustomText>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => setReturnCodeVisible(false)}
+                      style={{ marginTop: 16, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' }}
+                    >
+                      <CustomText style={{ fontSize: 12, fontWeight: '800', color: '#ef4444' }}>Hide Code</CustomText>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Return / Exchange Section (Mirroring Web) */}
+        {(order?.status?.toUpperCase() === "COMPLETED" || order?.status?.toUpperCase() === "PICKED_UP" || order?.status?.toUpperCase() === "DELIVERED") && !isReturn && (() => {
+
+          const stepTimestamps = {};
+          if (order.TrackingEvent) {
+            order.TrackingEvent.forEach(ev => {
+              if (!stepTimestamps[ev.status]) stepTimestamps[ev.status] = ev.createdAt;
+            });
+          }
+          const completedAt = stepTimestamps["COLLECTED"] || stepTimestamps["PICKED_UP"] || order.updatedAt;
+          const hoursSinceCompletion = (Date.now() - new Date(completedAt).getTime()) / (1000 * 60 * 60);
+          const isEligible = hoursSinceCompletion < 48;
+
+          return (
+            <View style={[styles.glassCard, { borderColor: 'rgba(249,115,22,0.1)' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(249,115,22,0.1)', borderColor: 'rgba(249,115,22,0.2)' }]}>
+                  <RotateCcw size={20} color="#fb923c" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <CustomText style={{ fontSize: 16, fontWeight: '900', color: '#f3f4f6' }}>
+                    Need a Return or Exchange?
+                  </CustomText>
+                  <CustomText style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+                    For electronics, you can request a refund or exchange within 48 hours of pickup.
+                  </CustomText>
+                </View>
+              </View>
+
+              {!isEligible ? (
+                <View style={{ backgroundColor: 'rgba(239,68,68,0.05)', borderColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderRadius: 16, padding: 12, flexDirection: 'row', alignItems: 'center' }}>
+                  <AlertTriangle size={16} color="#f87171" />
+                  <CustomText style={{ color: '#f87171', fontSize: 11, fontWeight: '800', marginLeft: 8 }}>
+                    The 48-hour return window for this pickup order has closed.
+                  </CustomText>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Replacements', { initiateReplacementForOrderId: order.id })}
+                    style={{ flex: 1, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.02)', gap: 4 }}
+                  >
+                    <CustomText style={{ color: '#f3f4f6', fontWeight: '800', fontSize: 13 }}>Request Exchange</CustomText>
+                    <CustomText style={{ color: '#9ca3af', fontSize: 10, lineHeight: 14 }}>Swap this item for a replacement at the seller's location.</CustomText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Replacements', { initiateReplacementForOrderId: order.id })}
+                    style={{ flex: 1, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.02)', gap: 4 }}
+                  >
+                    <CustomText style={{ color: '#f3f4f6', fontWeight: '800', fontSize: 13 }}>Request Refund</CustomText>
+                    <CustomText style={{ color: '#9ca3af', fontSize: 10, lineHeight: 14 }}>Return the item for a full refund subject to seller verification.</CustomText>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Delivery Code Card */}
         {showDeliveryCode && (

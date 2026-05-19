@@ -499,7 +499,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                 textStyle={{ color: colors.foreground }}
                 onPress={() => {
                   setSuccessModalVisible(false);
-                  navigation.navigate('Market');
+                  navigation.navigate('MainApp', { screen: 'Home' });
                 }}
               >
                 <ShoppingBag size={20} color={colors.foreground} style={{ marginRight: 8 }} />

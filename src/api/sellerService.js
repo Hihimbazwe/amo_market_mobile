@@ -215,6 +215,24 @@ export const sellerService = {
     }
   },
 
+  verifyReturnCode: async (userId, orderId, returnCode) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/verify-return`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ returnCode }),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to verify return code (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('verifyReturnCode error:', error);
+      throw error;
+    }
+  },
+
   getWallet: async (userId) => {
     try {
       const response = await fetch(`${BASE_URL}/api/wallet`, {
@@ -300,12 +318,25 @@ export const sellerService = {
     }
   },
 
-  updateReplacementStatus: async (userId, replacementId, status) => {
+  updateReplacementStatus: async (userId, replacementId, status, action = undefined) => {
     try {
+      const payload = {};
+      if (status) payload.status = status;
+      if (action) payload.action = action;
+      
+      // Map APPROVED/REJECTED to action for compatibility with Next.js backend PATCH api
+      if (status === 'APPROVED') {
+        payload.action = 'approve';
+        delete payload.status;
+      } else if (status === 'REJECTED') {
+        payload.action = 'reject';
+        delete payload.status;
+      }
+
       const response = await fetch(`${BASE_URL}/api/replacements/${replacementId}`, {
         method: 'PATCH',
         headers: buildHeaders(userId),
-        body: JSON.stringify({ status })
+        body: JSON.stringify(payload)
       });
       const text = await response.text();
       let data;
@@ -318,6 +349,24 @@ export const sellerService = {
       return data;
     } catch (error) {
       console.error('updateReplacementStatus error:', error);
+      throw error;
+    }
+  },
+
+  verifyReplacementReturn: async (userId, pickupCode) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/replacements/verify`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ pickupCode }),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Verification failed (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('verifyReplacementReturn error:', error);
       throw error;
     }
   },

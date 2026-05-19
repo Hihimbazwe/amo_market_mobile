@@ -22,7 +22,7 @@ const SellerOrdersScreen = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [replacementsCount, setReplacementsCount] = useState(0);
+  const [returnsCount, setReturnsCount] = useState(0);
 
   // Assign agent modal state
   const [showAgentModal, setShowAgentModal] = useState(false);
@@ -52,6 +52,10 @@ const SellerOrdersScreen = () => {
   const [pickupCodeInput, setPickupCodeInput] = useState('');
   const [verifyingPickup, setVerifyingPickup] = useState(false);
 
+  const [showVerifyReturnModal, setShowVerifyReturnModal] = useState(false);
+  const [returnCodeInput, setReturnCodeInput] = useState('');
+  const [verifyingReturn, setVerifyingReturn] = useState(false);
+
   const statusColors = {
     PENDING: { bg: colors.glass, text: colors.muted },
     PROCESSING: { bg: 'rgba(59, 130, 246, 0.1)', text: '#3B82F6' },
@@ -61,6 +65,11 @@ const SellerOrdersScreen = () => {
     DELIVERED: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10B981' },
     COMPLETED: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10B981' },
     CANCELLED: { bg: 'rgba(239, 68, 68, 0.1)', text: '#EF4444' },
+    RETURN_REQUESTED: { bg: 'rgba(239, 68, 68, 0.1)', text: '#EF4444' },
+    RETURN_IN_TRANSIT: { bg: 'rgba(249, 115, 22, 0.1)', text: colors.primary },
+    RETURN_COMPLETED: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10B981' },
+    RETURNED_TO_SELLER: { bg: 'rgba(16, 185, 129, 0.1)', text: '#10B981' },
+    REFUNDED: { bg: 'rgba(59, 130, 246, 0.1)', text: '#3B82F6' },
   };
 
   const fetchOrdersAndReplacements = async () => {
@@ -70,9 +79,15 @@ const SellerOrdersScreen = () => {
         sellerService.getOrders(user.id),
         sellerService.getReplacements(user.id).catch(() => []) 
       ]);
-      setOrders(data);
+      const returnStatuses = ['RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'RETURN_COMPLETED', 'RETURNED_TO_SELLER', 'REFUNDED'];
+      const filteredOrders = data.filter(order => 
+        !returnStatuses.includes(order.status) && 
+        order.shippingStatus !== 'RETURN_INITIATED'
+      );
+      
+      setOrders(filteredOrders);
       if (Array.isArray(reps)) {
-        setReplacementsCount(reps.filter((r) => r.status === 'OPEN' || r.status === 'PENDING').length);
+        setReturnsCount(reps.filter((r) => r.status === 'OPEN' || r.status === 'PENDING').length);
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -232,6 +247,31 @@ const SellerOrdersScreen = () => {
     }
   };
 
+  const handleOpenVerifyReturn = (order) => {
+    setTargetOrderId(order.id);
+    setReturnCodeInput('');
+    setActionModalVisible(false);
+    setTimeout(() => setShowVerifyReturnModal(true), 150);
+  };
+
+  const handleVerifyReturn = async () => {
+    if (!returnCodeInput.trim()) {
+      Alert.alert(t('error'), "Return code is required");
+      return;
+    }
+    setVerifyingReturn(true);
+    try {
+      await sellerService.verifyReturnCode(user.id, targetOrderId, returnCodeInput.trim().toUpperCase());
+      setShowVerifyReturnModal(false);
+      Alert.alert(t('success'), "Return verified successfully!");
+      fetchOrdersAndReplacements();
+    } catch (err) {
+      Alert.alert(t('error'), err.message || "Failed to verify return code");
+    } finally {
+      setVerifyingReturn(false);
+    }
+  };
+
   const filteredOrders = Array.isArray(orders) ? orders.filter((order) => {
     const matchesFilter = filter === 'ALL' || order.status === filter;
     
@@ -381,20 +421,20 @@ const SellerOrdersScreen = () => {
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 }}>
         <TouchableOpacity
           style={[styles.replacementsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => navigation.navigate('SellerReplacements')}
+          onPress={() => navigation.navigate('SellerReturns')}
           activeOpacity={0.8}
         >
           <View style={[styles.replacementsIcon, { backgroundColor: 'rgba(249,115,22,0.12)' }]}>
             <RefreshCcw color="#F97316" size={20} />
-            {replacementsCount > 0 && (
+            {returnsCount > 0 && (
               <View style={styles.badgeIndicator}>
-                <CustomText style={styles.badgeText}>{replacementsCount}</CustomText>
+                <CustomText style={styles.badgeText}>{returnsCount}</CustomText>
               </View>
             )}
           </View>
           <View style={{ flex: 1 }}>
-            <CustomText style={[styles.replacementsTitle, { color: colors.foreground }]}>{t('replacementRequests')}</CustomText>
-            <CustomText style={[styles.replacementsSub, { color: colors.muted }]}>{t('manageRMA')}</CustomText>
+            <CustomText style={[styles.replacementsTitle, { color: colors.foreground }]}>{t('returnRequests') || 'Return Requests'}</CustomText>
+            <CustomText style={[styles.replacementsSub, { color: colors.muted }]}>{t('manageReturns') || 'Manage returns and refunds'}</CustomText>
           </View>
           <ChevronRight color={colors.muted} size={18} />
         </TouchableOpacity>
@@ -481,6 +521,17 @@ const SellerOrdersScreen = () => {
                       >
                         <CheckCircle2 size={18} color="#10B981" />
                         <CustomText style={[styles.actionMenuText, { color: '#10B981' }]}>{t('verifyPickupCode')}</CustomText>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Verify Return Code — shown if order is RETURN_REQUESTED or RETURN_IN_TRANSIT */}
+                    {['RETURN_REQUESTED', 'RETURN_IN_TRANSIT'].includes(selectedOrderForActions.status?.toUpperCase()) && (
+                      <TouchableOpacity
+                        style={[styles.actionMenuItem]}
+                        onPress={() => handleOpenVerifyReturn(selectedOrderForActions)}
+                      >
+                        <RefreshCcw size={18} color="#3B82F6" />
+                        <CustomText style={[styles.actionMenuText, { color: '#3B82F6' }]}>Verify Return Code</CustomText>
                       </TouchableOpacity>
                     )}
 
@@ -778,6 +829,87 @@ const SellerOrdersScreen = () => {
                       <ShieldCheck size={18} color="white" />
                       <CustomText style={{ fontWeight: 'bold', color: 'white' }}>
                         {t('verifyAndComplete')}
+                      </CustomText>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* Verify Return Code Modal */}
+      <Modal visible={showVerifyReturnModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', height: '70%' }}
+          >
+            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '100%' }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <CustomText variant="h2">Verify Return Code</CustomText>
+                  {targetOrderId && (
+                    <CustomText style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                      {t('order')} #{targetOrderId.slice(-8).toUpperCase()}
+                    </CustomText>
+                  )}
+                </View>
+                <TouchableOpacity onPress={() => setShowVerifyReturnModal(false)} style={styles.closeBtn}>
+                  <X color={colors.muted} size={24} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView 
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingBottom: 20 }}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.pickupCodeSection}>
+                  <View style={[styles.pickupIconCircle, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
+                    <RefreshCcw color="#3B82F6" size={40} />
+                  </View>
+                  
+                  <CustomText variant="h2" style={styles.pickupSectionTitle}>Enter Return Code</CustomText>
+                  <CustomText style={[styles.pickupSectionSubtitle, { color: colors.muted }]}>
+                    Ask the buyer for the 6-character return code shown in their app to verify the return request.
+                  </CustomText>
+
+                  <View style={[styles.pickupInputWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                    <TextInput
+                      style={[styles.pickupInput, { color: colors.foreground }]}
+                      placeholder="R T 1 2 3 4"
+                      placeholderTextColor={colors.muted}
+                      autoCapitalize="characters"
+                      maxLength={8}
+                      value={returnCodeInput}
+                      onChangeText={v => setReturnCodeInput(v.toUpperCase())}
+                      letterSpacing={8}
+                    />
+                  </View>
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowVerifyReturnModal(false)}>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>{t('cancel')}</CustomText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.submitAssignBtn,
+                    { backgroundColor: '#3B82F6' },
+                    (verifyingReturn || !returnCodeInput.trim()) && { opacity: 0.5 }
+                  ]}
+                  onPress={handleVerifyReturn}
+                  disabled={verifyingReturn || !returnCodeInput.trim()}
+                >
+                  {verifyingReturn ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <ShieldCheck size={18} color="white" />
+                      <CustomText style={{ fontWeight: 'bold', color: 'white' }}>
+                        Verify Return
                       </CustomText>
                     </>
                   )}

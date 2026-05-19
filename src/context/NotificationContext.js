@@ -12,14 +12,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // we are replacing it with true native Expo Push Notifications.
 // ─────────────────────────────────────────────────────────
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
 export const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
@@ -31,6 +23,17 @@ export const NotificationProvider = ({ children }) => {
   const [loadingSettings, setLoadingSettings] = useState(true);
   const notificationListener = useRef();
   const responseListener = useRef();
+
+  // Dynamically set notification handler based on user settings
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: pushNotificationsEnabled,
+        shouldPlaySound: pushNotificationsEnabled,
+        shouldSetBadge: false,
+      }),
+    });
+  }, [pushNotificationsEnabled]);
 
   useEffect(() => {
     const loadSettings = async () => {

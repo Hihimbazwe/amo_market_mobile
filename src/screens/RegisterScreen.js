@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image, Modal, ActivityIndicator } from 'react-native';
 import { ArrowLeft, ShoppingBag, Store, UserCheck, XCircle } from 'lucide-react-native';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop, Path, G } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
 import CustomInput from '../components/CustomInput';
 import { authService } from '../api/authService';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { StatusBar } from 'react-native';
 
 const GoogleIcon = () => (
@@ -22,7 +24,91 @@ const GoogleIcon = () => (
 
 const RegisterScreen = ({ navigation }) => {
   const { colors, isDarkMode } = useTheme();
+  const { login } = useAuth();
   const [role, setRole] = useState('BUYER');
+  const [googleModalVisible, setGoogleModalVisible] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+  const [customGoogleName, setCustomGoogleName] = useState('');
+  const [showCustomGoogleForm, setShowCustomGoogleForm] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSignIn = async (gEmail, gName, gImage) => {
+    setGoogleLoading(true);
+    try {
+      const result = await authService.loginWithGoogle(gEmail, gName, gImage);
+      await login(result);
+      
+      setGoogleModalVisible(false);
+
+      // Check if there is an auto-logout redirect to restore
+      const savedRedirect = await AsyncStorage.getItem('@auto_logout_redirect');
+      if (savedRedirect) {
+        try {
+          const redirectObj = JSON.parse(savedRedirect);
+          await AsyncStorage.removeItem('@auto_logout_redirect');
+          
+          if (redirectObj && redirectObj.name) {
+            console.log('[SESSION_RESTORE] Restoring screen:', redirectObj.name);
+
+            // 1. Root Stacks / Screens outside tabs
+            if (['Checkout', 'ProductDetail', 'OrderSuccess', 'Notifications', 'GlobalSearch', 'ChatDetail', 'StatusViewer'].includes(redirectObj.name)) {
+              navigation.navigate(redirectObj.name, redirectObj.params);
+              return;
+            }
+
+            // 2. Base Tabs
+            if (['Home', 'Cart', 'Messages', 'Me'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', { screen: redirectObj.name, params: redirectObj.params });
+              return;
+            }
+
+            // 3. Nested inside Home Stack
+            if (['HomeMain', 'SellerStore'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', {
+                screen: 'Home',
+                params: { screen: redirectObj.name, params: redirectObj.params }
+              });
+              return;
+            }
+
+            // 4. Nested inside Messages Stack
+            if (['MessagesMain'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', {
+                screen: 'Messages',
+                params: { screen: redirectObj.name, params: redirectObj.params }
+              });
+              return;
+            }
+
+            // 5. Drawer screens inside 'Me'
+            navigation.navigate('MainApp', {
+              screen: 'Me',
+              params: {
+                screen: redirectObj.name,
+                params: redirectObj.params
+              }
+            });
+            return;
+          }
+        } catch (e) {
+          console.error('[SESSION_RESTORE] Failed to parse or restore auto logout redirect', e);
+        }
+      }
+
+      // Redirect based on role
+      const redirectRole = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
+      if (['SELLER', 'COURIER', 'AGENT'].includes(redirectRole)) {
+        navigation.navigate('MainApp', { screen: 'Me' });
+      } else {
+        navigation.navigate('MainApp', { screen: 'Home' });
+      }
+
+    } catch (error) {
+      Alert.alert('Google Sign-In Failed', error.message || 'Something went wrong');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -195,26 +281,149 @@ const RegisterScreen = ({ navigation }) => {
               <View style={[styles.line, { backgroundColor: colors.border }]} />
             </View>
 
-            <TouchableOpacity 
-              style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }]}
-              onPress={() => Alert.alert('Google Sign-In', 'Google Sign-In reached! Configuration needed for full experience.')}
-              activeOpacity={0.8}
-            >
-              <GoogleIcon />
-              <CustomText style={styles.googleButtonText}>Join with Google</CustomText>
-            </TouchableOpacity>
-          </View>
+             <TouchableOpacity 
+               style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }]}
+               onPress={() => setGoogleModalVisible(true)}
+               activeOpacity={0.8}
+             >
+               <GoogleIcon />
+               <CustomText style={styles.googleButtonText}>Join with Google</CustomText>
+             </TouchableOpacity>
+           </View>
 
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Login')}
-            style={styles.link}
-          >
-            <CustomText style={[styles.linkText, { color: colors.muted }]}>
-              Already have an account? <CustomText style={{ color: colors.primary }}>Login</CustomText>
-            </CustomText>
-          </TouchableOpacity>
+           <TouchableOpacity 
+             onPress={() => navigation.navigate('Login')}
+             style={styles.link}
+           >
+             <CustomText style={[styles.linkText, { color: colors.muted }]}>
+               Already have an account? <CustomText style={{ color: colors.primary }}>Login</CustomText>
+             </CustomText>
+           </TouchableOpacity>
+         </View>
+       </ScrollView>
+
+      {/* Google Account Chooser Bottom Sheet Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={googleModalVisible}
+        onRequestClose={() => {
+          if (!googleLoading) setGoogleModalVisible(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <GoogleIcon />
+              <CustomText variant="h2" style={{ marginTop: 12, textAlign: 'center' }}>Sign in with Google</CustomText>
+              <CustomText variant="caption" style={{ color: colors.muted, marginTop: 4, textAlign: 'center' }}>
+                to continue to AMO Market
+              </CustomText>
+            </View>
+
+            {googleLoading ? (
+              <View style={styles.modalLoading}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <CustomText style={{ marginTop: 16 }}>Connecting to Google...</CustomText>
+              </View>
+            ) : showCustomGoogleForm ? (
+              /* Custom Account Form */
+              <View style={styles.formContainer}>
+                <CustomInput
+                  label="Name"
+                  placeholder="e.g. John Doe"
+                  value={customGoogleName}
+                  onChangeText={setCustomGoogleName}
+                  colors={colors}
+                />
+                <View style={{ height: 12 }} />
+                <CustomInput
+                  label="Google Email"
+                  placeholder="e.g. user@gmail.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={customGoogleEmail}
+                  onChangeText={setCustomGoogleEmail}
+                  colors={colors}
+                />
+                <View style={{ height: 20 }} />
+                <CustomButton
+                  title="Continue"
+                  onPress={() => {
+                    if (!customGoogleEmail || !customGoogleName) {
+                      Alert.alert('Error', 'Please fill in all fields');
+                      return;
+                    }
+                    handleGoogleSignIn(customGoogleEmail, customGoogleName, null);
+                  }}
+                />
+                <TouchableOpacity
+                  style={{ marginTop: 12, alignSelf: 'center' }}
+                  onPress={() => setShowCustomGoogleForm(false)}
+                >
+                  <CustomText style={{ color: colors.primary, fontWeight: '600' }}>Back to accounts</CustomText>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* Account List */
+              <View style={styles.accountsList}>
+                {/* Pre-populated Google Account 1 */}
+                <TouchableOpacity
+                  style={[styles.accountItem, { borderColor: colors.border }]}
+                  onPress={() => handleGoogleSignIn('john.doe@gmail.com', 'John Doe', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150')}
+                >
+                  <Image
+                    source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150' }}
+                    style={styles.accountAvatar}
+                  />
+                  <View style={styles.accountDetails}>
+                    <CustomText style={{ fontWeight: '600', color: colors.foreground }}>John Doe</CustomText>
+                    <CustomText style={{ color: colors.muted, fontSize: 12 }}>john.doe@gmail.com</CustomText>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Pre-populated Google Account 2 */}
+                <TouchableOpacity
+                  style={[styles.accountItem, { borderColor: colors.border, marginTop: 12 }]}
+                  onPress={() => handleGoogleSignIn('jane.smith@gmail.com', 'Jane Smith', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150')}
+                >
+                  <Image
+                    source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150' }}
+                    style={styles.accountAvatar}
+                  />
+                  <View style={styles.accountDetails}>
+                    <CustomText style={{ fontWeight: '600', color: colors.foreground }}>Jane Smith</CustomText>
+                    <CustomText style={{ color: colors.muted, fontSize: 12 }}>jane.smith@gmail.com</CustomText>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Add Custom Account */}
+                <TouchableOpacity
+                  style={[styles.accountItem, { borderColor: colors.border, marginTop: 12 }]}
+                  onPress={() => setShowCustomGoogleForm(true)}
+                >
+                  <View style={[styles.accountAvatar, { backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' }]}>
+                    <CustomText style={{ fontSize: 20, fontWeight: '300', color: colors.foreground }}>+</CustomText>
+                  </View>
+                  <View style={styles.accountDetails}>
+                    <CustomText style={{ fontWeight: '600', color: colors.primary }}>Use another account</CustomText>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!googleLoading && (
+              <TouchableOpacity
+                style={[styles.cancelBtn, { marginTop: 24 }]}
+                onPress={() => setGoogleModalVisible(false)}
+              >
+                <CustomText style={{ color: '#ef4444', fontWeight: '700' }}>Cancel</CustomText>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </ScrollView>
+      </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -340,6 +549,52 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     fontSize: 15,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalLoading: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  formContainer: {
+    paddingVertical: 10,
+  },
+  accountsList: {
+    paddingVertical: 10,
+  },
+  accountItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  accountAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 16,
+  },
+  accountDetails: {
+    flex: 1,
+  },
+  cancelBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
   },
 });
 

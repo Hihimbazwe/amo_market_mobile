@@ -27,7 +27,7 @@ import SellerOverviewScreen from '../screens/seller/SellerOverviewScreen';
 import SellerOrdersScreen from '../screens/seller/SellerOrdersScreen';
 import SellerShipmentScreen from '../screens/seller/SellerShipmentScreen';
 import SellerWalletScreen from '../screens/seller/SellerWalletScreen';
-import SellerReplacementsScreen from '../screens/seller/SellerReplacementsScreen';
+import SellerReturnsScreen from '../screens/seller/SellerReturnsScreen';
 import SellerDisputesScreen from '../screens/seller/SellerDisputesScreen';
 import SellerProfileScreen from '../screens/seller/SellerProfileScreen';
 import SellerSettingsScreen from '../screens/seller/SellerSettingsScreen';
@@ -235,7 +235,7 @@ export default function SellerDashboardDrawer({ navigation }) {
           <Stack.Screen name="SellerOverview" component={SellerOverviewScreen} />
           <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} />
           <Stack.Screen name="SellerShipment" component={SellerShipmentScreen} />
-          <Stack.Screen name="SellerReplacements" component={SellerReplacementsScreen} />
+          <Stack.Screen name="SellerReturns" component={SellerReturnsScreen} />
           <Stack.Screen name="SellerDisputes" component={SellerDisputesScreen} />
           <Stack.Screen name="SellerWallet" component={SellerWalletScreen} />
           <Stack.Screen name="SellerWithdraw" component={SellerWithdrawScreen} />

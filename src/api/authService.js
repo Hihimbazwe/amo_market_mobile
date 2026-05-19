@@ -66,6 +66,34 @@ export const authService = {
       throw error;
     }
   },
+  
+  loginWithGoogle: async (email, name, image) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/auth/mobile-google`, {
+        method: 'POST',
+        headers: commonHeaders,
+        body: JSON.stringify({ email, name, image }),
+      }, 25000);
+
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        if (!response.ok) throw new Error(responseText || 'Google login failed');
+        throw new Error('Invalid server response');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Google login failed');
+      }
+
+      return data.user;
+    } catch (error) {
+      console.error('Google login error:', error);
+      throw error;
+    }
+  },
 
   register: async (userData) => {
     try {

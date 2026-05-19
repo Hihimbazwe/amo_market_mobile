@@ -62,7 +62,7 @@ const OrderSuccessScreen = ({ route, navigation }) => {
           style={[styles.homeBtn, { borderColor: colors.border }]}
           textStyle={{ color: colors.foreground }}
           onPress={() => {
-            navigation.navigate('Market');
+            navigation.navigate('MainApp', { screen: 'Home' });
           }}
         >
           <ShoppingBag size={20} color={colors.foreground} style={{ marginRight: 8 }} />

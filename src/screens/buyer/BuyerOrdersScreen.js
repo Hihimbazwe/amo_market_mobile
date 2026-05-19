@@ -80,6 +80,10 @@ const BuyerOrdersScreen = ({ navigation }) => {
   const [allLocations, setAllLocations] = useState([]);
   const [savingPickup, setSavingPickup] = useState(false);
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const [returnModalVisible, setReturnModalVisible] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [returnError, setReturnError] = useState('');
 
   const fetchOrders = async () => {
     if (!user?.id) return;
@@ -246,6 +250,25 @@ const BuyerOrdersScreen = ({ navigation }) => {
       Alert.alert(t('error') || "Error", error.message || "Failed to update pickup time");
     } finally {
       setSavingPickup(false);
+    }
+  };
+
+  const handleReturnRequest = async () => {
+    if (!user?.id || !selectedOrder || !returnReason.trim()) return;
+    setSubmittingReturn(true);
+    setReturnError('');
+    try {
+      await orderService.submitReturnRequest(user.id, selectedOrder.id, returnReason);
+      setReturnModalVisible(false);
+      setOptionsVisible(false);
+      setReturnReason('');
+      await fetchOrders();
+      Alert.alert(t('success') || "Success", "Return request submitted successfully");
+    } catch (error) {
+      console.error('Return request error:', error);
+      setReturnError(error.message || "Failed to submit return request");
+    } finally {
+      setSubmittingReturn(false);
     }
   };
 
@@ -534,7 +557,8 @@ const BuyerOrdersScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 )}
 
-                {/* After-Sales Request */}
+                {/* After-Sales Request (Commented out as requested) */}
+                {/*
                 {(selectedOrder?.status === 'DELIVERED' || selectedOrder?.status === 'COMPLETED') && (
                     <TouchableOpacity 
                     style={styles.optionItem}
@@ -547,6 +571,32 @@ const BuyerOrdersScreen = ({ navigation }) => {
                     <CustomText style={[styles.optionLabel, { color: '#F97316' }]}>After-Sales Request</CustomText>
                     </TouchableOpacity>
                 )}
+                */}
+
+                {/* Request Return Option */}
+                {(() => {
+                  if (!selectedOrder) return null;
+                  const isCompletedOrDelivered = ['COMPLETED', 'PICKED_UP', 'DELIVERED'].includes(selectedOrder.status?.toUpperCase());
+                  const isReturn = ['RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'RETURN_COMPLETED', 'RETURNED_TO_SELLER', 'REFUNDED'].includes(selectedOrder.status?.toUpperCase());
+
+                  if (isCompletedOrDelivered && !isReturn) {
+                    return (
+                      <TouchableOpacity 
+                        style={styles.optionItem}
+                        onPress={() => {
+                          setOptionsVisible(false);
+                          setReturnReason('');
+                          setReturnError('');
+                          setReturnModalVisible(true);
+                        }}
+                      >
+                        <RotateCcw size={20} color="#F97316" />
+                        <CustomText style={[styles.optionLabel, { color: '#F97316' }]}>Request Return</CustomText>
+                      </TouchableOpacity>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Report Issue */}
                 <TouchableOpacity 
@@ -706,6 +756,70 @@ const BuyerOrdersScreen = ({ navigation }) => {
               >
                 {cancelling ? <ActivityIndicator size="small" color="#fff" /> : (
                   <CustomText style={{ color: '#fff', fontWeight: 'bold' }}>{t('yesCancel')}</CustomText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Return Request Modal */}
+      <Modal
+        visible={returnModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setReturnModalVisible(false)}
+      >
+        <View style={styles.cancelModalOverlay}>
+          <View style={[styles.cancelModalContent, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+            <View style={styles.cancelModalHeader}>
+              <View style={[styles.cancelModalIconBox, { backgroundColor: 'rgba(234, 179, 8, 0.1)' }]}>
+                <RefreshCw size={24} color="#eab308" />
+              </View>
+              <View style={{ marginLeft: 12 }}>
+                <CustomText variant="h3">Request Return</CustomText>
+                <CustomText style={{ fontSize: 11, color: colors.muted }}>#{selectedOrder?.id?.slice(-8).toUpperCase()}</CustomText>
+              </View>
+            </View>
+
+            <TextInput
+              style={{ 
+                backgroundColor: colors.inputBg, 
+                borderColor: colors.glassBorder, 
+                borderWidth: 1, 
+                color: colors.foreground, 
+                borderRadius: 12, 
+                padding: 12, 
+                minHeight: 80, 
+                textAlignVertical: 'top',
+                marginVertical: 16 
+              }}
+              placeholder="Describe the reason for return (e.g. wrong item, damaged, etc.)..."
+              placeholderTextColor={colors.muted}
+              multiline
+              numberOfLines={3}
+              value={returnReason}
+              onChangeText={setReturnReason}
+            />
+
+            {returnError ? (
+              <CustomText style={{ color: '#ef4444', fontSize: 12, marginBottom: 16 }}>{returnError}</CustomText>
+            ) : null}
+
+            <View style={styles.cancelModalActions}>
+              <TouchableOpacity 
+                style={[styles.cancelModalBtn, { backgroundColor: colors.glass }]} 
+                onPress={() => setReturnModalVisible(false)}
+              >
+                <CustomText style={{ fontWeight: 'bold' }}>Cancel</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.cancelModalBtn, { backgroundColor: colors.primary }]} 
+                onPress={handleReturnRequest}
+                disabled={submittingReturn || !returnReason.trim()}
+              >
+                {submittingReturn ? <ActivityIndicator size="small" color="#fff" /> : (
+                  <CustomText style={{ color: '#fff', fontWeight: 'bold' }}>Submit</CustomText>
                 )}
               </TouchableOpacity>
             </View>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Image, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Image, KeyboardAvoidingView, Platform, Alert, Modal, ActivityIndicator } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop, Path, G } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +28,89 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const [googleModalVisible, setGoogleModalVisible] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+  const [customGoogleName, setCustomGoogleName] = useState('');
+  const [showCustomGoogleForm, setShowCustomGoogleForm] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleGoogleSignIn = async (gEmail, gName, gImage) => {
+    setGoogleLoading(true);
+    try {
+      const result = await authService.loginWithGoogle(gEmail, gName, gImage);
+      await login(result);
+      
+      setGoogleModalVisible(false);
+
+      // Check if there is an auto-logout redirect to restore
+      const savedRedirect = await AsyncStorage.getItem('@auto_logout_redirect');
+      if (savedRedirect) {
+        try {
+          const redirectObj = JSON.parse(savedRedirect);
+          await AsyncStorage.removeItem('@auto_logout_redirect');
+          
+          if (redirectObj && redirectObj.name) {
+            console.log('[SESSION_RESTORE] Restoring screen:', redirectObj.name);
+
+            // 1. Root Stacks / Screens outside tabs
+            if (['Checkout', 'ProductDetail', 'OrderSuccess', 'Notifications', 'GlobalSearch', 'ChatDetail', 'StatusViewer'].includes(redirectObj.name)) {
+              navigation.navigate(redirectObj.name, redirectObj.params);
+              return;
+            }
+
+            // 2. Base Tabs
+            if (['Home', 'Cart', 'Messages', 'Me'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', { screen: redirectObj.name, params: redirectObj.params });
+              return;
+            }
+
+            // 3. Nested inside Home Stack
+            if (['HomeMain', 'SellerStore'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', {
+                screen: 'Home',
+                params: { screen: redirectObj.name, params: redirectObj.params }
+              });
+              return;
+            }
+
+            // 4. Nested inside Messages Stack
+            if (['MessagesMain'].includes(redirectObj.name)) {
+              navigation.navigate('MainApp', {
+                screen: 'Messages',
+                params: { screen: redirectObj.name, params: redirectObj.params }
+              });
+              return;
+            }
+
+            // 5. Drawer screens inside 'Me'
+            navigation.navigate('MainApp', {
+              screen: 'Me',
+              params: {
+                screen: redirectObj.name,
+                params: redirectObj.params
+              }
+            });
+            return;
+          }
+        } catch (e) {
+          console.error('[SESSION_RESTORE] Failed to parse or restore auto logout redirect', e);
+        }
+      }
+
+      // Redirect based on role
+      const role = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
+      if (['SELLER', 'COURIER', 'AGENT'].includes(role)) {
+        navigation.navigate('MainApp', { screen: 'Me' });
+      } else {
+        navigation.navigate('MainApp', { screen: 'Home' });
+      }
+
+    } catch (error) {
+      Alert.alert('Google Sign-In Failed', error.message || 'Something went wrong');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -202,32 +285,20 @@ const LoginScreen = ({ navigation }) => {
               Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
             </CustomText>
 
-            <View style={styles.separator}>
-              <View style={[styles.line, { backgroundColor: colors.border }]} />
-              <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
-              <View style={[styles.line, { backgroundColor: colors.border }]} />
-            </View>
 
-            <TouchableOpacity 
-              style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }]}
-              onPress={() => Alert.alert('Google Sign-In', 'Google Sign-In reached! Configuration needed for full experience.')}
-              activeOpacity={0.8}
-            >
-              <GoogleIcon />
-              <CustomText style={styles.googleButtonText}>Continue with Google</CustomText>
-            </TouchableOpacity>
-          </View>
+           </View>
 
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Register')}
-            style={styles.link}
-          >
-            <CustomText style={[styles.linkText, { color: colors.muted }]}>
-              Don't have an account? <CustomText style={{ color: colors.primary }}>Register</CustomText>
-            </CustomText>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+           <TouchableOpacity 
+             onPress={() => navigation.navigate('Register')}
+             style={styles.link}
+           >
+             <CustomText style={[styles.linkText, { color: colors.muted }]}>
+               Don't have an account? <CustomText style={{ color: colors.primary }}>Register</CustomText>
+             </CustomText>
+           </TouchableOpacity>
+         </View>
+       </ScrollView>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -317,6 +388,52 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     fontSize: 15,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalLoading: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  formContainer: {
+    paddingVertical: 10,
+  },
+  accountsList: {
+    paddingVertical: 10,
+  },
+  accountItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  accountAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 16,
+  },
+  accountDetails: {
+    flex: 1,
+  },
+  cancelBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
   },
 });
 

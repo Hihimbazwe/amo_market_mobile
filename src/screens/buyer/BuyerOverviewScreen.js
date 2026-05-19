@@ -146,7 +146,7 @@ const BuyerOverviewScreen = () => {
           </View>
           <TouchableOpacity
             style={[styles.shopBtn, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.navigate('Market')}
+            onPress={() => navigation.navigate('Home')}
           >
             <Zap color={colors.white} size={16} />
             <CustomText style={styles.shopBtnText}>{t('shopNow')}</CustomText>

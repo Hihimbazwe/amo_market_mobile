@@ -138,5 +138,32 @@ export const orderService = {
       console.error('cancelOrder error:', error);
       throw error;
     }
+  },
+
+  getReturnCode: async (userId, orderId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/buyer/orders/${orderId}/return-code`, {
+        method: 'GET',
+        headers: buildHeaders(userId),
+      });
+      return await handleResponse(response, 'Failed to fetch return code');
+    } catch (error) {
+      console.error('getReturnCode error:', error);
+      throw error;
+    }
+  },
+
+  submitReturnRequest: async (userId, orderId, reason) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/buyer/orders/${orderId}/return-request`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ reason }),
+      });
+      return await handleResponse(response, 'Failed to submit return request');
+    } catch (error) {
+      console.error('submitReturnRequest error:', error);
+      throw error;
+    }
   }
 };
