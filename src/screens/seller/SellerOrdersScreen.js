@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, RefreshControl, Alert, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
-import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone, CheckCircle2, ClipboardList, KeyRound, Store, Clock, FileText } from 'lucide-react-native';
+import { Menu, Search, ShoppingBag, Package as PackageIcon, ChevronRight, User, RefreshCcw, Truck, UserCheck, X, MoreVertical, Star, ShieldCheck, MapPin, Phone, CheckCircle2, ClipboardList, KeyRound, Store, Clock, FileText, QrCode, Keyboard } from 'lucide-react-native';
 import { TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import CustomText from '../../components/CustomText';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
@@ -48,13 +49,34 @@ const SellerOrdersScreen = () => {
 
   // Prepare & Verify Pickup state
   const [preparingOrderId, setPreparingOrderId] = useState(null);
-  const [showVerifyPickupModal, setShowVerifyPickupModal] = useState(false);
+  const [showVerifyPickupModal, setShowVerifyVerifyPickupModalInternal] = useState(false);
   const [pickupCodeInput, setPickupCodeInput] = useState('');
   const [verifyingPickup, setVerifyingPickup] = useState(false);
 
-  const [showVerifyReturnModal, setShowVerifyReturnModal] = useState(false);
+  const [showVerifyReturnModal, setShowVerifyVerifyReturnModalInternal] = useState(false);
   const [returnCodeInput, setReturnCodeInput] = useState('');
   const [verifyingReturn, setVerifyingReturn] = useState(false);
+
+  const [pickupVerifyMethod, setPickupVerifyMethod] = useState(null); // 'SCAN', 'MANUAL', or null
+  const [returnVerifyMethod, setReturnVerifyMethod] = useState(null); // 'SCAN', 'MANUAL', or null
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+
+  const setShowVerifyPickupModal = (val) => {
+    setShowVerifyVerifyPickupModalInternal(val);
+    if (!val) {
+      setPickupVerifyMethod(null);
+      setScanned(false);
+    }
+  };
+
+  const setShowVerifyReturnModal = (val) => {
+    setShowVerifyVerifyReturnModalInternal(val);
+    if (!val) {
+      setReturnVerifyMethod(null);
+      setScanned(false);
+    }
+  };
 
   const statusColors = {
     PENDING: { bg: colors.glass, text: colors.muted },
@@ -225,8 +247,93 @@ const SellerOrdersScreen = () => {
   const handleOpenVerifyPickup = (order) => {
     setTargetOrderId(order.id);
     setPickupCodeInput('');
+    setPickupVerifyMethod(null);
     setActionModalVisible(false);
     setTimeout(() => setShowVerifyPickupModal(true), 150);
+  };
+
+  const handleOpenPickupScanner = async () => {
+    if (!permission) {
+      const status = await requestPermission();
+      if (!status.granted) {
+        Alert.alert('Permission Denied', 'Camera permission is required to scan QR codes.');
+        return;
+      }
+    } else if (!permission.granted) {
+      const status = await requestPermission();
+      if (!status.granted) {
+        Alert.alert('Permission Denied', 'Camera permission is required to scan QR codes.');
+        return;
+      }
+    }
+    setPickupVerifyMethod('SCAN');
+    setScanned(false);
+  };
+
+  const handlePickupBarcodeScanned = ({ data }) => {
+    if (scanned) return;
+    setScanned(true);
+    let extractedCode = data;
+    
+    // 1. Try to extract the Code from line-based layout like `Code: AB12CD`
+    const codeMatch = data.match(/(?:Code|ReturnCode)\s*:\s*([a-zA-Z0-9]+)/i);
+    if (codeMatch) {
+      extractedCode = codeMatch[1];
+    } else {
+      // 2. Try JSON parsing
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed && parsed.code) {
+          extractedCode = parsed.code;
+        } else if (parsed && parsed.pickupCode) {
+          extractedCode = parsed.pickupCode;
+        } else if (parsed && parsed.returnCode) {
+          extractedCode = parsed.returnCode;
+        }
+      } catch (e) {}
+    }
+    
+    const cleaned = extractedCode?.replace(/\s/g, '').toUpperCase();
+    
+    // 3. Extract and validate Order ID suffix if present
+    const orderIdMatch = data.match(/Order\s*:\s*#?([a-zA-Z0-9]+)/i);
+    if (orderIdMatch) {
+      const scannedOrderIdSuffix = orderIdMatch[1].toUpperCase();
+      const expectedOrderIdSuffix = targetOrderId?.slice(-8).toUpperCase();
+      if (expectedOrderIdSuffix && scannedOrderIdSuffix !== expectedOrderIdSuffix) {
+        Alert.alert(
+          'Order Mismatch',
+          `Scanned QR code is for order #${scannedOrderIdSuffix}, but you are verifying order #${expectedOrderIdSuffix}.`
+        );
+        setScanned(false);
+        return;
+      }
+    }
+    
+    if (cleaned) {
+      setPickupCodeInput(cleaned);
+      setPickupVerifyMethod(null);
+      // Auto-verify directly!
+      const autoVerify = async () => {
+        setVerifyingPickup(true);
+        try {
+          await sellerService.verifyPickupCode(user.id, targetOrderId, cleaned);
+          setShowVerifyPickupModal(false);
+          Alert.alert(t('success') || 'Success', t('pickupVerified') || 'Pickup verified successfully!');
+          fetchOrdersAndReplacements();
+        } catch (err) {
+          Alert.alert(t('error') || 'Error', err.message || t('failedToVerifyPickup') || 'Failed to verify pickup');
+        } finally {
+          setVerifyingPickup(false);
+          setScanned(false);
+        }
+      };
+      
+      autoVerify();
+    } else {
+      Alert.alert('Invalid QR Code', 'Could not detect a valid verification code in the scanned QR code.');
+      setScanned(false);
+    }
   };
 
   const handleVerifyPickup = async () => {
@@ -237,7 +344,7 @@ const SellerOrdersScreen = () => {
     setVerifyingPickup(true);
     try {
       await sellerService.verifyPickupCode(user.id, targetOrderId, pickupCodeInput.trim().toUpperCase());
-      setShowVerifyPickupModal(false);
+      setShowVerifyVerifyPickupModalInternal(false);
       Alert.alert(t('success'), t('pickupVerified'));
       fetchOrdersAndReplacements();
     } catch (err) {
@@ -250,8 +357,93 @@ const SellerOrdersScreen = () => {
   const handleOpenVerifyReturn = (order) => {
     setTargetOrderId(order.id);
     setReturnCodeInput('');
+    setReturnVerifyMethod(null);
     setActionModalVisible(false);
     setTimeout(() => setShowVerifyReturnModal(true), 150);
+  };
+
+  const handleOpenReturnScanner = async () => {
+    if (!permission) {
+      const status = await requestPermission();
+      if (!status.granted) {
+        Alert.alert('Permission Denied', 'Camera permission is required to scan QR codes.');
+        return;
+      }
+    } else if (!permission.granted) {
+      const status = await requestPermission();
+      if (!status.granted) {
+        Alert.alert('Permission Denied', 'Camera permission is required to scan QR codes.');
+        return;
+      }
+    }
+    setReturnVerifyMethod('SCAN');
+    setScanned(false);
+  };
+
+  const handleReturnBarcodeScanned = ({ data }) => {
+    if (scanned) return;
+    setScanned(true);
+    let extractedCode = data;
+    
+    // 1. Try to extract the Code from line-based layout like `ReturnCode: RT12CD`
+    const codeMatch = data.match(/(?:Code|ReturnCode)\s*:\s*([a-zA-Z0-9]+)/i);
+    if (codeMatch) {
+      extractedCode = codeMatch[1];
+    } else {
+      // 2. Try JSON parsing
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed && parsed.code) {
+          extractedCode = parsed.code;
+        } else if (parsed && parsed.pickupCode) {
+          extractedCode = parsed.pickupCode;
+        } else if (parsed && parsed.returnCode) {
+          extractedCode = parsed.returnCode;
+        }
+      } catch (e) {}
+    }
+    
+    const cleaned = extractedCode?.replace(/\s/g, '').toUpperCase();
+    
+    // 3. Extract and validate Order ID suffix if present
+    const orderIdMatch = data.match(/Order\s*:\s*#?([a-zA-Z0-9]+)/i);
+    if (orderIdMatch) {
+      const scannedOrderIdSuffix = orderIdMatch[1].toUpperCase();
+      const expectedOrderIdSuffix = targetOrderId?.slice(-8).toUpperCase();
+      if (expectedOrderIdSuffix && scannedOrderIdSuffix !== expectedOrderIdSuffix) {
+        Alert.alert(
+          'Order Mismatch',
+          `Scanned QR code is for order #${scannedOrderIdSuffix}, but you are verifying order #${expectedOrderIdSuffix}.`
+        );
+        setScanned(false);
+        return;
+      }
+    }
+    
+    if (cleaned) {
+      setReturnCodeInput(cleaned);
+      setReturnVerifyMethod(null);
+      // Auto-verify directly!
+      const autoVerify = async () => {
+        setVerifyingReturn(true);
+        try {
+          await sellerService.verifyReturnCode(user.id, targetOrderId, cleaned);
+          setShowVerifyReturnModal(false);
+          Alert.alert(t('success') || 'Success', "Return verified successfully!");
+          fetchOrdersAndReplacements();
+        } catch (err) {
+          Alert.alert(t('error') || 'Error', err.message || "Failed to verify return code");
+        } finally {
+          setVerifyingReturn(false);
+          setScanned(false);
+        }
+      };
+      
+      autoVerify();
+    } else {
+      Alert.alert('Invalid QR Code', 'Could not detect a valid verification code in the scanned QR code.');
+      setScanned(false);
+    }
   };
 
   const handleVerifyReturn = async () => {
@@ -262,7 +454,7 @@ const SellerOrdersScreen = () => {
     setVerifyingReturn(true);
     try {
       await sellerService.verifyReturnCode(user.id, targetOrderId, returnCodeInput.trim().toUpperCase());
-      setShowVerifyReturnModal(false);
+      setShowVerifyVerifyReturnModalInternal(false);
       Alert.alert(t('success'), "Return verified successfully!");
       fetchOrdersAndReplacements();
     } catch (err) {
@@ -763,9 +955,9 @@ const SellerOrdersScreen = () => {
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ width: '100%', height: '70%' }}
+            style={{ width: '100%', maxHeight: '90%' }}
           >
-            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '100%' }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: undefined }]}>
               <View style={styles.modalHeader}>
                 <View>
                   <CustomText variant="h2">{t('verifyPickupCode')}</CustomText>
@@ -784,19 +976,76 @@ const SellerOrdersScreen = () => {
                 contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingBottom: 20 }}
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.pickupCodeSection}>
-                  <View style={[styles.pickupIconCircle, { backgroundColor: '#10B98115' }]}>
-                    <ShieldCheck color="#10B981" size={40} />
+                {/* 1. Scan QR Code Section */}
+                {pickupVerifyMethod === 'SCAN' ? (
+                  <View style={{ width: '100%', height: 260, overflow: 'hidden', borderRadius: 16 }}>
+                    <CameraView
+                      style={StyleSheet.absoluteFillObject}
+                      barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                      onBarcodeScanned={scanned ? undefined : handlePickupBarcodeScanned}
+                    >
+                      <View style={styles.scannerOverlay}>
+                        <View style={styles.scannerUnfocused} />
+                        <View style={{ flexDirection: 'row' }}>
+                          <View style={styles.scannerUnfocused} />
+                          <View style={[styles.scannerFocus, { borderColor: '#f97316', width: 160, height: 160 }]}>
+                            {/* Laser pointer line */}
+                            <View style={[styles.laser, { backgroundColor: '#f97316' }]} />
+                            
+                            {/* Reticle Corner Brackets */}
+                            <View style={[styles.corner, styles.topLeft, { borderColor: '#f97316' }]} />
+                            <View style={[styles.corner, styles.topRight, { borderColor: '#f97316' }]} />
+                            <View style={[styles.corner, styles.bottomLeft, { borderColor: '#f97316' }]} />
+                            <View style={[styles.corner, styles.bottomRight, { borderColor: '#f97316' }]} />
+                          </View>
+                          <View style={styles.scannerUnfocused} />
+                        </View>
+                        <View style={styles.scannerUnfocused}>
+                          <CustomText style={[styles.scanText, { fontSize: 11, marginBottom: 6 }]}>Position the QR code inside the frame</CustomText>
+                          <TouchableOpacity 
+                            style={[styles.scannerCancelBtn, { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingVertical: 4, paddingHorizontal: 12 }]}
+                            onPress={() => setPickupVerifyMethod(null)}
+                          >
+                            <CustomText style={{ color: 'white', fontWeight: 'bold', fontSize: 11 }}>Cancel Scan</CustomText>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </CameraView>
                   </View>
-                  
-                  <CustomText variant="h2" style={styles.pickupSectionTitle}>{t('enterPickupCode')}</CustomText>
-                  <CustomText style={[styles.pickupSectionSubtitle, { color: colors.muted }]}>
+                ) : (
+                  <TouchableOpacity 
+                    style={[styles.optionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={handleOpenPickupScanner}
+                  >
+                    <View style={[styles.optionIconBox, { backgroundColor: 'rgba(249, 115, 22, 0.15)' }]}>
+                      <QrCode color="#f97316" size={24} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <CustomText style={{ fontWeight: 'bold', fontSize: 15, color: colors.foreground }}>Scan QR Code</CustomText>
+                      <CustomText style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>
+                        Open camera to scan customer's pickup QR code.
+                      </CustomText>
+                    </View>
+                  </TouchableOpacity>
+                )}
+
+                {/* Or Divider */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                  <CustomText style={{ marginHorizontal: 12, fontSize: 11, color: colors.muted, fontWeight: 'bold' }}>OR</CustomText>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                </View>
+
+                {/* 2. Manual Entry Section */}
+                <View style={[styles.pickupCodeSection, { paddingVertical: 0 }]}>
+                  <CustomText variant="h2" style={[styles.pickupSectionTitle, { fontSize: 16, marginBottom: 4 }]}>{t('enterPickupCode')}</CustomText>
+                  <CustomText style={[styles.pickupSectionSubtitle, { color: colors.muted, fontSize: 11, marginBottom: 12, textAlign: 'center' }]}>
                     {t('askBuyerForPickupCode') || "Ask the buyer for the 6-character code shown in their app to verify the collection."}
                   </CustomText>
 
-                  <View style={[styles.pickupInputWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                  <View style={[styles.pickupInputWrapper, { backgroundColor: colors.glass, borderColor: colors.border, height: 56, marginBottom: 0 }]}>
                     <TextInput
-                      style={[styles.pickupInput, { color: colors.foreground }]}
+                      style={[styles.pickupInput, { color: colors.foreground, fontSize: 20 }]}
                       placeholder="A B 1 2 3 4"
                       placeholderTextColor={colors.muted}
                       autoCapitalize="characters"
@@ -811,7 +1060,7 @@ const SellerOrdersScreen = () => {
 
               <View style={styles.modalFooter}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowVerifyPickupModal(false)}>
-                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>{t('cancel')}</CustomText>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>{t('close')}</CustomText>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
@@ -844,9 +1093,9 @@ const SellerOrdersScreen = () => {
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ width: '100%', height: '70%' }}
+            style={{ width: '100%', maxHeight: '90%' }}
           >
-            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: '100%' }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: undefined }]}>
               <View style={styles.modalHeader}>
                 <View>
                   <CustomText variant="h2">Verify Return Code</CustomText>
@@ -865,19 +1114,76 @@ const SellerOrdersScreen = () => {
                 contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingBottom: 20 }}
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.pickupCodeSection}>
-                  <View style={[styles.pickupIconCircle, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
-                    <RefreshCcw color="#3B82F6" size={40} />
+                {/* 1. Scan QR Code Section */}
+                {returnVerifyMethod === 'SCAN' ? (
+                  <View style={{ width: '100%', height: 260, overflow: 'hidden', borderRadius: 16 }}>
+                    <CameraView
+                      style={StyleSheet.absoluteFillObject}
+                      barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                      onBarcodeScanned={scanned ? undefined : handleReturnBarcodeScanned}
+                    >
+                      <View style={styles.scannerOverlay}>
+                        <View style={styles.scannerUnfocused} />
+                        <View style={{ flexDirection: 'row' }}>
+                          <View style={styles.scannerUnfocused} />
+                          <View style={[styles.scannerFocus, { borderColor: '#3B82F6', width: 160, height: 160 }]}>
+                            {/* Laser pointer line */}
+                            <View style={[styles.laser, { backgroundColor: '#3B82F6' }]} />
+                            
+                            {/* Reticle Corner Brackets */}
+                            <View style={[styles.corner, styles.topLeft, { borderColor: '#3B82F6' }]} />
+                            <View style={[styles.corner, styles.topRight, { borderColor: '#3B82F6' }]} />
+                            <View style={[styles.corner, styles.bottomLeft, { borderColor: '#3B82F6' }]} />
+                            <View style={[styles.corner, styles.bottomRight, { borderColor: '#3B82F6' }]} />
+                          </View>
+                          <View style={styles.scannerUnfocused} />
+                        </View>
+                        <View style={styles.scannerUnfocused}>
+                          <CustomText style={[styles.scanText, { fontSize: 11, marginBottom: 6 }]}>Position the QR code inside the frame</CustomText>
+                          <TouchableOpacity 
+                            style={[styles.scannerCancelBtn, { backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingVertical: 4, paddingHorizontal: 12 }]}
+                            onPress={() => setReturnVerifyMethod(null)}
+                          >
+                            <CustomText style={{ color: 'white', fontWeight: 'bold', fontSize: 11 }}>Cancel Scan</CustomText>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </CameraView>
                   </View>
-                  
-                  <CustomText variant="h2" style={styles.pickupSectionTitle}>Enter Return Code</CustomText>
-                  <CustomText style={[styles.pickupSectionSubtitle, { color: colors.muted }]}>
+                ) : (
+                  <TouchableOpacity 
+                    style={[styles.optionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={handleOpenReturnScanner}
+                  >
+                    <View style={[styles.optionIconBox, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+                      <QrCode color="#3B82F6" size={24} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <CustomText style={{ fontWeight: 'bold', fontSize: 15, color: colors.foreground }}>Scan QR Code</CustomText>
+                      <CustomText style={{ color: colors.muted, fontSize: 11, marginTop: 2 }}>
+                        Open camera to scan customer's return QR code.
+                      </CustomText>
+                    </View>
+                  </TouchableOpacity>
+                )}
+
+                {/* Or Divider */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                  <CustomText style={{ marginHorizontal: 12, fontSize: 11, color: colors.muted, fontWeight: 'bold' }}>OR</CustomText>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                </View>
+
+                {/* 2. Manual Entry Section */}
+                <View style={[styles.pickupCodeSection, { paddingVertical: 0 }]}>
+                  <CustomText variant="h2" style={[styles.pickupSectionTitle, { fontSize: 16, marginBottom: 4 }]}>Enter Return Code</CustomText>
+                  <CustomText style={[styles.pickupSectionSubtitle, { color: colors.muted, fontSize: 11, marginBottom: 12, textAlign: 'center' }]}>
                     Ask the buyer for the 6-character return code shown in their app to verify the return request.
                   </CustomText>
 
-                  <View style={[styles.pickupInputWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                  <View style={[styles.pickupInputWrapper, { backgroundColor: colors.glass, borderColor: colors.border, height: 56, marginBottom: 0 }]}>
                     <TextInput
-                      style={[styles.pickupInput, { color: colors.foreground }]}
+                      style={[styles.pickupInput, { color: colors.foreground, fontSize: 20 }]}
                       placeholder="R T 1 2 3 4"
                       placeholderTextColor={colors.muted}
                       autoCapitalize="characters"
@@ -892,7 +1198,7 @@ const SellerOrdersScreen = () => {
 
               <View style={styles.modalFooter}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowVerifyReturnModal(false)}>
-                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>{t('cancel')}</CustomText>
+                  <CustomText style={{ fontWeight: 'bold', color: colors.muted }}>{t('close')}</CustomText>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
@@ -1128,10 +1434,12 @@ const styles = StyleSheet.create({
   badgeText: { color: 'white', fontSize: 9, fontWeight: '900' },
   modalOverlay: { 
     flex: 1, 
-    justifyContent: 'flex-end', 
-    backgroundColor: 'rgba(0,0,0,0.85)' 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    padding: 20
   },
-  modalContent: { height: '60%', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 24 },
+  modalContent: { width: '100%', maxHeight: '85%', borderRadius: 24, borderWidth: 1, padding: 24, justifyContent: 'center' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   closeBtn: { padding: 4 },
   agentRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 8, gap: 12 },
@@ -1165,6 +1473,91 @@ const styles = StyleSheet.create({
   detailItemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   itemImagePlaceholder: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  optionsSection: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    width: '100%',
+  },
+  optionIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scannerOverlay: {
+    flex: 1,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  scannerUnfocused: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scannerFocus: {
+    borderWidth: 1,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  laser: {
+    width: '90%',
+    height: 2.5,
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  corner: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderWidth: 4,
+  },
+  topLeft: {
+    top: -4,
+    left: -4,
+    borderBottomWidth: 0,
+    borderRightWidth: 0,
+  },
+  topRight: {
+    top: -4,
+    right: -4,
+    borderBottomWidth: 0,
+    borderLeftWidth: 0,
+  },
+  bottomLeft: {
+    bottom: -4,
+    left: -4,
+    borderTopWidth: 0,
+    borderRightWidth: 0,
+  },
+  bottomRight: {
+    bottom: -4,
+    right: -4,
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+  },
+  scanText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  scannerCancelBtn: {
+    borderRadius: 12,
+  },
 });
 
 export default SellerOrdersScreen;

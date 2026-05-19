@@ -233,6 +233,24 @@ export const sellerService = {
     }
   },
 
+  rejectReturn: async (userId, orderId, reason) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/reject-return`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ reason }),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+      if (!response.ok) throw new Error(data.error || `Failed to reject return (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('rejectReturn error:', error);
+      throw error;
+    }
+  },
+
   getWallet: async (userId) => {
     try {
       const response = await fetch(`${BASE_URL}/api/wallet`, {
@@ -299,7 +317,7 @@ export const sellerService = {
 
   getReplacements: async (userId) => {
     try {
-      const response = await fetch(`${BASE_URL}/api/replacements`, {
+      const response = await fetch(`${BASE_URL}/api/replacements?_t=${Date.now()}`, {
         method: 'GET',
         headers: buildHeaders(userId),
       });
