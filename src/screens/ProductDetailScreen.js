@@ -284,7 +284,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
     }
     navigation.navigate('ChatDetail', {
       conversation: {
-        id: `temp_${product.seller.id}`, // Temporary or existing ID
+        id: `new-${product.seller.userId || product.seller.id}`,
         otherUser: {
           id: product.seller.userId || product.seller.id,
           name: product.seller.name,

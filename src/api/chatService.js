@@ -77,7 +77,7 @@ export const chatService = {
       }));
     } catch (e) {
       console.warn('API getMessages error detail:', e);
-      return [];
+      return null;
     }
   },
 

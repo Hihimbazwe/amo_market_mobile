@@ -279,6 +279,7 @@ export default function ChatDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { conversation } = route.params || {};
+  const participantId = conversation?.participantId || conversation?.otherUser?.id;
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -300,7 +301,7 @@ export default function ChatDetailScreen() {
     
     return addListener((event) => {
       // Typing events for this conversation
-      if (event.conversationId === conversation.id && event.userId === conversation.participantId) {
+      if (event.conversationId === conversation.id && event.userId === participantId) {
         if (event.type === 'USER_TYPING') {
           setTyping(true);
         } else if (event.type === 'USER_STOPPED_TYPING') {
@@ -309,14 +310,14 @@ export default function ChatDetailScreen() {
       }
       
       // Online/Offline status could also be handled here if server broadcasts USER_ONLINE
-      if (event.type === 'USER_ONLINE' && event.userId === conversation.participantId) {
+      if (event.type === 'USER_ONLINE' && event.userId === participantId) {
         setIsOnline(true);
       }
-      if (event.type === 'USER_OFFLINE' && event.userId === conversation.participantId) {
+      if (event.type === 'USER_OFFLINE' && event.userId === participantId) {
         setIsOnline(false);
       }
     });
-  }, [conversation?.id, conversation?.participantId, user?.id, addListener]);
+  }, [conversation?.id, participantId, user?.id, addListener]);
 
   // Typing dots animation for header
   const [typingDots, setTypingDots] = useState('');
@@ -354,7 +355,7 @@ export default function ChatDetailScreen() {
       { 
         text: 'Unblock', 
         onPress: async () => {
-          const res = await chatService.blockUser(user?.id, conversation?.participantId, 'unblock');
+          const res = await chatService.blockUser(user?.id, participantId, 'unblock');
           if (res.success || res.error === undefined) {
             setIsBlockedByMe(false);
           } else {
@@ -392,7 +393,7 @@ export default function ChatDetailScreen() {
           text: 'Block', 
           style: 'destructive', 
           onPress: async () => {
-            const res = await chatService.blockUser(user?.id, conversation?.participantId, 'block');
+            const res = await chatService.blockUser(user?.id, participantId, 'block');
             if (res.success || res.error === undefined) {
               setIsBlockedByMe(true);
             } else {
@@ -450,9 +451,9 @@ export default function ChatDetailScreen() {
         if (conversation.isLocked && !isAuthenticated) return;
 
         let cid = conversation.id;
-        if (cid.startsWith('new-')) {
+        if (cid.startsWith('new-') || cid.startsWith('temp_')) {
           try {
-            const pId = cid.replace('new-', '');
+            const pId = cid.startsWith('new-') ? cid.replace('new-', '') : cid.replace('temp_', '');
             cid = await chatService.createConversation(pId, user.id);
             navigation.setParams({ conversation: { ...conversation, id: cid } });
           } catch (e) {
@@ -467,7 +468,9 @@ export default function ChatDetailScreen() {
         refreshUnread();
 
         const data = await chatService.getMessages(cid, user.id);
-        setMessages(data);
+        if (data) {
+          setMessages(data);
+        }
         setLoading(false);
       };
 
@@ -475,21 +478,23 @@ export default function ChatDetailScreen() {
       
       const pollInterval = setInterval(async () => {
         if (!conversation?.id || !user?.id) return;
-        const cid = conversation.id.startsWith('new-') ? null : conversation.id;
+        const cid = (conversation.id.startsWith('new-') || conversation.id.startsWith('temp_')) ? null : conversation.id;
         if (cid) {
           // Poll new messages
           const data = await chatService.getMessages(cid, user.id);
-          // Only update if lengths diff or last message diff to avoid over-rendering janks
-          setMessages(prev => {
-             if (prev.length !== data.length || (data.length > 0 && prev[prev.length-1]?.id !== data[data.length-1]?.id)) {
-               return data;
-             }
-             return prev;
-          });
+          if (data) {
+            // Only update if lengths diff or last message diff to avoid over-rendering janks
+            setMessages(prev => {
+               if (prev.length !== data.length || (data.length > 0 && prev[prev.length-1]?.id !== data[data.length-1]?.id)) {
+                 return data;
+               }
+               return prev;
+            });
+          }
           
           // Poll typing and online status
-          const statusResult = await chatService.checkTyping(cid, user.id, conversation.participantId);
-          console.log(`[DEBUG-CHAT-DETAIL] Polling status for ${conversation.participantId}:`, statusResult);
+          const statusResult = await chatService.checkTyping(cid, user.id, participantId);
+          console.log(`[DEBUG-CHAT-DETAIL] Polling status for ${participantId}:`, statusResult);
           setTyping(statusResult.typing);
           setIsOnline(statusResult.isOnline);
           setLastSeen(statusResult.lastSeen);
@@ -498,7 +503,7 @@ export default function ChatDetailScreen() {
       }, 3000);
 
       return () => { clearInterval(pollInterval); };
-    }, [conversation?.id, user?.id, isAuthenticated])
+    }, [conversation?.id, user?.id, isAuthenticated, participantId])
   );
 
 
@@ -588,9 +593,9 @@ export default function ChatDetailScreen() {
     setMessages((prev) => [...prev, myMsg]);
     
     let cid = conversation.id;
-    if (cid.startsWith('new-')) {
+    if (cid.startsWith('new-') || cid.startsWith('temp_')) {
        try {
-         const pId = cid.replace('new-', '');
+         const pId = cid.startsWith('new-') ? cid.replace('new-', '') : cid.replace('temp_', '');
          cid = await chatService.createConversation(pId, user?.id);
          navigation.setParams({ conversation: { ...conversation, id: cid } });
        } catch (e) {

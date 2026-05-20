@@ -159,7 +159,7 @@ export default function ChatListScreen() {
   const sellerCtx = useContext(SellerDrawerContext);
   const toggleDrawer = buyerCtx?.toggleDrawer || sellerCtx?.toggleDrawer || (() => {});
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     Promise.all([
       chatService.getConversations(user?.id, filterType),
       chatService.getStatuses(user?.id, true) // Pass userId for prioritization
@@ -191,7 +191,7 @@ export default function ChatListScreen() {
       console.warn('API load failed:', err);
       setLoading(false);
     });
-  };
+  }, [user?.id, filterType, search]);
 
   useFocusEffect(
     useCallback(() => {
@@ -532,24 +532,25 @@ export default function ChatListScreen() {
         <View style={styles.centered}>
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
-      ) : filtered.length === 0 ? (
-        <View style={styles.centered}>
-          <MessageCircle color={colors.glassBorder} size={56} />
-          <CustomText style={[styles.emptyText, { color: colors.muted }]}>No conversations yet</CustomText>
-          <CustomText style={[styles.emptySubText, { color: colors.muted }]}>
-            Start a conversation from a product page or order
-          </CustomText>
-        </View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={renderStatusBar}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 100 }}>
+              <MessageCircle color={colors.glassBorder} size={56} />
+              <CustomText style={[styles.emptyText, { color: colors.muted, marginTop: 16 }]}>No conversations yet</CustomText>
+              <CustomText style={[styles.emptySubText, { color: colors.muted, textAlign: 'center', marginTop: 8 }]}>
+                Start a conversation from a product page or order
+              </CustomText>
+            </View>
+          }
           renderItem={({ item }) => (
             <ConversationItem item={item} onPress={handleOpen} onSwipeAction={handleSwipeAction} colors={colors} />
           )}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          contentContainerStyle={{ paddingBottom: 20, flexGrow: 1 }}
         />
       )}
     </SafeAreaView>
