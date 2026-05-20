@@ -71,7 +71,7 @@ const formatCoverageArea = (coverageArea) => {
 const StatusBadge = ({ status, pickupType }) => {
   let color = '#f97316';
   let text = status.replace(/_/g, ' ');
-  if (['DELIVERED','COMPLETED','PICKED_UP'].includes(status)) { color = '#22c55e'; }
+  if (['DELIVERED','COMPLETED','PICKED_UP','RETURN_COMPLETED','RETURNED_TO_SELLER'].includes(status)) { color = '#22c55e'; }
   else if (['CANCELLED','FAILED_DELIVERY'].includes(status)) { color = '#ef4444'; }
   else if (['SHIPPED','IN_TRANSIT','OUT_FOR_DELIVERY','PREPARED'].includes(status)) { color = '#3b82f6'; }
   

@@ -61,12 +61,14 @@ const SellerOrdersScreen = () => {
   const [returnVerifyMethod, setReturnVerifyMethod] = useState(null); // 'SCAN', 'MANUAL', or null
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const isScanningRef = React.useRef(false);
 
   const setShowVerifyPickupModal = (val) => {
     setShowVerifyVerifyPickupModalInternal(val);
     if (!val) {
       setPickupVerifyMethod(null);
       setScanned(false);
+      isScanningRef.current = false;
     }
   };
 
@@ -75,6 +77,7 @@ const SellerOrdersScreen = () => {
     if (!val) {
       setReturnVerifyMethod(null);
       setScanned(false);
+      isScanningRef.current = false;
     }
   };
 
@@ -268,10 +271,12 @@ const SellerOrdersScreen = () => {
     }
     setPickupVerifyMethod('SCAN');
     setScanned(false);
+    isScanningRef.current = false;
   };
 
   const handlePickupBarcodeScanned = ({ data }) => {
-    if (scanned) return;
+    if (isScanningRef.current) return;
+    isScanningRef.current = true;
     setScanned(true);
     let extractedCode = data;
     
@@ -305,6 +310,7 @@ const SellerOrdersScreen = () => {
           'Order Mismatch',
           `Scanned QR code is for order #${scannedOrderIdSuffix}, but you are verifying order #${expectedOrderIdSuffix}.`
         );
+        isScanningRef.current = false;
         setScanned(false);
         return;
       }
@@ -323,15 +329,17 @@ const SellerOrdersScreen = () => {
           fetchOrdersAndReplacements();
         } catch (err) {
           Alert.alert(t('error') || 'Error', err.message || t('failedToVerifyPickup') || 'Failed to verify pickup');
+          isScanningRef.current = false;
+          setScanned(false);
         } finally {
           setVerifyingPickup(false);
-          setScanned(false);
         }
       };
       
       autoVerify();
     } else {
       Alert.alert('Invalid QR Code', 'Could not detect a valid verification code in the scanned QR code.');
+      isScanningRef.current = false;
       setScanned(false);
     }
   };
@@ -378,10 +386,12 @@ const SellerOrdersScreen = () => {
     }
     setReturnVerifyMethod('SCAN');
     setScanned(false);
+    isScanningRef.current = false;
   };
 
   const handleReturnBarcodeScanned = ({ data }) => {
-    if (scanned) return;
+    if (isScanningRef.current) return;
+    isScanningRef.current = true;
     setScanned(true);
     let extractedCode = data;
     
@@ -415,6 +425,7 @@ const SellerOrdersScreen = () => {
           'Order Mismatch',
           `Scanned QR code is for order #${scannedOrderIdSuffix}, but you are verifying order #${expectedOrderIdSuffix}.`
         );
+        isScanningRef.current = false;
         setScanned(false);
         return;
       }
@@ -433,15 +444,17 @@ const SellerOrdersScreen = () => {
           fetchOrdersAndReplacements();
         } catch (err) {
           Alert.alert(t('error') || 'Error', err.message || "Failed to verify return code");
+          isScanningRef.current = false;
+          setScanned(false);
         } finally {
           setVerifyingReturn(false);
-          setScanned(false);
         }
       };
       
       autoVerify();
     } else {
       Alert.alert('Invalid QR Code', 'Could not detect a valid verification code in the scanned QR code.');
+      isScanningRef.current = false;
       setScanned(false);
     }
   };
@@ -712,7 +725,7 @@ const SellerOrdersScreen = () => {
                         onPress={() => handleOpenVerifyPickup(selectedOrderForActions)}
                       >
                         <CheckCircle2 size={18} color="#10B981" />
-                        <CustomText style={[styles.actionMenuText, { color: '#10B981' }]}>{t('verifyPickupCode')}</CustomText>
+                        <CustomText style={[styles.actionMenuText, { color: '#10B981' }]}>{t('verify Pickup Code')}</CustomText>
                       </TouchableOpacity>
                     )}
 
@@ -957,7 +970,7 @@ const SellerOrdersScreen = () => {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ width: '100%', maxHeight: '90%' }}
           >
-            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: undefined }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, minHeight: 500 }]}>
               <View style={styles.modalHeader}>
                 <View>
                   <CustomText variant="h2">{t('verifyPickupCode')}</CustomText>
@@ -1038,10 +1051,8 @@ const SellerOrdersScreen = () => {
 
                 {/* 2. Manual Entry Section */}
                 <View style={[styles.pickupCodeSection, { paddingVertical: 0 }]}>
-                  <CustomText variant="h2" style={[styles.pickupSectionTitle, { fontSize: 16, marginBottom: 4 }]}>{t('enterPickupCode')}</CustomText>
-                  <CustomText style={[styles.pickupSectionSubtitle, { color: colors.muted, fontSize: 11, marginBottom: 12, textAlign: 'center' }]}>
-                    {t('askBuyerForPickupCode') || "Ask the buyer for the 6-character code shown in their app to verify the collection."}
-                  </CustomText>
+                  <CustomText variant="h2" style={[styles.pickupSectionTitle, { fontSize: 16, marginBottom: 4 }]}>{t('enter Pickup Code')}</CustomText>
+                  
 
                   <View style={[styles.pickupInputWrapper, { backgroundColor: colors.glass, borderColor: colors.border, height: 56, marginBottom: 0 }]}>
                     <TextInput
@@ -1095,7 +1106,7 @@ const SellerOrdersScreen = () => {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ width: '100%', maxHeight: '90%' }}
           >
-            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: undefined }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, minHeight: 500 }]}>
               <View style={styles.modalHeader}>
                 <View>
                   <CustomText variant="h2">Verify Return Code</CustomText>

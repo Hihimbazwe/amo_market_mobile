@@ -39,7 +39,9 @@ const getStatusColor = (status) => {
   const s = status?.toUpperCase();
   switch (s) {
     case 'COMPLETED':
-    case 'DELIVERED': return '#10B981'; // green
+    case 'DELIVERED':
+    case 'RETURNED_TO_SELLER':
+    case 'RETURN_COMPLETED': return '#10B981'; // green
     case 'PROCESSING':
     case 'PAID':
     case 'PREPARED':

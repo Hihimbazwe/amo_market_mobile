@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  ScrollView, 
-  Image, 
-  TouchableOpacity, 
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Image,
+  TouchableOpacity,
   StatusBar,
   Dimensions,
   Share,
@@ -14,13 +14,13 @@ import {
   Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  ArrowLeft, 
-  Share2, 
-  Heart, 
-  MapPin, 
-  Star, 
-  ShieldCheck, 
+import {
+  ArrowLeft,
+  Share2,
+  Heart,
+  MapPin,
+  Star,
+  ShieldCheck,
   MessageCircle,
   Phone,
   ShoppingCart,
@@ -33,7 +33,9 @@ import {
   CreditCard,
   Store,
   ShoppingBag,
-  Play
+  Play,
+  UserPlus,
+  UserCheck
 } from 'lucide-react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import CustomText from '../components/CustomText';
@@ -57,11 +59,11 @@ const VideoComponent = ({ url }) => {
   });
 
   return (
-    <VideoView 
-      player={player} 
-      style={{ width: width, height: 400 }} 
-      allowsFullscreen 
-      allowsPictureInPicture 
+    <VideoView
+      player={player}
+      style={{ width: width, height: 400 }}
+      allowsFullscreen
+      allowsPictureInPicture
     />
   );
 };
@@ -84,17 +86,17 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [loadingSocial, setLoadingSocial] = useState(true);
-  
+
   // Review form states
   const [eligibleOrderId, setEligibleOrderId] = useState(null);
   const [userRating, setUserRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
-  
+
   const isFavorite = routeProduct?.id ? isInWishlist(routeProduct.id) : false;
   const media = routeProduct?.media || [];
   const hasImages = media.length > 0;
-  
+
   const product = {
     id: routeProduct?.id,
     title: routeProduct?.title || routeProduct?.name || 'Product Details',
@@ -102,8 +104,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
     isHotDeal: routeProduct?.isHotDeal || false,
     isDiscount: routeProduct?.isDiscount || false,
     discountPercent: routeProduct?.discountPercent || 0,
-    location: routeProduct?.district && routeProduct?.province 
-      ? `${routeProduct.district}, ${routeProduct.province}` 
+    location: routeProduct?.district && routeProduct?.province
+      ? `${routeProduct.district}, ${routeProduct.province}`
       : routeProduct?.location || 'Unknown Location',
     description: routeProduct?.description || 'No description available.',
     specifications: [
@@ -151,8 +153,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
     if (user?.id && product.id) {
       orderService.getOrders(user.id)
         .then(orders => {
-          const eligible = orders.find(o => 
-            o.status === 'COMPLETED' && 
+          const eligible = orders.find(o =>
+            o.status === 'COMPLETED' &&
             o.items?.some(i => i.productId === product.id)
           );
           if (eligible) setEligibleOrderId(eligible.id);
@@ -232,7 +234,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
       setUserRating(0);
       setReviewComment('');
       setEligibleOrderId(null);
-      
+
       const revs = await productService.getReviews(product.id);
       setReviews(revs || []);
       Alert.alert("Success", "Your review has been posted!");
@@ -280,7 +282,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
       navigation.navigate('Login');
       return;
     }
-    navigation.navigate('ChatDetail', { 
+    navigation.navigate('ChatDetail', {
       conversation: {
         id: `temp_${product.seller.id}`, // Temporary or existing ID
         otherUser: {
@@ -295,7 +297,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.imageContainer}>
           {hasImages ? (
@@ -325,10 +327,10 @@ const ProductDetailScreen = ({ route, navigation }) => {
             </View>
           ) : (
             <View style={[styles.image, { backgroundColor: colors.glass, justifyContent: 'center', alignItems: 'center' }]}>
-               <ShoppingBag size={80} color={colors.muted} opacity={0.2} />
+              <ShoppingBag size={80} color={colors.muted} opacity={0.2} />
             </View>
           )}
-          
+
           <SafeAreaView style={styles.headerOverlay}>
             <View style={styles.headerActions}>
               <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
@@ -338,7 +340,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 <TouchableOpacity style={styles.iconButton} onPress={onShare}>
                   <Share2 color="#ffffff" size={24} />
                 </TouchableOpacity>
-                 <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.iconButton, { marginLeft: 12 }]}
                   onPress={() => product.id && toggleWishlist(product.id)}
                   disabled={wishlistLoading}
@@ -409,13 +411,13 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
           {(() => {
             const reviewCount = reviews.length > 0 ? reviews.length : (routeProduct?._count?.reviews || 0);
-            const avgRating = reviews.length > 0 
-              ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length 
+            const avgRating = reviews.length > 0
+              ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
               : (routeProduct?.avgRating > 0 ? routeProduct.avgRating : 4.8);
             return (
               <View style={styles.ratingRow}>
                 <View style={styles.stars}>
-                   {[...Array(5)].map((_, i) => <Star key={i} size={14} color="#FBBF24" fill={i < Math.round(avgRating) ? "#FBBF24" : "none"} />)}
+                  {[...Array(5)].map((_, i) => <Star key={i} size={14} color="#FBBF24" fill={i < Math.round(avgRating) ? "#FBBF24" : "none"} />)}
                 </View>
                 <CustomText variant="caption" style={styles.ratingText}>
                   {avgRating.toFixed(1)} ⭐ ({reviewCount} verified reviews)
@@ -434,7 +436,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 }, 0);
                 const currentPrice = basePrice + variantsPrice;
                 const finalPrice = currentPrice * qty;
-                
+
                 return (
                   <>
                     <CustomText variant="h1" style={{ color: colors.primary }}>Rwf {finalPrice.toLocaleString()}</CustomText>
@@ -469,54 +471,59 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 <MapPin size={12} color={colors.muted} />
                 <CustomText variant="caption" style={styles.locationText}>{product.location}</CustomText>
               </View>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity 
-                style={[styles.visitShopBtn, { borderColor: colors.primary }]}
-                onPress={() => navigation.navigate('SellerStore', { sellerId: product.seller.id, sellerName: product.seller.name })}
-              >
-                 <Store size={14} color={colors.primary} />
-                 <CustomText style={[styles.visitShopText, { color: colors.primary }]}>VISIT</CustomText>
-              </TouchableOpacity>
+              
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <TouchableOpacity
+                  style={[styles.visitShopBtn, { borderColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6 }]}
+                  onPress={() => navigation.navigate('SellerStore', { sellerId: product.seller.id, sellerName: product.seller.name })}
+                >
+                  <Store size={14} color={colors.primary} />
+                  <CustomText style={[styles.visitShopText, { color: colors.primary, fontSize: 12 }]}>VISIT</CustomText>
+                </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[
-                  styles.visitShopBtn, 
-                  { 
-                    backgroundColor: isFollowing ? colors.primary + '15' : colors.primary,
-                    borderColor: colors.primary 
-                  }
-                ]}
-                onPress={handleFollow}
-                disabled={followLoading}
-              >
-                {followLoading ? (
-                  <ActivityIndicator size="small" color={isFollowing ? colors.primary : "#fff"} />
-                ) : (
-                  <>
-                    <Heart size={14} color={isFollowing ? colors.primary : "#fff"} fill={isFollowing ? colors.primary : "transparent"} />
-                    <CustomText style={[styles.visitShopText, { color: isFollowing ? colors.primary : "#fff" }]}>
-                      {isFollowing ? 'FOLLOWING' : 'FOLLOW'}
-                    </CustomText>
-                  </>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.visitShopBtn,
+                    {
+                      backgroundColor: isFollowing ? colors.primary + '15' : colors.primary,
+                      borderColor: colors.primary,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6
+                    }
+                  ]}
+                  onPress={handleFollow}
+                  disabled={followLoading}
+                >
+                  {followLoading ? (
+                    <ActivityIndicator size="small" color={isFollowing ? colors.primary : "#fff"} />
+                  ) : (
+                    <>
+                      {isFollowing ? (
+                        <UserCheck size={16} color={colors.primary} />
+                      ) : (
+                        <UserPlus size={16} color="#fff" />
+                      )}
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
           <View style={styles.statsGrid}>
-             {[
-               { label: 'Rating', value: product.seller.rating },
-               { label: 'Sales', value: product.seller.sales },
-               { label: 'Response', value: product.seller.response }
-             ].map((stat, i) => (
-               <View key={i} style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                 <CustomText variant="h3" style={{ color: colors.primary }}>{stat.value}</CustomText>
-                 <CustomText style={styles.statLabel}>{stat.label}</CustomText>
-               </View>
-             ))}
+            {[
+              { label: 'Rating', value: product.seller.rating },
+              { label: 'Sales', value: product.seller.sales },
+              { label: 'Response', value: product.seller.response }
+            ].map((stat, i) => (
+              <View key={i} style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <CustomText variant="h3" style={{ color: colors.primary }}>{stat.value}</CustomText>
+                <CustomText style={styles.statLabel}>{stat.label}</CustomText>
+              </View>
+            ))}
           </View>
 
+          {/* 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }} style={{ marginTop: 20 }}>
             {[
               { icon: Truck, label: 'Free Delivery', desc: 'Available for Kigali orders' },
@@ -533,21 +540,22 @@ const ProductDetailScreen = ({ route, navigation }) => {
           </ScrollView>
 
           <View style={[styles.paymentSection, { backgroundColor: 'rgba(74, 222, 128, 0.05)', borderColor: 'rgba(74, 222, 128, 0.2)' }]}>
-             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-               <CreditCard size={16} color="#4ade80" />
-               <CustomText style={{ color: '#4ade80', fontWeight: 'bold', marginLeft: 8 }}>WE ACCEPT</CustomText>
-             </View>
-             <View style={styles.paymentMethods}>
-               {['MoMo', 'Airtel', 'Visa', 'Cash'].map(m => (
-                 <View key={m} style={styles.paymentMethod}>
-                   <CustomText style={styles.paymentMethodText}>{m}</CustomText>
-                 </View>
-               ))}
-             </View>
-             <CustomText variant="caption" style={{ marginTop: 8, color: colors.muted }}>
-               ✓ 100% secure escrow protection for all orders
-             </CustomText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <CreditCard size={16} color="#4ade80" />
+              <CustomText style={{ color: '#4ade80', fontWeight: 'bold', marginLeft: 8 }}>WE ACCEPT</CustomText>
+            </View>
+            <View style={styles.paymentMethods}>
+              {['MoMo', 'Airtel', 'Visa', 'Cash'].map(m => (
+                <View key={m} style={styles.paymentMethod}>
+                  <CustomText style={styles.paymentMethodText}>{m}</CustomText>
+                </View>
+              ))}
+            </View>
+            <CustomText variant="caption" style={{ marginTop: 8, color: colors.muted }}>
+              ✓ protection for all orders
+            </CustomText>
           </View>
+          */}
 
           {routeProduct?.variants && routeProduct.variants.length > 0 && (
             <View style={styles.variantsSection}>
@@ -564,7 +572,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
                     {vars.map((v) => (
                       <TouchableOpacity
                         key={v.value}
-                        onPress={() => setSelectedVariants({...selectedVariants, [varName]: v.value})}
+                        onPress={() => setSelectedVariants({ ...selectedVariants, [varName]: v.value })}
                         style={[
                           styles.variantOption,
                           { backgroundColor: colors.card, borderColor: colors.border },
@@ -600,8 +608,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 <CustomText variant="h3">+</CustomText>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={[styles.cartBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]} 
+            <TouchableOpacity
+              style={[styles.cartBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
               onPress={handleAddToCart}
               disabled={addingToCart}
             >
@@ -615,8 +623,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
           <View style={[styles.tabsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.tabHeader}>
               {['Description', 'Specs', 'Reviews'].map((tab, idx) => (
-                <TouchableOpacity 
-                  key={tab} 
+                <TouchableOpacity
+                  key={tab}
                   onPress={() => setActiveTab(idx)}
                   style={[styles.tabItem, activeTab === idx && [styles.activeTabItem, { borderBottomColor: colors.primary }]]}
                 >
@@ -638,120 +646,120 @@ const ProductDetailScreen = ({ route, navigation }) => {
               )}
               {activeTab === 2 && (
                 <View>
-                   {eligibleOrderId && (
-                     <View style={[styles.reviewForm, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '20' }]}>
-                       <CustomText variant="h3" style={{ marginBottom: 12 }}>Leave a Review</CustomText>
-                       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-                         {[1, 2, 3, 4, 5].map((s) => (
-                           <TouchableOpacity key={s} onPress={() => setUserRating(s)}>
-                             <Star 
-                               size={28} 
-                               color={s <= userRating ? "#FBBF24" : colors.muted} 
-                               fill={s <= userRating ? "#FBBF24" : "none"} 
-                             />
-                           </TouchableOpacity>
-                         ))}
-                       </View>
-                       <CustomInput 
-                         placeholder="What did you like or dislike? Your feedback helps others."
-                         value={reviewComment}
-                         onChangeText={setReviewComment}
-                         multiline
-                         numberOfLines={3}
-                         containerStyle={{ marginBottom: 16 }}
-                       />
-                       <TouchableOpacity 
-                         style={[styles.submitReviewBtn, { backgroundColor: colors.primary, opacity: submittingReview ? 0.7 : 1 }]}
-                         onPress={handlePostReview}
-                         disabled={submittingReview}
-                       >
-                         {submittingReview ? <ActivityIndicator size="small" color="white" /> : (
-                           <>
-                             <Star size={16} color="white" />
-                             <CustomText style={{ color: 'white', fontWeight: 'bold', marginLeft: 8 }}>Post Review</CustomText>
-                           </>
-                         )}
-                       </TouchableOpacity>
-                     </View>
-                   )}
+                  {eligibleOrderId && (
+                    <View style={[styles.reviewForm, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '20' }]}>
+                      <CustomText variant="h3" style={{ marginBottom: 12 }}>Leave a Review</CustomText>
+                      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <TouchableOpacity key={s} onPress={() => setUserRating(s)}>
+                            <Star
+                              size={28}
+                              color={s <= userRating ? "#FBBF24" : colors.muted}
+                              fill={s <= userRating ? "#FBBF24" : "none"}
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <CustomInput
+                        placeholder="What did you like or dislike? Your feedback helps others."
+                        value={reviewComment}
+                        onChangeText={setReviewComment}
+                        multiline
+                        numberOfLines={3}
+                        containerStyle={{ marginBottom: 16 }}
+                      />
+                      <TouchableOpacity
+                        style={[styles.submitReviewBtn, { backgroundColor: colors.primary, opacity: submittingReview ? 0.7 : 1 }]}
+                        onPress={handlePostReview}
+                        disabled={submittingReview}
+                      >
+                        {submittingReview ? <ActivityIndicator size="small" color="white" /> : (
+                          <>
+                            <Star size={16} color="white" />
+                            <CustomText style={{ color: 'white', fontWeight: 'bold', marginLeft: 8 }}>Post Review</CustomText>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
-                   {loadingSocial ? <ActivityIndicator color={colors.primary} /> : reviews.length > 0 ? (
-                     <View>
-                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}>
-                         <CustomText style={{ fontSize: 40, fontWeight: '900', color: colors.text || '#fff' }}>
-                           {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
-                         </CustomText>
-                         <View>
-                           <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                             {[...Array(5)].map((_, i) => (
-                               <Star key={i} size={16} color="#FBBF24" fill={i < Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) ? "#FBBF24" : "none"} />
-                             ))}
-                           </View>
-                           <CustomText variant="caption">{reviews.length} verified review{reviews.length !== 1 ? 's' : ''}</CustomText>
-                         </View>
-                       </View>
-                       {reviews.map((r, i) => (
-                         <View key={i} style={styles.reviewItem}>
-                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                             <View style={styles.stars}>
-                               {[...Array(5)].map((_, si) => <Star key={si} size={10} color="#FBBF24" fill={si < r.rating ? "#FBBF24" : "none"} />)}
-                             </View>
-                             <CustomText variant="caption" style={{ marginLeft: 8 }}>{new Date(r.createdAt).toLocaleDateString()}</CustomText>
-                             <View style={styles.verifiedPurchaseBadge}>
-                               <CustomText style={styles.verifiedPurchaseText}>Verified Purchase</CustomText>
-                             </View>
-                           </View>
-                           {r.comment ? <CustomText style={{ fontSize: 13, color: colors.muted }}>{r.comment}</CustomText> : null}
-                         </View>
-                       ))}
-                     </View>
-                   ) : (
-                     <View style={{ alignItems: 'center', py: 20 }}>
-                       <Star size={32} color={colors.muted} style={{ opacity: 0.3, marginBottom: 8 }} />
-                       <CustomText style={[styles.tabContent, { textAlign: 'center' }]}>
-                         No reviews yet. {eligibleOrderId ? "Be the first to review!" : "Complete a purchase of this product to leave a review."}
-                       </CustomText>
-                     </View>
-                   )}
+                  {loadingSocial ? <ActivityIndicator color={colors.primary} /> : reviews.length > 0 ? (
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}>
+                        <CustomText style={{ fontSize: 40, fontWeight: '900', color: colors.text || '#fff' }}>
+                          {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                        </CustomText>
+                        <View>
+                          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} size={16} color="#FBBF24" fill={i < Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) ? "#FBBF24" : "none"} />
+                            ))}
+                          </View>
+                          <CustomText variant="caption">{reviews.length} verified review{reviews.length !== 1 ? 's' : ''}</CustomText>
+                        </View>
+                      </View>
+                      {reviews.map((r, i) => (
+                        <View key={i} style={styles.reviewItem}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            <View style={styles.stars}>
+                              {[...Array(5)].map((_, si) => <Star key={si} size={10} color="#FBBF24" fill={si < r.rating ? "#FBBF24" : "none"} />)}
+                            </View>
+                            <CustomText variant="caption" style={{ marginLeft: 8 }}>{new Date(r.createdAt).toLocaleDateString()}</CustomText>
+                            <View style={styles.verifiedPurchaseBadge}>
+                              <CustomText style={styles.verifiedPurchaseText}>Verified Purchase</CustomText>
+                            </View>
+                          </View>
+                          {r.comment ? <CustomText style={{ fontSize: 13, color: colors.muted }}>{r.comment}</CustomText> : null}
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={{ alignItems: 'center', py: 20 }}>
+                      <Star size={32} color={colors.muted} style={{ opacity: 0.3, marginBottom: 8 }} />
+                      <CustomText style={[styles.tabContent, { textAlign: 'center' }]}>
+                        No reviews yet. {eligibleOrderId ? "Be the first to review!" : "Complete a purchase of this product to leave a review."}
+                      </CustomText>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
           </View>
-          
+
           <View style={{ height: 120 }} />
         </View>
       </ScrollView>
 
       <View style={[styles.bottomBar, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
-         <TouchableOpacity 
-           style={[styles.buyNowBtn, { backgroundColor: colors.primary }]}
-           onPress={() => {
-             if (!user) {
-               Alert.alert("Login Required", "Please login to place an order.");
-               navigation.navigate('Login');
-               return;
-             }
-             navigation.navigate('Checkout', { 
-               productId: product.id, 
-               qty,
-               buyNowProduct: {
-                 id: product.id,
-                 title: product.title,
-                 price: product.price,
-                 media: routeProduct?.media || []
-               }
-             });
-           }}
-         >
-           <CustomText style={styles.buyNowText}>BUY NOW</CustomText>
-           <ChevronRight color="#fff" size={20} />
-         </TouchableOpacity>
-         <TouchableOpacity 
-           style={[styles.chatBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}
-           onPress={handleChatWithSeller}
-         >
-           <MessageCircle color={colors.primary} size={24} />
-         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.buyNowBtn, { backgroundColor: colors.primary }]}
+          onPress={() => {
+            if (!user) {
+              Alert.alert("Login Required", "Please login to place an order.");
+              navigation.navigate('Login');
+              return;
+            }
+            navigation.navigate('Checkout', {
+              productId: product.id,
+              qty,
+              buyNowProduct: {
+                id: product.id,
+                title: product.title,
+                price: product.price,
+                media: routeProduct?.media || []
+              }
+            });
+          }}
+        >
+          <CustomText style={styles.buyNowText}>BUY NOW</CustomText>
+          <ChevronRight color="#fff" size={20} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chatBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}
+          onPress={handleChatWithSeller}
+        >
+          <MessageCircle color={colors.primary} size={24} />
+        </TouchableOpacity>
       </View>
     </View>
   );

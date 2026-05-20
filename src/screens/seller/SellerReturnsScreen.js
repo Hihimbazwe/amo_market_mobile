@@ -35,12 +35,14 @@ const SellerReturnsScreen = () => {
   const [verifyMethod, setVerifyMethod] = React.useState(null); // 'SCAN', 'MANUAL', or null
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = React.useState(false);
+  const isScanningRef = React.useRef(false);
 
   const setShowVerifyModal = (val) => {
     setShowVerifyModalInternal(val);
     if (!val) {
       setVerifyMethod(null);
       setScanned(false);
+      isScanningRef.current = false;
     }
   };
 
@@ -60,10 +62,12 @@ const SellerReturnsScreen = () => {
     }
     setVerifyMethod('SCAN');
     setScanned(false);
+    isScanningRef.current = false;
   };
 
   const handleReturnBarcodeScanned = ({ data }) => {
-    if (scanned) return;
+    if (isScanningRef.current) return;
+    isScanningRef.current = true;
     setScanned(true);
     let extractedCode = data;
     
@@ -97,6 +101,7 @@ const SellerReturnsScreen = () => {
           'Order Mismatch',
           `Scanned QR code is for order #${scannedOrderIdSuffix}, but you are verifying order #${expectedOrderIdSuffix}.`
         );
+        isScanningRef.current = false;
         setScanned(false);
         return;
       }
@@ -117,15 +122,17 @@ const SellerReturnsScreen = () => {
           fetchReturns();
         } catch (err) {
           Alert.alert(t('error') || 'Error', err.message || 'Failed to verify return code.');
+          isScanningRef.current = false;
+          setScanned(false);
         } finally {
           setVerifying(false);
-          setScanned(false);
         }
       };
       
       autoVerify();
     } else {
       Alert.alert('Invalid QR Code', 'Could not detect a valid verification code in the scanned QR code.');
+      isScanningRef.current = false;
       setScanned(false);
     }
   };
@@ -395,7 +402,7 @@ const SellerReturnsScreen = () => {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ width: '100%', maxHeight: '90%' }}
           >
-            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, height: undefined }]}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border, minHeight: 500 }]}>
               <View style={styles.modalHeader}>
                 <View>
                   <CustomText variant="h2">Verify Return Code</CustomText>

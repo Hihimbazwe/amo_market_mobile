@@ -35,7 +35,8 @@ import {
   X,
   TrendingUp,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Flame
 } from 'lucide-react-native';
 import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import CustomText from '../components/CustomText';
@@ -82,11 +83,18 @@ const HomeScreen = ({ navigation }) => {
   const mainScrollRef = useRef(null);
   const timerRef = useRef(null);
 
+  const heroProducts = useMemo(() => {
+    if (!liveProducts || liveProducts.length === 0) return [null];
+    const hotDeals = liveProducts.filter(p => p.isHotDeal);
+    if (hotDeals.length > 0) return hotDeals.slice(0, 5);
+    return liveProducts.slice(0, 5);
+  }, [liveProducts]);
+
   useEffect(() => {
     // Start auto-slide timer
-    if (liveProducts.length > 0) {
+    if (heroProducts[0] !== null) {
       timerRef.current = setInterval(() => {
-        const nextIndex = (activeHeroIndex + 1) % Math.min(liveProducts.length, 5);
+        const nextIndex = (activeHeroIndex + 1) % heroProducts.length;
         setActiveHeroIndex(nextIndex);
         flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
       }, 4000);
@@ -94,7 +102,7 @@ const HomeScreen = ({ navigation }) => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [liveProducts, activeHeroIndex]);
+  }, [heroProducts, activeHeroIndex]);
 
   const fetchFeatured = async (showRefresher = false) => {
     if (showRefresher) setRefreshing(true);
@@ -144,8 +152,6 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
-      {/* Removed Search Overlay */}
-
       {/* Main Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -197,7 +203,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.heroContainer}>
           <FlatList
             ref={flatListRef}
-            data={liveProducts.length > 0 ? liveProducts.slice(0, 5) : [null]}
+            data={heroProducts}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
@@ -216,16 +222,28 @@ const HomeScreen = ({ navigation }) => {
                   imageStyle={{ borderRadius: 24 }}
                 >
                   <View style={styles.heroOverlay}>
-                    <CustomText variant="h1" style={styles.heroTitle}>
-                      {t('heroTitle')}
+                    {item?.isHotDeal && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 8 }}>
+                        <Flame size={12} color="#ffffff" />
+                        <CustomText style={{ color: '#ffffff', fontSize: 10, fontWeight: 'bold', marginLeft: 4 }}>HOT DEAL</CustomText>
+                      </View>
+                    )}
+                    <CustomText variant="h1" style={styles.heroTitle} numberOfLines={2}>
+                      {item?.title || t('heroTitle')}
                     </CustomText>
                     <CustomText variant="subtitle" style={styles.heroSubtitle}>
-                      {t('heroSubtitle')}
+                      {item?.price ? `Rwf ${item.price.toLocaleString()}` : t('heroSubtitle')}
                     </CustomText>
                     <CustomButton 
                       title={t('shopNow')} 
                       style={styles.heroButton}
-                      onPress={scrollToProducts} 
+                      onPress={() => {
+                        if (item?.id) {
+                          navigation.navigate('ProductDetail', { product: item });
+                        } else {
+                          scrollToProducts();
+                        }
+                      }} 
                     />
                   </View>
                 </ImageBackground>
@@ -234,7 +252,7 @@ const HomeScreen = ({ navigation }) => {
           />
           {/* Pagination Dots */}
           <View style={styles.heroPagination}>
-            {(liveProducts.length > 0 ? liveProducts.slice(0, 5) : [null]).map((_, i) => (
+            {heroProducts.map((_, i) => (
               <View 
                 key={i} 
                 style={[

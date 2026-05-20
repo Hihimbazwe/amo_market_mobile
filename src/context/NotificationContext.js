@@ -21,8 +21,23 @@ export const NotificationProvider = ({ children }) => {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(true);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [notificationsList, setNotificationsList] = useState([]);
   const notificationListener = useRef();
   const responseListener = useRef();
+
+  useEffect(() => {
+    const loadStoredNotifications = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@notifications_list');
+        if (stored) {
+          setNotificationsList(JSON.parse(stored));
+        }
+      } catch (err) {
+        console.warn('Failed to load notifications list', err);
+      }
+    };
+    loadStoredNotifications();
+  }, []);
 
   // Dynamically set notification handler based on user settings
   useEffect(() => {
@@ -134,11 +149,40 @@ export const NotificationProvider = ({ children }) => {
     // Handle notifications received while app is running foreground
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
+      const newNotificationItem = {
+        id: notification.request.identifier || String(Date.now()),
+        title: notification.request.content.title || 'Notification',
+        message: notification.request.content.body || '',
+        data: notification.request.content.data || {},
+        createdAt: new Date().toISOString(),
+        read: false,
+      };
+      setNotificationsList(prev => {
+        if (prev.some(n => n.id === newNotificationItem.id)) return prev;
+        const updated = [newNotificationItem, ...prev];
+        AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e => console.warn(e));
+        return updated;
+      });
     });
 
     // Handle user tapping the notification
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       console.log(response);
+      const notification = response.notification;
+      const newNotificationItem = {
+        id: notification.request.identifier || String(Date.now()),
+        title: notification.request.content.title || 'Notification',
+        message: notification.request.content.body || '',
+        data: notification.request.content.data || {},
+        createdAt: new Date().toISOString(),
+        read: false,
+      };
+      setNotificationsList(prev => {
+        if (prev.some(n => n.id === newNotificationItem.id)) return prev;
+        const updated = [newNotificationItem, ...prev];
+        AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e => console.warn(e));
+        return updated;
+      });
     });
 
     return () => {
@@ -147,18 +191,60 @@ export const NotificationProvider = ({ children }) => {
     };
   }, [user?.id, pushNotificationsEnabled]);
 
+  const fetchNotifications = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('@notifications_list');
+      if (stored) {
+        setNotificationsList(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const updated = notificationsList.map(n => ({ ...n, read: true }));
+    setNotificationsList(updated);
+    try {
+      await AsyncStorage.setItem('@notifications_list', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  const deleteNotification = async (id) => {
+    const updated = notificationsList.filter(n => n.id !== id);
+    setNotificationsList(updated);
+    try {
+      await AsyncStorage.setItem('@notifications_list', JSON.stringify(updated));
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    setNotificationsList([]);
+    try {
+      await AsyncStorage.removeItem('@notifications_list');
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
   return (
     <NotificationContext.Provider value={{ 
-      notifications: [], // Return to empty, rely array on push alerts
-      unreadCount: unreadChatCount, 
+      notifications: notificationsList,
+      unreadCount: notificationsList.filter(n => !n.read).length, 
+      unreadChatCount: unreadChatCount,
       refreshUnread: fetchUnread,
       loading: false, 
       expoPushToken,
       pushNotificationsEnabled,
       togglePushNotifications,
-      fetchNotifications: () => {},
-      markAllAsRead: () => {},
-      deleteNotification: () => {},
+      fetchNotifications,
+      markAllAsRead,
+      deleteNotification,
+      clearAllNotifications,
     }}>
       {children}
     </NotificationContext.Provider>

@@ -147,7 +147,7 @@ const LoadingScreen = () => {
 const AppTabs = () => {
   const { user } = useAuth();
   const { cartCount } = useCart();
-  const { unreadCount } = useNotifications();
+  const { unreadChatCount } = useNotifications();
   const { colors } = useTheme();
 
   return (
@@ -186,7 +186,7 @@ const AppTabs = () => {
         name="Messages"
         component={MessagesStack}
         options={{
-          tabBarBadge: unreadCount > 0 ? unreadCount : null,
+          tabBarBadge: unreadChatCount > 0 ? unreadChatCount : null,
           tabBarBadgeStyle: { backgroundColor: '#ef4444', fontSize: 10 }
         }}
       />
