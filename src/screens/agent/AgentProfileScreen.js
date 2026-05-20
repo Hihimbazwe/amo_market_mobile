@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
-import { ShieldCheck, Star, User, Mail, Phone, Calendar, Upload, X, CheckCircle2, AlertCircle, FileText, ChevronRight, Shield, MapPin, ScanLine, Loader2 } from 'lucide-react-native';
+import { ShieldCheck, Star, User, Mail, Phone, Calendar, Upload, X, CheckCircle2, AlertCircle, FileText, ChevronRight, Shield, MapPin, ScanLine, Loader2, Camera } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -8,6 +8,7 @@ import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { AgentDrawerContext } from '../../context/AgentDrawerContext';
 import { useAuth } from '../../context/AuthContext';
+import { authService } from '../../api/authService';
 import { agentService } from '../../api/agentService';
 import { Menu } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,7 @@ import PresenceDot from '../../components/PresenceDot';
 const AgentProfileScreen = () => {
     const { toggleDrawer } = React.useContext(AgentDrawerContext);
     const { colors } = useTheme();
-    const { user } = useAuth();
+    const { user, login } = useAuth();
     const { t } = useTranslation(['dashboard', 'common']);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -24,6 +25,92 @@ const AgentProfileScreen = () => {
     const [submitting, setSubmitting] = useState(false);
     const [selectedDocs, setSelectedDocs] = useState([]); // [{uri, url, name}]
     const [success, setSuccess] = useState(false);
+
+    const uploadAvatar = async (uri) => {
+        setLoading(true);
+        try {
+            const uploadRes = await authService.uploadFile(user.id, uri);
+            if (!uploadRes.url) throw new Error('Upload failed: No URL returned.');
+            
+            await authService.updateProfile(user.id, { image: uploadRes.url });
+            login({ ...user, image: uploadRes.url });
+            Alert.alert(t('success'), t('profilePictureUpdated') || 'Profile picture updated successfully.');
+            load();
+        } catch (err) {
+            console.error('Upload Avatar Error:', err);
+            Alert.alert(t('error'), err.message || t('failedToUploadPhoto'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateAvatar = () => {
+        Alert.alert(
+            t('profilePicture') || 'Profile Picture',
+            t('chooseSource') || 'Choose how you want to update your profile picture:',
+            [
+                {
+                    text: t('takePhoto') || 'Take Photo...',
+                    onPress: async () => {
+                        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                        if (status !== 'granted') {
+                            Alert.alert(t('error'), t('cameraPermissionDenied') || 'Camera permission is required.');
+                            return;
+                        }
+                        const result = await ImagePicker.launchCameraAsync({
+                            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                            allowsEditing: true,
+                            aspect: [1, 1],
+                            quality: 0.7,
+                        });
+                        if (!result.canceled && result.assets && result.assets[0]) {
+                            uploadAvatar(result.assets[0].uri);
+                        }
+                    }
+                },
+                {
+                    text: t('chooseLibrary') || 'Choose from Library...',
+                    onPress: async () => {
+                        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                        if (status !== 'granted') {
+                            Alert.alert(t('error'), t('galleryPermissionDenied') || 'Gallery permission is required.');
+                            return;
+                        }
+                        const result = await ImagePicker.launchImageLibraryAsync({
+                            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                            allowsEditing: true,
+                            aspect: [1, 1],
+                            quality: 0.7,
+                        });
+                        if (!result.canceled && result.assets && result.assets[0]) {
+                            uploadAvatar(result.assets[0].uri);
+                        }
+                    }
+                },
+                ...(user?.image ? [{
+                    text: t('removePhoto') || 'Remove Profile Picture',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            await authService.updateProfile(user.id, { image: null });
+                            login({ ...user, image: null });
+                            Alert.alert(t('success'), t('profilePictureRemoved') || 'Profile picture removed successfully.');
+                            load();
+                        } catch (err) {
+                            Alert.alert(t('error'), err.message || t('failedToRemovePhoto'));
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }] : []),
+                {
+                    text: t('cancel') || 'Cancel',
+                    style: 'cancel'
+                }
+            ]
+        );
+    };
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -140,13 +227,20 @@ const AgentProfileScreen = () => {
                     <>
                         <View style={[styles.card, styles.avatarCard, { backgroundColor: colors.glass, borderColor: colors.border }]}>
                             <View>
-                                <View style={[styles.avatarContainer, { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` }]}>
+                                <TouchableOpacity 
+                                    onPress={handleUpdateAvatar}
+                                    activeOpacity={0.8}
+                                    style={[styles.avatarContainer, { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` }]}
+                                >
                                     {user?.image ? (
                                         <Image source={{ uri: user.image }} style={styles.avatarLarge} />
                                     ) : (
                                         <CustomText style={{ fontSize: 28, fontWeight: '800', color: colors.primary }}>{initials}</CustomText>
                                     )}
-                                </View>
+                                    <View style={[styles.cameraBtn, { borderColor: colors.background, backgroundColor: colors.primary }]}>
+                                        <Camera color="white" size={10} />
+                                    </View>
+                                </TouchableOpacity>
                                 <View style={styles.presenceContainer}>
                                     <PresenceDot size={14} borderSize={3} borderColor={colors.background} />
                                 </View>
@@ -328,8 +422,19 @@ const createStyles = (colors) => StyleSheet.create({
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 400 },
     card: { padding: 24, borderRadius: 24, borderWidth: 1, marginBottom: 20 },
     avatarCard: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-    avatarContainer: { width: 72, height: 72, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    avatarContainer: { width: 72, height: 72, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
     presenceContainer: { position: 'absolute', bottom: -2, right: -2 },
+    cameraBtn: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+    },
     avatarLarge: { width: 72, height: 72 },
     roleBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 1, marginTop: 8 },
     sectionLabel: { color: colors.foreground, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 24, opacity: 0.8 },

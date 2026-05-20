@@ -174,6 +174,43 @@ export const authService = {
       throw error;
     }
   },
+
+  uploadFile: async (userId, fileUri) => {
+    try {
+      const headers = buildHeaders(userId);
+      delete headers['Content-Type'];
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: fileUri,
+        type: 'image/jpeg',
+        name: `avatar_${Date.now()}.jpg`
+      });
+
+      const response = await fetchWithTimeout(`${BASE_URL}/api/upload`, {
+        method: 'POST',
+        headers,
+        body: formData
+      }, 30000);
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error('Invalid server response during upload');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('uploadFile error:', error);
+      throw error;
+    }
+  },
   
   changePassword: async (userId, currentPassword, newPassword) => {
     try {

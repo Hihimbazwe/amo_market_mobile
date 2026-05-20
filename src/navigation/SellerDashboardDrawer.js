@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated, Dimensions, TouchableWithoutFeedback, Image, Alert } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -226,43 +226,41 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
 };
 
 export default function SellerDashboardDrawer({ navigation }) {
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const { visible, setVisible } = useContext(SellerDrawerContext);
 
   return (
-    <SellerDrawerContext.Provider value={{ toggleDrawer: () => setDrawerVisible(v => !v) }}>
-      <View style={{ flex: 1 }}>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="SellerOverview" component={SellerOverviewScreen} />
-          <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} />
-          <Stack.Screen name="SellerShipment" component={SellerShipmentScreen} />
-          <Stack.Screen name="SellerReturns" component={SellerReturnsScreen} />
-          <Stack.Screen name="SellerDisputes" component={SellerDisputesScreen} />
-          <Stack.Screen name="SellerWallet" component={SellerWalletScreen} />
-          <Stack.Screen name="SellerWithdraw" component={SellerWithdrawScreen} />
-          <Stack.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
-          <Stack.Screen name="SellerMembership" component={SellerMembershipScreen} />
-          <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
-          <Stack.Screen name="SellerInventory" component={SellerInventoryScreen} />
-          <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
-          <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
-          <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
-          <Stack.Screen name="SellerProductDetail" component={SellerProductDetailScreen} />
+    <View style={{ flex: 1 }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="SellerOverview" component={SellerOverviewScreen} />
+        <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} />
+        <Stack.Screen name="SellerShipment" component={SellerShipmentScreen} />
+        <Stack.Screen name="SellerReturns" component={SellerReturnsScreen} />
+        <Stack.Screen name="SellerDisputes" component={SellerDisputesScreen} />
+        <Stack.Screen name="SellerWallet" component={SellerWalletScreen} />
+        <Stack.Screen name="SellerWithdraw" component={SellerWithdrawScreen} />
+        <Stack.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
+        <Stack.Screen name="SellerMembership" component={SellerMembershipScreen} />
+        <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
+        <Stack.Screen name="SellerInventory" component={SellerInventoryScreen} />
+        <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
+        <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
+        <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
+        <Stack.Screen name="SellerProductDetail" component={SellerProductDetailScreen} />
 
-          {/* Parity Screens */}
-          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-          <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
-          <Stack.Screen name="Cart" component={CartScreen} />
-          <Stack.Screen name="Checkout" component={CheckoutScreen} />
-          <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
-        </Stack.Navigator>
+        {/* Parity Screens */}
+        <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
+        <Stack.Screen name="Cart" component={CartScreen} />
+        <Stack.Screen name="Checkout" component={CheckoutScreen} />
+        <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
+      </Stack.Navigator>
 
-        <CustomDrawer
-          visible={drawerVisible}
-          onClose={() => setDrawerVisible(false)}
-          navigation={navigation?.navigate ? navigation : { navigate: () => { } }}
-        />
-      </View>
-    </SellerDrawerContext.Provider>
+      <CustomDrawer
+        visible={visible}
+        onClose={() => setVisible(false)}
+        navigation={navigation?.navigate ? navigation : { navigate: () => { } }}
+      />
+    </View>
   );
 }
 

@@ -204,8 +204,12 @@ export default function StatusViewerScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <ArrowLeft color="#fff" size={24} />
           </TouchableOpacity>
-          <View style={[styles.avatar, { backgroundColor: currentStatus.sellerColor }]}>
-            <CustomText style={styles.avatarText}>{currentStatus.sellerInitials}</CustomText>
+          <View style={[styles.avatar, { backgroundColor: currentStatus.sellerColor, overflow: 'hidden' }]}>
+            {currentStatus.sellerImage ? (
+              <Image source={{ uri: currentStatus.sellerImage }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <CustomText style={styles.avatarText}>{currentStatus.sellerInitials}</CustomText>
+            )}
           </View>
           <View style={styles.nameWrap}>
             <CustomText style={styles.userName}>{currentStatus.sellerName}</CustomText>

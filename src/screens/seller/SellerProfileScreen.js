@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, ScrollView, Alert,
   ActivityIndicator, RefreshControl, TextInput,
-  Keyboard, Platform,
+  Keyboard, Platform, Image,
 } from 'react-native';
 import {
   Menu, Store, Camera, MapPin, Navigation, Search,
@@ -10,12 +10,14 @@ import {
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import CustomText from '../../components/CustomText';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
 import LocationMapWebView from '../../components/LocationMapWebView';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
+import { authService } from '../../api/authService';
 import { sellerService } from '../../api/sellerService';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +65,92 @@ const SellerProfileScreen = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const uploadAvatar = async (uri) => {
+    setLoading(true);
+    try {
+      const uploadRes = await authService.uploadFile(user.id, uri);
+      if (!uploadRes.url) throw new Error('Upload failed: No URL returned.');
+      
+      await authService.updateProfile(user.id, { image: uploadRes.url });
+      login({ ...user, image: uploadRes.url });
+      Alert.alert(t('success'), t('profilePictureUpdated') || 'Profile picture updated successfully.');
+      fetchProfile();
+    } catch (err) {
+      console.error('Upload Avatar Error:', err);
+      Alert.alert(t('error'), err.message || t('failedToUploadPhoto'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateAvatar = () => {
+    Alert.alert(
+      t('profilePicture') || 'Profile Picture',
+      t('chooseSource') || 'Choose how you want to update your profile picture:',
+      [
+        {
+          text: t('takePhoto') || 'Take Photo...',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert(t('error'), t('cameraPermissionDenied') || 'Camera permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+            if (!result.canceled && result.assets && result.assets[0]) {
+              uploadAvatar(result.assets[0].uri);
+            }
+          }
+        },
+        {
+          text: t('chooseLibrary') || 'Choose from Library...',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert(t('error'), t('galleryPermissionDenied') || 'Gallery permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+            if (!result.canceled && result.assets && result.assets[0]) {
+              uploadAvatar(result.assets[0].uri);
+            }
+          }
+        },
+        ...(user?.image ? [{
+          text: t('removePhoto') || 'Remove Profile Picture',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await authService.updateProfile(user.id, { image: null });
+              login({ ...user, image: null });
+              Alert.alert(t('success'), t('profilePictureRemoved') || 'Profile picture removed successfully.');
+              fetchProfile();
+            } catch (err) {
+              Alert.alert(t('error'), err.message || t('failedToRemovePhoto'));
+            } finally {
+              setLoading(false);
+            }
+          }
+        }] : []),
+        {
+          text: t('cancel') || 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
 
   // Location state
   const [locData, setLocData] = useState({ locationName: '', locationAddress: '', locationLat: 0, locationLng: 0 });
@@ -237,10 +325,19 @@ const SellerProfileScreen = () => {
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
         ) : (
           <>
-            {/* ── Avatar ── */}
-            <View style={styles.avatarSection}>
-              <TouchableOpacity style={[styles.avatarPlaceholder, { backgroundColor: `${colors.primary}20`, borderColor: `${colors.primary}30` }]}>
-                <Store color={colors.primary} size={48} />
+             <View style={styles.avatarSection}>
+              <TouchableOpacity 
+                onPress={handleUpdateAvatar}
+                activeOpacity={0.8}
+                style={[styles.avatarPlaceholder, { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` }]}
+              >
+                {user?.image ? (
+                  <Image source={{ uri: user.image }} style={styles.avatarImage} />
+                ) : (
+                  <CustomText style={{ fontSize: 32, fontWeight: '900', color: colors.primary }}>
+                    {(name || user?.name || "S").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                  </CustomText>
+                )}
                 <View style={[styles.cameraBtn, { borderColor: colors.background, backgroundColor: colors.primary }]}>
                   <Camera color="white" size={16} />
                 </View>
@@ -404,6 +501,7 @@ const styles = StyleSheet.create({
     width: 100, height: 100, borderRadius: 50,
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, position: 'relative',
   },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 50 },
   cameraBtn: {
     position: 'absolute', bottom: 0, right: 0,
     width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 3,

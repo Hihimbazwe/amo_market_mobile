@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicato
 import { Menu, User, Mail, Shield, Calendar, Camera, ArrowLeft } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import CustomText from '../../components/CustomText';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
@@ -23,6 +24,90 @@ const BuyerProfileScreen = () => {
 
   const [name, setName] = useState(user?.name || '');
   const [loading, setLoading] = useState(false);
+
+  const uploadAvatar = async (uri) => {
+    setLoading(true);
+    try {
+      const uploadRes = await authService.uploadFile(user.id, uri);
+      if (!uploadRes.url) throw new Error('Upload failed: No URL returned.');
+      
+      const updateRes = await authService.updateProfile(user.id, { image: uploadRes.url });
+      login({ ...user, image: uploadRes.url });
+      Alert.alert(t('success'), t('profilePictureUpdated') || 'Profile picture updated successfully.');
+    } catch (err) {
+      console.error('Upload Avatar Error:', err);
+      Alert.alert(t('error'), err.message || t('failedToUploadPhoto'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateAvatar = () => {
+    Alert.alert(
+      t('profilePicture') || 'Profile Picture',
+      t('chooseSource') || 'Choose how you want to update your profile picture:',
+      [
+        {
+          text: t('takePhoto') || 'Take Photo...',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert(t('error'), t('cameraPermissionDenied') || 'Camera permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+            if (!result.canceled && result.assets && result.assets[0]) {
+              uploadAvatar(result.assets[0].uri);
+            }
+          }
+        },
+        {
+          text: t('chooseLibrary') || 'Choose from Library...',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert(t('error'), t('galleryPermissionDenied') || 'Gallery permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+            if (!result.canceled && result.assets && result.assets[0]) {
+              uploadAvatar(result.assets[0].uri);
+            }
+          }
+        },
+        ...(user?.image ? [{
+          text: t('removePhoto') || 'Remove Profile Picture',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await authService.updateProfile(user.id, { image: null });
+              login({ ...user, image: null });
+              Alert.alert(t('success'), t('profilePictureRemoved') || 'Profile picture removed successfully.');
+            } catch (err) {
+              Alert.alert(t('error'), err.message || t('failedToRemovePhoto'));
+            } finally {
+              setLoading(false);
+            }
+          }
+        }] : []),
+        {
+          text: t('cancel') || 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
 
   useEffect(() => {
     if (user?.name) setName(user.name);
@@ -64,7 +149,11 @@ const BuyerProfileScreen = () => {
         {/* Avatar Card */}
         <View style={[styles.glassCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.avatarWrap}>
-            <View style={[styles.avatarBox, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}>
+            <TouchableOpacity 
+              onPress={handleUpdateAvatar}
+              activeOpacity={0.8}
+              style={[styles.avatarBox, { backgroundColor: accentColor + '15', borderColor: accentColor + '30' }]}
+            >
               {user?.image ? (
                 <Image source={{ uri: user.image }} style={styles.avatarImage} />
               ) : (
@@ -73,7 +162,7 @@ const BuyerProfileScreen = () => {
               <View style={[styles.cameraBtn, { backgroundColor: accentColor }]}>
                 <Camera color="#fff" size={12} />
               </View>
-            </View>
+            </TouchableOpacity>
             <View style={{ flex: 1 }}>
               <CustomText style={[styles.profileName, { color: colors.foreground }]}>{user?.name || '—'}</CustomText>
               <CustomText style={[styles.profileEmail, { color: colors.muted }]}>{user?.email}</CustomText>

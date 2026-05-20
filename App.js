@@ -44,6 +44,11 @@ import CartScreen from './src/screens/CartScreen';
 import AuthOverlay from './src/components/AuthOverlay';
 import AutoLogoutWarningModal from './src/components/modals/AutoLogoutWarningModal';
 import 'react-native-gesture-handler';
+
+import { BuyerDrawerContext } from './src/context/BuyerDrawerContext';
+import { SellerDrawerContext } from './src/context/SellerDrawerContext';
+import { CourierDrawerContext } from './src/context/CourierDrawerContext';
+import { AgentDrawerContext } from './src/context/AgentDrawerContext';
 // Network Performance Logger
 const originalFetch = global.fetch;
 global.fetch = async (...args) => {
@@ -152,6 +157,7 @@ const AppTabs = () => {
 
   return (
     <Tab.Navigator
+      lazy={false}
       initialRouteName={['SELLER', 'COURIER', 'AGENT'].includes(user?.role?.toUpperCase()) ? 'Me' : 'Home'}
       screenOptions={({ route }) => ({
         headerShown: false,
@@ -218,6 +224,12 @@ const RootNavigator = () => {
   const [showWarning, setShowWarning] = React.useState(false);
   const [currentRoute, setCurrentRoute] = React.useState(null);
   const [currentRouteObj, setCurrentRouteObj] = React.useState(null);
+
+  // Global Drawer Visible States
+  const [buyerDrawerVisible, setBuyerDrawerVisible] = React.useState(false);
+  const [sellerDrawerVisible, setSellerDrawerVisible] = React.useState(false);
+  const [courierDrawerVisible, setCourierDrawerVisible] = React.useState(false);
+  const [agentDrawerVisible, setAgentDrawerVisible] = React.useState(false);
 
   const INACTIVITY_LIMIT = 9 * 60 * 1000; // 9 minutes warning
   const LOGOUT_LIMIT = 10 * 60 * 1000; // 10 minutes total
@@ -316,44 +328,52 @@ const RootNavigator = () => {
         return false;
       }}
     >
-      <NavigationContainer 
-        linking={linking}
-        onStateChange={(state) => {
-          if (!state) return;
-          try {
-            let route = state.routes[state.index];
-            while (route && route.state && typeof route.state.index === 'number') {
-              const nextRoute = route.state.routes[route.state.index];
-              if (nextRoute) {
-                route = nextRoute;
-              } else {
-                break;
-              }
-            }
-            if (route && route.name) {
-              const ignoredRoutes = ['Login', 'Register', 'VerifyOTP', 'ForgotPassword', 'ResetPassword', 'Auth'];
-              if (!ignoredRoutes.includes(route.name)) {
-                setCurrentRoute(route.name);
-                if (user) {
-                  setCurrentRouteObj({ name: route.name, params: route.params });
-                }
-              }
-            }
-          } catch (err) {
-            console.warn('[NAVIGATION] Error tracking route state', err);
-          }
-        }}
-      >
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="MainApp" component={AppTabs} />
-          <Stack.Screen name="Checkout" component={CheckoutScreen} />
-          <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
-          {!user && (
-            <Stack.Screen name="Auth" component={AuthStack} />
-          )}
-        </Stack.Navigator>
-        <AuthOverlay currentRoute={currentRoute} />
-      </NavigationContainer>
+      <BuyerDrawerContext.Provider value={{ visible: buyerDrawerVisible, setVisible: setBuyerDrawerVisible, toggleDrawer: () => setBuyerDrawerVisible(v => !v) }}>
+        <SellerDrawerContext.Provider value={{ visible: sellerDrawerVisible, setVisible: setSellerDrawerVisible, toggleDrawer: () => setSellerDrawerVisible(v => !v) }}>
+          <CourierDrawerContext.Provider value={{ visible: courierDrawerVisible, setVisible: setCourierDrawerVisible, toggleDrawer: () => setCourierDrawerVisible(v => !v) }}>
+            <AgentDrawerContext.Provider value={{ visible: agentDrawerVisible, setVisible: setAgentDrawerVisible, toggleDrawer: () => setAgentDrawerVisible(v => !v) }}>
+              <NavigationContainer 
+                linking={linking}
+                onStateChange={(state) => {
+                  if (!state) return;
+                  try {
+                    let route = state.routes[state.index];
+                    while (route && route.state && typeof route.state.index === 'number') {
+                      const nextRoute = route.state.routes[route.state.index];
+                      if (nextRoute) {
+                        route = nextRoute;
+                      } else {
+                        break;
+                      }
+                    }
+                    if (route && route.name) {
+                      const ignoredRoutes = ['Login', 'Register', 'VerifyOTP', 'ForgotPassword', 'ResetPassword', 'Auth'];
+                      if (!ignoredRoutes.includes(route.name)) {
+                        setCurrentRoute(route.name);
+                        if (user) {
+                          setCurrentRouteObj({ name: route.name, params: route.params });
+                        }
+                      }
+                    }
+                  } catch (err) {
+                    console.warn('[NAVIGATION] Error tracking route state', err);
+                  }
+                }}
+              >
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="MainApp" component={AppTabs} />
+                  <Stack.Screen name="Checkout" component={CheckoutScreen} />
+                  <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
+                  {!user && (
+                    <Stack.Screen name="Auth" component={AuthStack} />
+                  )}
+                </Stack.Navigator>
+                <AuthOverlay currentRoute={currentRoute} />
+              </NavigationContainer>
+            </AgentDrawerContext.Provider>
+          </CourierDrawerContext.Provider>
+        </SellerDrawerContext.Provider>
+      </BuyerDrawerContext.Provider>
 
       <AutoLogoutWarningModal
         visible={showWarning}

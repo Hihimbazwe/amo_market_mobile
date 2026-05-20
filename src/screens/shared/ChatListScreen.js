@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +26,8 @@ import PresenceDot from '../../components/PresenceDot';
 // Try to get whichever drawer context is available
 import { BuyerDrawerContext } from '../../context/BuyerDrawerContext';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
+import { CourierDrawerContext } from '../../context/CourierDrawerContext';
+import { AgentDrawerContext } from '../../context/AgentDrawerContext';
 
 
 function formatTime(date) {
@@ -87,10 +90,14 @@ const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
     >
       {/* Avatar */}
       <View style={styles.avatarWrap}>
-        <View style={[styles.avatar, { backgroundColor: item.participantColor + '15', borderColor: item.participantColor + '33' }]}>
-          <CustomText style={[styles.avatarText, { color: item.participantColor }]}>
-            {item.participantInitials}
-          </CustomText>
+        <View style={[styles.avatar, { backgroundColor: item.participantColor + '15', borderColor: item.participantColor + '33', overflow: 'hidden' }]}>
+          {item.participantImage ? (
+            <Image source={{ uri: item.participantImage }} style={{ width: '100%', height: '100%' }} />
+          ) : (
+            <CustomText style={[styles.avatarText, { color: item.participantColor }]}>
+              {item.participantInitials}
+            </CustomText>
+          )}
         </View>
         {item.isOnline && (
           <View style={styles.onlineDotWrapper}>
@@ -157,7 +164,21 @@ export default function ChatListScreen() {
   // Try to grab whichever drawer context is available
   const buyerCtx = useContext(BuyerDrawerContext);
   const sellerCtx = useContext(SellerDrawerContext);
-  const toggleDrawer = buyerCtx?.toggleDrawer || sellerCtx?.toggleDrawer || (() => {});
+  const courierCtx = useContext(CourierDrawerContext);
+  const agentCtx = useContext(AgentDrawerContext);
+
+  const toggleDrawer = () => {
+    const role = user?.role?.toUpperCase();
+    if (role === 'SELLER') {
+      sellerCtx?.toggleDrawer();
+    } else if (role === 'AGENT') {
+      agentCtx?.toggleDrawer();
+    } else if (role === 'COURIER') {
+      courierCtx?.toggleDrawer();
+    } else {
+      buyerCtx?.toggleDrawer();
+    }
+  };
 
   const loadData = useCallback(() => {
     Promise.all([
@@ -404,8 +425,12 @@ export default function ChatListScreen() {
     return (
       <TouchableOpacity onPress={() => handleViewStatus(index)} style={styles.statusItem}>
         <View style={[styles.statusAvatarRing, { borderColor: isNew ? colors.primary : colors.glassBorder }]}>
-          <View style={[styles.statusAvatar, { backgroundColor: item.sellerColor + '15' }]}>
-            <CustomText style={[styles.statusAvatarText, { color: item.sellerColor }]}>{item.sellerInitials}</CustomText>
+          <View style={[styles.statusAvatar, { backgroundColor: item.sellerColor + '15', overflow: 'hidden' }]}>
+            {item.sellerImage ? (
+              <Image source={{ uri: item.sellerImage }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <CustomText style={[styles.statusAvatarText, { color: item.sellerColor }]}>{item.sellerInitials}</CustomText>
+            )}
           </View>
         </View>
         <CustomText style={[styles.statusName, { color: colors.foreground }]} numberOfLines={1}>
@@ -438,8 +463,12 @@ export default function ChatListScreen() {
                   {myStatus ? (
                     // Seller HAS a status: Show solid ring
                     <View style={[styles.statusAvatarRing, { borderColor: colors.primary }]}>
-                      <View style={[styles.statusAvatar, { backgroundColor: colors.glass }]}>
-                        <CustomText style={[styles.statusAvatarText, { color: colors.primary }]}>{myStatus.sellerInitials}</CustomText>
+                      <View style={[styles.statusAvatar, { backgroundColor: colors.glass, overflow: 'hidden' }]}>
+                        {myStatus.sellerImage || user?.image ? (
+                          <Image source={{ uri: myStatus.sellerImage || user?.image }} style={{ width: '100%', height: '100%' }} />
+                        ) : (
+                          <CustomText style={[styles.statusAvatarText, { color: colors.primary }]}>{myStatus.sellerInitials}</CustomText>
+                        )}
                         <View style={[styles.addPlusBtnMini, { backgroundColor: colors.primary }]}>
                           <Plus color="#fff" size={10} />
                         </View>

@@ -258,10 +258,13 @@ const SellerInventoryScreen = ({ navigation }) => {
   };
 
   const handleTogglePublish = async (productId, currentStatus) => {
+    // Optimistic UI update for perfectly smooth publish/unpublish
+    setItems(prev => prev.map(p => p.id === productId ? { ...p, published: !currentStatus } : p));
     try {
       await productService.updateProduct(user.id, productId, { published: !currentStatus });
-      fetchInventory();
     } catch (err) {
+      // Revert on error
+      setItems(prev => prev.map(p => p.id === productId ? { ...p, published: currentStatus } : p));
       Alert.alert(t('error'), err.message || t('failedToUpdateVisibility'));
     }
   };
@@ -635,7 +638,7 @@ const SellerInventoryScreen = ({ navigation }) => {
             }}>
               <Flame size={18} color={actionMenuProduct?.isHotDeal ? '#EF4444' : colors.muted} />
               <CustomText style={{ marginLeft: 12, color: actionMenuProduct?.isHotDeal ? '#EF4444' : colors.foreground }}>
-                {actionMenuProduct?.isHotDeal ? t('removeHotDeal') : t('mark As HotDeal')}
+                {actionMenuProduct?.isHotDeal ? t('remove HotDeal') : t('mark As HotDeal')}
               </CustomText>
             </TouchableOpacity>
 

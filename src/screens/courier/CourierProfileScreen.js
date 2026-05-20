@@ -1,23 +1,111 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, StyleSheet, ScrollView, TouchableOpacity, TextInput,
-  ActivityIndicator, Alert, StatusBar, RefreshControl
+  ActivityIndicator, Alert, StatusBar, RefreshControl, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, User, Phone, MapPin, Truck, Save } from 'lucide-react-native';
+import { ChevronLeft, User, Phone, MapPin, Truck, Save, Camera } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { authService } from '../../api/authService';
 import { courierService } from '../../api/courierService';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 
 export default function CourierProfileScreen({ navigation }) {
   const { colors } = useTheme();
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const { t } = useTranslation(['dashboard', 'common']);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const uploadAvatar = async (uri) => {
+    setLoading(true);
+    try {
+      const uploadRes = await authService.uploadFile(user.id, uri);
+      if (!uploadRes.url) throw new Error('Upload failed: No URL returned.');
+      
+      await authService.updateProfile(user.id, { image: uploadRes.url });
+      login({ ...user, image: uploadRes.url });
+      Alert.alert(t('success'), t('profilePictureUpdated') || 'Profile picture updated successfully.');
+      fetchProfile();
+    } catch (err) {
+      console.error('Upload Avatar Error:', err);
+      Alert.alert(t('error'), err.message || t('failedToUploadPhoto'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateAvatar = () => {
+    Alert.alert(
+      t('profilePicture') || 'Profile Picture',
+      t('chooseSource') || 'Choose how you want to update your profile picture:',
+      [
+        {
+          text: t('takePhoto') || 'Take Photo...',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert(t('error'), t('cameraPermissionDenied') || 'Camera permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+            if (!result.canceled && result.assets && result.assets[0]) {
+              uploadAvatar(result.assets[0].uri);
+            }
+          }
+        },
+        {
+          text: t('chooseLibrary') || 'Choose from Library...',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert(t('error'), t('galleryPermissionDenied') || 'Gallery permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.7,
+            });
+            if (!result.canceled && result.assets && result.assets[0]) {
+              uploadAvatar(result.assets[0].uri);
+            }
+          }
+        },
+        ...(user?.image ? [{
+          text: t('removePhoto') || 'Remove Profile Picture',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await authService.updateProfile(user.id, { image: null });
+              login({ ...user, image: null });
+              Alert.alert(t('success'), t('profilePictureRemoved') || 'Profile picture removed successfully.');
+              fetchProfile();
+            } catch (err) {
+              Alert.alert(t('error'), err.message || t('failedToRemovePhoto'));
+            } finally {
+              setLoading(false);
+            }
+          }
+        }] : []),
+        {
+          text: t('cancel') || 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
+  };
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ phone: '', vehicleType: '', licensePlate: '', bio: '' });
 
@@ -74,9 +162,20 @@ export default function CourierProfileScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Avatar card */}
         <View style={[styles.avatarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.avatar, { backgroundColor: 'rgba(249,115,22,0.15)', borderColor: 'rgba(249,115,22,0.3)' }]}>
-            <CustomText style={styles.avatarInitial}>{user?.name?.[0]?.toUpperCase() || 'C'}</CustomText>
-          </View>
+          <TouchableOpacity 
+            onPress={handleUpdateAvatar}
+            activeOpacity={0.8}
+            style={[styles.avatar, { backgroundColor: 'rgba(249,115,22,0.15)', borderColor: 'rgba(249,115,22,0.3)' }]}
+          >
+            {user?.image ? (
+              <Image source={{ uri: user.image }} style={styles.avatarImage} />
+            ) : (
+              <CustomText style={styles.avatarInitial}>{(user?.name || 'C').split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}</CustomText>
+            )}
+            <View style={[styles.cameraBtn, { borderColor: colors.card, backgroundColor: '#f97316' }]}>
+              <Camera color="white" size={10} />
+            </View>
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <CustomText style={[styles.userName, { color: colors.foreground }]}>{user?.name || t('courier')}</CustomText>
             <CustomText style={{ fontSize: 12, color: colors.muted }}>{user?.email}</CustomText>
@@ -150,7 +249,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '900' },
   content: { padding: 16 },
   avatarCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 18, borderWidth: 1, padding: 16, gap: 16, marginBottom: 16 },
-  avatar: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  avatar: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 30 },
+  cameraBtn: {
+    position: 'absolute', bottom: -2, right: -2,
+    width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2,
+  },
   avatarInitial: { fontSize: 26, fontWeight: '900', color: '#f97316' },
   userName: { fontSize: 16, fontWeight: '800', marginBottom: 2 },
   roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start', marginTop: 6 },

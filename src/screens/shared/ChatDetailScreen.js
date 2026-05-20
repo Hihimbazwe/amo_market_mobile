@@ -295,11 +295,56 @@ export default function ChatDetailScreen() {
   const { addListener, sendTyping, sendStopTyping } = usePresence();
   const typingTimerRef = useRef(null);
 
+  // Heartbeat pulsing effect for online state
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (isOnline && !isHidden) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0.8,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 650,
+            useNativeDriver: true,
+          }),
+          Animated.delay(1200),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(0);
+    }
+  }, [isOnline, isHidden]);
+
+  const pulseScale = pulseAnim.interpolate({
+    inputRange: [0, 1.2],
+    outputRange: [1, 1.45],
+  });
+  const pulseOpacity = pulseAnim.interpolate({
+    inputRange: [0, 0.5, 1.2],
+    outputRange: [0.65, 0.4, 0],
+  });
+
   // Listen for real-time WebSocket events
   useEffect(() => {
     if (!conversation?.id || !user?.id) return;
     
     return addListener((event) => {
+      if (isHidden) return; // Ignore all real-time events if availability is hidden
+
       // Typing events for this conversation
       if (event.conversationId === conversation.id && event.userId === participantId) {
         if (event.type === 'USER_TYPING') {
@@ -317,7 +362,7 @@ export default function ChatDetailScreen() {
         setIsOnline(false);
       }
     });
-  }, [conversation?.id, participantId, user?.id, addListener]);
+  }, [conversation?.id, participantId, user?.id, addListener, isHidden]);
 
   // Typing dots animation for header
   const [typingDots, setTypingDots] = useState('');
@@ -472,6 +517,17 @@ export default function ChatDetailScreen() {
           setMessages(data);
         }
         setLoading(false);
+
+        // Fetch initial typing and availability status immediately
+        try {
+          const statusResult = await chatService.checkTyping(cid, user.id, participantId);
+          setTyping(statusResult.typing);
+          setIsOnline(statusResult.isOnline);
+          setLastSeen(statusResult.lastSeen);
+          setIsHidden(!!statusResult.isHidden);
+        } catch (e) {
+          console.warn('Failed to fetch initial presence status:', e);
+        }
       };
 
       initMessages();
@@ -652,12 +708,26 @@ export default function ChatDetailScreen() {
         </TouchableOpacity>
 
         {/* Avatar + name + status */}
-        <View style={[styles.headerAvatar, { backgroundColor: (conversation?.participantColor || colors.primary) + '22', borderColor: (conversation?.participantColor || colors.primary) + '55' }]}>
-          <CustomText style={[styles.headerAvatarText, { color: conversation?.participantColor || colors.primary }]}>
-            {conversation?.participantInitials || '??'}
-          </CustomText>
+        <View style={[styles.headerAvatar, { backgroundColor: (conversation?.participantColor || colors.primary) + '22', borderColor: (conversation?.participantColor || colors.primary) + '55', overflow: 'hidden' }]}>
+          {conversation?.participantImage ? (
+            <Image source={{ uri: conversation.participantImage }} style={{ width: '100%', height: '100%' }} />
+          ) : (
+            <CustomText style={[styles.headerAvatarText, { color: conversation?.participantColor || colors.primary }]}>
+              {conversation?.participantInitials || '??'}
+            </CustomText>
+          )}
           {isOnline && !isHidden && (
             <View style={styles.onlineDotHeaderWrapper}>
+              <Animated.View 
+                style={[
+                  styles.onlineDotPulse, 
+                  { 
+                    backgroundColor: '#22c55e', 
+                    transform: [{ scale: pulseScale }], 
+                    opacity: pulseOpacity 
+                  }
+                ]} 
+              />
               <PresenceDot size={12} borderSize={2} borderColor={colors.background} />
             </View>
           )}
@@ -669,7 +739,7 @@ export default function ChatDetailScreen() {
           </CustomText>
           {!isHidden && (
             <CustomText style={[styles.headerStatus, { color: typing ? colors.primary : (isOnline ? '#22c55e' : colors.muted) }]}>
-              {typing ? `typing${typingDots}` : isOnline ? 'Online' : (lastSeen ? `Last seen ${formatLastSeen(lastSeen)}` : 'Offline')}
+              {typing ? `typing${typingDots}` : isOnline ? 'Online' : `Last seen ${lastSeen ? formatLastSeen(lastSeen) : 'recently'}`}
             </CustomText>
           )}
         </View>
@@ -690,9 +760,9 @@ export default function ChatDetailScreen() {
               <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat('lock')}>
                 <CustomText style={{ color: colors.foreground }}>{conversation?.isLocked ? 'Unlock Chat' : 'Lock Chat'}</CustomText>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat(conversation?.isHidden ? 'unhide' : 'hide')}>
+              {/* <TouchableOpacity style={styles.optionItem} onPress={() => handleManageChat(conversation?.isHidden ? 'unhide' : 'hide')}>
                 <CustomText style={{ color: colors.foreground }}>{conversation?.isHidden ? 'Unhide Chat' : 'Hide Chat'}</CustomText>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
               {isBlockedByMe ? (
                 <TouchableOpacity style={styles.optionItem} onPress={handleUnblockPrompt}>
                   <CustomText style={{ color: '#ef4444' }}>Unblock User</CustomText>
@@ -976,6 +1046,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -1,
     right: -1,
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerInfo: { flex: 1 },
   headerName: { fontSize: 16, fontWeight: '700' },
@@ -1312,5 +1386,16 @@ const styles = StyleSheet.create({
   quotedText: {
     fontSize: 12,
     opacity: 0.9,
+  },
+  onlineDotPulse: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    shadowColor: '#22c55e',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 2,
   },
 });

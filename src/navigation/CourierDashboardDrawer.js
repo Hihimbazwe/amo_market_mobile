@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import {
   View, StyleSheet, TouchableOpacity, ScrollView, Modal,
   Animated, Dimensions, TouchableWithoutFeedback, Image, Alert
@@ -198,7 +198,7 @@ const CustomDrawer = ({ visible, onClose, navigation, activeScreen, setActiveScr
 
 // ─── Main Drawer Navigator ────────────────────────────────────────────────────
 export default function CourierDashboardDrawer({ navigation }) {
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const { visible, setVisible } = useContext(CourierDrawerContext);
   const [activeScreen, setActiveScreen] = useState('CourierDashboard');
 
   const stackNavRef = useRef(null);
@@ -211,33 +211,31 @@ export default function CourierDashboardDrawer({ navigation }) {
   };
 
   return (
-    <CourierDrawerContext.Provider value={{ toggleDrawer: () => setDrawerVisible(v => !v) }}>
-      <View style={{ flex: 1 }}>
-        <Stack.Navigator
-          ref={stackNavRef}
-          screenOptions={{ headerShown: false }}
-          initialRouteName="CourierDashboard"
-        >
-          <Stack.Screen name="CourierDashboard" component={CourierDashboardScreen} />
-          <Stack.Screen name="CourierShipments" component={CourierShipmentsScreen} />
-          <Stack.Screen name="CourierEarnings" component={CourierEarningsScreen} />
-          <Stack.Screen name="CourierProfile" component={CourierProfileScreen} />
-          <Stack.Screen name="CourierSettings" component={CourierSettingsScreen} />
-          <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
-          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-          <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
-          <Stack.Screen name="Cart" component={CartScreen} />
-        </Stack.Navigator>
+    <View style={{ flex: 1 }}>
+      <Stack.Navigator
+        ref={stackNavRef}
+        screenOptions={{ headerShown: false }}
+        initialRouteName="CourierDashboard"
+      >
+        <Stack.Screen name="CourierDashboard" component={CourierDashboardScreen} />
+        <Stack.Screen name="CourierShipments" component={CourierShipmentsScreen} />
+        <Stack.Screen name="CourierEarnings" component={CourierEarningsScreen} />
+        <Stack.Screen name="CourierProfile" component={CourierProfileScreen} />
+        <Stack.Screen name="CourierSettings" component={CourierSettingsScreen} />
+        <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
+        <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
+        <Stack.Screen name="Cart" component={CartScreen} />
+      </Stack.Navigator>
 
-        <CustomDrawer
-          visible={drawerVisible}
-          onClose={() => setDrawerVisible(false)}
-          navigation={navigation}
-          activeScreen={activeScreen}
-          setActiveScreen={setActiveScreen}
-        />
-      </View>
-    </CourierDrawerContext.Provider>
+      <CustomDrawer
+        visible={visible}
+        onClose={() => setVisible(false)}
+        navigation={navigation}
+        activeScreen={activeScreen}
+        setActiveScreen={setActiveScreen}
+      />
+    </View>
   );
 }
 

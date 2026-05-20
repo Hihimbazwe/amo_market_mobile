@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { View, StyleSheet, TouchableOpacity, Modal, Animated, Dimensions, TouchableWithoutFeedback, Image, Alert } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -189,37 +189,35 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
 };
 
 export default function BuyerDashboard({ navigation }) {
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const { visible, setVisible } = useContext(BuyerDrawerContext);
 
   return (
-    <BuyerDrawerContext.Provider value={{ toggleDrawer: () => setDrawerVisible(!drawerVisible) }}>
-      <View style={{ flex: 1 }}>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Dashboard" component={BuyerOverviewScreen} />
-          <Stack.Screen name="Orders" component={BuyerOrdersScreen} />
-          <Stack.Screen name="Profile" component={BuyerProfileScreen} />
-          <Stack.Screen name="Wishlist" component={BuyerWishlistScreen} />
-          <Stack.Screen name="Wallet" component={BuyerWalletScreen} />
-          <Stack.Screen name="Disputes" component={BuyerDisputesScreen} />
-          <Stack.Screen name="Replacements" component={BuyerReplacementsScreen} />
-          <Stack.Screen name="Settings" component={BuyerSettingsScreen} />
-          <Stack.Screen name="OrderTracking" component={BuyerOrderTrackingScreen} />
-          <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
-          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-          <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
-          <Stack.Screen name="Cart" component={CartScreen} />
-          <Stack.Screen name="Checkout" component={CheckoutScreen} />
-          <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
-        </Stack.Navigator>
-        
-        <CustomDrawer 
-          visible={drawerVisible} 
-          onClose={() => setDrawerVisible(false)} 
-          // Custom navigation object to handle routes inside the Stack overlay
-          navigation={navigation.navigate ? navigation : { navigate: () => {} }}
-        />
-      </View>
-    </BuyerDrawerContext.Provider>
+    <View style={{ flex: 1 }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Dashboard" component={BuyerOverviewScreen} />
+        <Stack.Screen name="Orders" component={BuyerOrdersScreen} />
+        <Stack.Screen name="Profile" component={BuyerProfileScreen} />
+        <Stack.Screen name="Wishlist" component={BuyerWishlistScreen} />
+        <Stack.Screen name="Wallet" component={BuyerWalletScreen} />
+        <Stack.Screen name="Disputes" component={BuyerDisputesScreen} />
+        <Stack.Screen name="Replacements" component={BuyerReplacementsScreen} />
+        <Stack.Screen name="Settings" component={BuyerSettingsScreen} />
+        <Stack.Screen name="OrderTracking" component={BuyerOrderTrackingScreen} />
+        <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
+        <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
+        <Stack.Screen name="Cart" component={CartScreen} />
+        <Stack.Screen name="Checkout" component={CheckoutScreen} />
+        <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
+      </Stack.Navigator>
+      
+      <CustomDrawer 
+        visible={visible} 
+        onClose={() => setVisible(false)} 
+        // Custom navigation object to handle routes inside the Stack overlay
+        navigation={navigation.navigate ? navigation : { navigate: () => {} }}
+      />
+    </View>
   );
 }
 

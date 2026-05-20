@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Modal, Animated, Dimensions, TouchableWithoutFeedback, Image, Alert } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -199,32 +199,30 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
 };
 
 export default function AgentDashboardDrawer({ navigation }) {
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const { visible, setVisible } = useContext(AgentDrawerContext);
 
   return (
-    <AgentDrawerContext.Provider value={{ toggleDrawer: () => setDrawerVisible(v => !v) }}>
-      <View style={{ flex: 1 }}>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="AgentDashboard" component={AgentDashboardScreen} />
-          <Stack.Screen name="DeliveryRequests" component={DeliveryRequestsScreen} />
-          <Stack.Screen name="AgentOrders" component={AgentOrdersScreen} />
-          <Stack.Screen name="AgentCoverage" component={AgentCoverageScreen} />
-          <Stack.Screen name="AgentProfile" component={AgentProfileScreen} />
-          <Stack.Screen name="AgentSettings" component={AgentSettingsScreen} />
-          <Stack.Screen name="AgentVerifyCode" component={AgentVerifyCodeScreen} />
-          <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
-          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-          <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
-          <Stack.Screen name="Cart" component={CartScreen} />
-        </Stack.Navigator>
+    <View style={{ flex: 1 }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="AgentDashboard" component={AgentDashboardScreen} />
+        <Stack.Screen name="DeliveryRequests" component={DeliveryRequestsScreen} />
+        <Stack.Screen name="AgentOrders" component={AgentOrdersScreen} />
+        <Stack.Screen name="AgentCoverage" component={AgentCoverageScreen} />
+        <Stack.Screen name="AgentProfile" component={AgentProfileScreen} />
+        <Stack.Screen name="AgentSettings" component={AgentSettingsScreen} />
+        <Stack.Screen name="AgentVerifyCode" component={AgentVerifyCodeScreen} />
+        <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
+        <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
+        <Stack.Screen name="Cart" component={CartScreen} />
+      </Stack.Navigator>
 
-        <CustomDrawer
-          visible={drawerVisible}
-          onClose={() => setDrawerVisible(false)}
-          navigation={navigation?.navigate ? navigation : { navigate: () => {} }}
-        />
-      </View>
-    </AgentDrawerContext.Provider>
+      <CustomDrawer
+        visible={visible}
+        onClose={() => setVisible(false)}
+        navigation={navigation?.navigate ? navigation : { navigate: () => {} }}
+      />
+    </View>
   );
 }
 
