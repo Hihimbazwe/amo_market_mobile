@@ -16,7 +16,6 @@ const DeactivationBanner = () => {
 
   // Only render for deactivated sellers
   const isDeactivated = user?.accountStatus && user.accountStatus !== 'ACTIVE';
-  if (!isDeactivated) return null;
 
   // Subtle pulse animation on the warning icon
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -45,6 +44,8 @@ const DeactivationBanner = () => {
   const handleLogout = () => {
     logout();
   };
+
+  if (!isDeactivated) return null;
 
   return (
     <Animated.View style={[styles.banner, { transform: [{ translateY: slideAnim }] }]}>

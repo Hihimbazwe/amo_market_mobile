@@ -25,21 +25,30 @@ const AccountPrivacyModals = ({
   const [otp, setOtp] = useState('');
   const [isLoadingDelete, setIsLoadingDelete] = useState(false);
 
-  const handleConfirmDeactivate = async () => {
+  const isDeactivated = user?.accountStatus && user.accountStatus !== 'ACTIVE';
+
+  const handleConfirmToggleStatus = async () => {
     setIsDeactivating(true);
     try {
-      const result = await authService.deactivateAccount(user.id);
-      // Update local user state to reflect the new deactivated status immediately.
-      // The seller stays logged in but all marketplace actions are now restricted.
-      await updateUser({ accountStatus: result?.accountStatus ?? 'DEACTIVATED' });
-      Alert.alert(
-        t('accountDeactivated') || 'Account Deactivated',
-        t('accountDeactivatedSuccess') ||
-          'Your account has been deactivated. You can still browse your dashboard and log out, but marketplace actions are restricted.',
-      );
+      if (isDeactivated) {
+        const result = await authService.reactivateAccount(user.id);
+        await updateUser({ accountStatus: result?.accountStatus ?? 'ACTIVE' });
+        Alert.alert(
+          'Account Reactivated',
+          'Your account has been successfully reactivated. All marketplace actions are now fully available.',
+        );
+      } else {
+        const result = await authService.deactivateAccount(user.id);
+        await updateUser({ accountStatus: result?.accountStatus ?? 'DEACTIVATED' });
+        Alert.alert(
+          t('accountDeactivated') || 'Account Deactivated',
+          t('accountDeactivatedSuccess') ||
+            'Your account has been deactivated. You can still browse your dashboard and log out, but marketplace actions are restricted.',
+        );
+      }
       setShowDeactivateModal(false);
     } catch (err) {
-      Alert.alert(t('error'), err.message || t('failedToDeactivate') || 'Failed to deactivate account.');
+      Alert.alert(t('error'), err.message || 'Failed to update account status.');
     } finally {
       setIsDeactivating(false);
     }
@@ -87,20 +96,28 @@ const AccountPrivacyModals = ({
                 <View style={{ width: 36, height: 36, backgroundColor: 'rgba(245, 158, 11, 0.15)', borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
                   <CustomText style={{ fontSize: 18 }}>🔒</CustomText>
                 </View>
-                <CustomText style={{ color: colors.foreground, fontSize: 18, fontWeight: 'bold' }}>{t('deactivateAccount') || 'Deactivate Account?'}</CustomText>
+                <CustomText style={{ color: colors.foreground, fontSize: 18, fontWeight: 'bold' }}>
+                  {isDeactivated ? 'Reactivate Account?' : (t('deactivateAccount') || 'Deactivate Account?')}
+                </CustomText>
               </View>
-              <CustomText style={{ color: colors.muted, fontSize: 12, marginLeft: 48 }}>This can be undone by logging back in.</CustomText>
+              <CustomText style={{ color: colors.muted, fontSize: 12, marginLeft: 48 }}>
+                {isDeactivated ? 'Restore full access to your account.' : 'This can be undone by logging back in.'}
+              </CustomText>
             </View>
             <View style={{ padding: 24 }}>
               <CustomText style={{ color: colors.muted, fontSize: 14, marginBottom: 16, lineHeight: 22 }}>
-                While deactivated, your profile will be hidden from the platform. You can reactivate at any time by logging back in.
+                {isDeactivated
+                  ? 'Reactivating your account will restore your public profile and allow you to use all marketplace features again.'
+                  : 'While deactivated, your profile will be hidden from the platform. You can reactivate at any time by logging back in or using the settings menu.'}
               </CustomText>
               
-              <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.2)', borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 24 }}>
-                <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 6 }}>• Your profile will be hidden from other users</CustomText>
-                <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 6 }}>• You will be signed out immediately</CustomText>
-                <CustomText style={{ color: colors.muted, fontSize: 12 }}>• All your data is preserved and safe</CustomText>
-              </View>
+              {!isDeactivated && (
+                <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.2)', borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 24 }}>
+                  <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 6 }}>• Your profile will be hidden from other users</CustomText>
+                  <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 6 }}>• You will remain signed in, but with restricted access</CustomText>
+                  <CustomText style={{ color: colors.muted, fontSize: 12 }}>• All your data is preserved and safe</CustomText>
+                </View>
+              )}
 
               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
                 <TouchableOpacity 
@@ -110,12 +127,14 @@ const AccountPrivacyModals = ({
                   <CustomText style={{ color: colors.muted, fontSize: 14, fontWeight: 'bold' }}>Cancel</CustomText>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={handleConfirmDeactivate}
+                  onPress={handleConfirmToggleStatus}
                   disabled={isDeactivating}
-                  style={{ paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#F59E0B', borderRadius: 12, opacity: isDeactivating ? 0.5 : 1 }}
+                  style={{ paddingHorizontal: 20, paddingVertical: 12, backgroundColor: isDeactivated ? colors.primary : '#F59E0B', borderRadius: 12, opacity: isDeactivating ? 0.5 : 1 }}
                 >
                   <CustomText style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' }}>
-                    {isDeactivating ? 'Deactivating...' : 'Yes, Deactivate'}
+                    {isDeactivating 
+                      ? (isDeactivated ? 'Reactivating...' : 'Deactivating...') 
+                      : (isDeactivated ? 'Yes, Reactivate' : 'Yes, Deactivate')}
                   </CustomText>
                 </TouchableOpacity>
               </View>

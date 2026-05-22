@@ -157,6 +157,10 @@ const SellerInventoryScreen = ({ navigation }) => {
   }, [items]);
 
   const handleUpdateStock = async () => {
+    if (isDeactivated) {
+      Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
+      return;
+    }
     if (!editingItem) return;
     const newStock = parseInt(editStock);
     if (isNaN(newStock) || newStock < 0) {
@@ -329,6 +333,10 @@ const SellerInventoryScreen = ({ navigation }) => {
   };
 
   const handleRemoveDiscount = async (product) => {
+    if (isDeactivated) {
+      Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
+      return;
+    }
     try {
       await productService.updateProduct(user.id, product.id, { isDiscount: false, discountPercent: null });
       Alert.alert(t('success'), t('discountRemoved'));
@@ -391,16 +399,18 @@ const SellerInventoryScreen = ({ navigation }) => {
               <CustomText variant="caption" style={{ color: colors.muted }}>{t('stock')}:</CustomText>
               <CustomText style={styles.stockValue}>{item.stock}</CustomText>
             </View>
-            <TouchableOpacity 
-              style={[styles.editBtn, { backgroundColor: colors.glass }]}
-              onPress={() => {
-                setEditingItem({ productId: item.id, title: item.title, currentStock: item.stock });
-                setEditStock(String(item.stock));
-              }}
-            >
-              <Pencil size={14} color={colors.primary} />
-              <CustomText style={[styles.editBtnText, { color: colors.primary }]}>{t('edit')}</CustomText>
-            </TouchableOpacity>
+            {!isDeactivated && (
+              <TouchableOpacity 
+                style={[styles.editBtn, { backgroundColor: colors.glass }]}
+                onPress={() => {
+                  setEditingItem({ productId: item.id, title: item.title, currentStock: item.stock });
+                  setEditStock(String(item.stock));
+                }}
+              >
+                <Pencil size={14} color={colors.primary} />
+                <CustomText style={[styles.editBtnText, { color: colors.primary }]}>{t('edit')}</CustomText>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={styles.variantsContainer}>
@@ -418,15 +428,17 @@ const SellerInventoryScreen = ({ navigation }) => {
                   }]}>
                     {v.stock} {t('qty')}
                   </CustomText>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      setEditingItem({ productId: item.id, variantId: v.id, title: `${item.title} (${v.value})`, currentStock: v.stock });
-                      setEditStock(String(v.stock));
-                    }}
-                    style={styles.variantEditBtn}
-                  >
-                    <Pencil size={10} color={colors.muted} />
-                  </TouchableOpacity>
+                  {!isDeactivated && (
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setEditingItem({ productId: item.id, variantId: v.id, title: `${item.title} (${v.value})`, currentStock: v.stock });
+                        setEditStock(String(v.stock));
+                      }}
+                      style={styles.variantEditBtn}
+                    >
+                      <Pencil size={10} color={colors.muted} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             ))}
@@ -444,9 +456,11 @@ const SellerInventoryScreen = ({ navigation }) => {
               <CustomText style={styles.saleValue}>{item.totalSold}</CustomText>
             </View>
           </View>
-          <TouchableOpacity style={{ padding: 4 }} onPress={() => setActionMenuProduct(item)}>
-            <MoreVertical size={20} color={colors.foreground} />
-          </TouchableOpacity>
+          {!isDeactivated && (
+            <TouchableOpacity style={{ padding: 4 }} onPress={() => setActionMenuProduct(item)}>
+              <MoreVertical size={20} color={colors.foreground} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );

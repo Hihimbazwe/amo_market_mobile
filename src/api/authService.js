@@ -294,6 +294,23 @@ export const authService = {
     }
   },
 
+  reactivateAccount: async (userId) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/user/reactivate`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+      });
+      const responseText = await response.text();
+      let data;
+      try { data = JSON.parse(responseText); } catch (e) { throw new Error(responseText); }
+      if (!response.ok) throw new Error(data.error || 'Reactivation failed');
+      return data;
+    } catch (error) {
+      console.error('Reactivate account error:', error);
+      throw error;
+    }
+  },
+
   requestAccountDeletion: async (userId) => {
     try {
       const response = await fetchWithTimeout(`${BASE_URL}/api/user/delete/request`, {

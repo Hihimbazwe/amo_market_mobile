@@ -197,8 +197,13 @@ const SellerSettingsScreen = () => {
 
         {/* ACCOUNT PRIVACY */}
         <View style={styles.privacyRow}>
-          <TouchableOpacity style={styles.deactivateBtn} onPress={() => setShowDeactivateModal(true)}>
-            <CustomText style={styles.deactivateText}>deactivate seller account</CustomText>
+          <TouchableOpacity 
+            style={[styles.deactivateBtn, isSellerDeactivated && { borderColor: colors.primary }]} 
+            onPress={() => setShowDeactivateModal(true)}
+          >
+             <CustomText style={[styles.deactivateBtnText, isSellerDeactivated && { color: colors.primary }]}>
+               {isSellerDeactivated ? 'Reactivate Account' : 'Deactivate Account'}
+             </CustomText>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
