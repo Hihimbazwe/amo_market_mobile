@@ -274,7 +274,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply }) => {
 
 export default function ChatDetailScreen() {
   const { colors } = useTheme();
-  const { user } = useAuth();
+  const { user, isSellerDeactivated } = useAuth();
   const { refreshUnread } = useNotifications();
   const navigation = useNavigation();
   const route = useRoute();
@@ -615,6 +615,14 @@ export default function ChatDetailScreen() {
   };
 
   const handleSend = async () => {
+    // Deactivated sellers cannot send new messages
+    if (isSellerDeactivated) {
+      Alert.alert(
+        'Account Restricted',
+        'Your seller account is deactivated. You cannot send messages until your account is reactivated.'
+      );
+      return;
+    }
     if (!input.trim() || !user?.id) return;
     const text = input.trim();
     const rId = replyingTo?.id;
@@ -848,7 +856,27 @@ export default function ChatDetailScreen() {
 
       {/* Input Bar */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {isBlockedByMe ? (
+        {isSellerDeactivated ? (
+          /* Deactivated seller — show a locked input bar */
+          <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: 'rgba(245,158,11,0.3)' }]}>
+            <View style={[styles.inputBar, {
+              backgroundColor: 'rgba(245,158,11,0.06)',
+              borderRadius: 12,
+              margin: 10,
+              borderWidth: 1,
+              borderColor: 'rgba(245,158,11,0.25)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 14,
+              flexDirection: 'row',
+              gap: 8,
+            }]}>
+              <CustomText style={{ color: '#F59E0B', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+                🔒 Messaging restricted — account deactivated
+              </CustomText>
+            </View>
+          </View>
+        ) : isBlockedByMe ? (
           <TouchableOpacity 
              style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder, justifyContent: 'center', paddingVertical: 18 }]}
              onPress={handleUnblockPrompt}

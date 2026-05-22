@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, ActivityIndicator } from 'react-native';
-import { Menu, Search, Package, ShoppingBag, Wallet, BarChart2, Zap, ArrowUpRight } from 'lucide-react-native';
+import { Menu, Search, Package, ShoppingBag, Wallet, BarChart2, Zap, ArrowUpRight, Lock } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
@@ -8,13 +8,14 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import DeactivationBanner from '../../components/DeactivationBanner';
 
 import { sellerService } from '../../api/sellerService';
 
 
 const SellerOverviewScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
-  const { user } = useAuth();
+  const { user, isSellerDeactivated } = useAuth();
   const { colors, isDarkMode } = useTheme();
   const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
@@ -74,7 +75,10 @@ const SellerOverviewScreen = () => {
         </TouchableOpacity>
         <CustomText variant="h2">{t('sellerDashboard')}</CustomText>
       </View>
-      
+
+      {/* Deactivation banner — visible only when account is not ACTIVE */}
+      <DeactivationBanner />
+
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
         {/* Futuristic Search Bar */}
@@ -93,13 +97,21 @@ const SellerOverviewScreen = () => {
             <CustomText variant="h2">{t('storeOverview')}</CustomText>
             <CustomText style={{ color: colors.muted, marginTop: 4 }}>{t('sellerWelcome', { name: firstName })}</CustomText>
           </View>
-          <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.navigate('SellerProducts')}
-          >
-            <Package color="white" size={16} />
-            <CustomText style={[styles.actionBtnText, { color: 'white' }]}>{t('add')}</CustomText>
-          </TouchableOpacity>
+          {/* Hide Add button for deactivated sellers */}
+          {isSellerDeactivated ? (
+            <View style={[styles.actionBtn, { backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' }]}>
+              <Lock color="#F59E0B" size={14} />
+              <CustomText style={[styles.actionBtnText, { color: '#F59E0B' }]}>Locked</CustomText>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+              onPress={() => navigation.navigate('SellerProducts')}
+            >
+              <Package color="white" size={16} />
+              <CustomText style={[styles.actionBtnText, { color: 'white' }]}>{t('add')}</CustomText>
+            </TouchableOpacity>
+          )}
         </View>
 
         {loading ? (

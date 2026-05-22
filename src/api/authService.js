@@ -276,4 +276,56 @@ export const authService = {
       throw error;
     }
   },
+
+  deactivateAccount: async (userId) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/user/deactivate`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+      });
+      const responseText = await response.text();
+      let data;
+      try { data = JSON.parse(responseText); } catch (e) { throw new Error(responseText); }
+      if (!response.ok) throw new Error(data.error || 'Deactivation failed');
+      return data;
+    } catch (error) {
+      console.error('Deactivate account error:', error);
+      throw error;
+    }
+  },
+
+  requestAccountDeletion: async (userId) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/user/delete/request`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+      });
+      const responseText = await response.text();
+      let data;
+      try { data = JSON.parse(responseText); } catch (e) { throw new Error(responseText); }
+      if (!response.ok) throw new Error(data.error || 'Failed to request deletion');
+      return data;
+    } catch (error) {
+      console.error('Request account deletion error:', error);
+      throw error;
+    }
+  },
+
+  confirmAccountDeletion: async (userId, otp) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/user/delete/confirm`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ otp }),
+      });
+      const responseText = await response.text();
+      let data;
+      try { data = JSON.parse(responseText); } catch (e) { throw new Error(responseText); }
+      if (!response.ok) throw new Error(data.error || 'Failed to confirm deletion');
+      return data;
+    } catch (error) {
+      console.error('Confirm account deletion error:', error);
+      throw error;
+    }
+  },
 };

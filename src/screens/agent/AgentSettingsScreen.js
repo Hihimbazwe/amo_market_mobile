@@ -9,9 +9,10 @@ import CustomButton from '../../components/CustomButton';
 import { AgentDrawerContext } from '../../context/AgentDrawerContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { authService } from '../../api/authService';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../context/NotificationContext';
+import AccountPrivacyModals from '../../components/AccountPrivacyModals';
+
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -43,6 +44,8 @@ const AgentSettingsScreen = () => {
   const navigation = useNavigation();
   const { pushNotificationsEnabled, togglePushNotifications } = useNotifications();
   const [autoAccept, setAutoAccept] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -120,6 +123,17 @@ const AgentSettingsScreen = () => {
           </View>
         </View>
 
+        {/* ACCOUNT PRIVACY */}
+        <View style={styles.privacyRow}>
+          <TouchableOpacity style={styles.deactivateBtn} onPress={() => setShowDeactivateModal(true)}>
+            <CustomText style={styles.deactivateText}>{t('deactivateAccount') || 'Deactivate'}</CustomText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
+            <CustomText style={styles.deleteText}>{t('deleteAccount') || 'Delete'}</CustomText>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
           <CustomText style={styles.logoutText}>{t('signOut')}</CustomText>
         </TouchableOpacity>
@@ -146,6 +160,13 @@ const AgentSettingsScreen = () => {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      <AccountPrivacyModals 
+        showDeactivateModal={showDeactivateModal}
+        setShowDeactivateModal={setShowDeactivateModal}
+        showDeleteModal={showDeleteModal}
+        setShowDeleteModal={setShowDeleteModal}
+      />
     </SafeAreaView>
   );
 };
@@ -165,8 +186,13 @@ const styles = StyleSheet.create({
   settingSubtitle: { fontSize: 11, marginTop: 2 },
   actionText: { fontSize: 12, fontWeight: 'bold' },
   divider: { height: 1, marginHorizontal: 16 },
-  logoutBtn: { alignItems: 'center', padding: 20, marginTop: 20 },
-  logoutText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5 },
+  privacyRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 24 },
+  deactivateBtn: { flex: 1, alignItems: 'center', padding: 16, backgroundColor: 'rgba(245, 158, 11, 0.1)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.3)' },
+  deactivateText: { color: '#F59E0B', fontSize: 13, fontWeight: 'bold', letterSpacing: 0.5 },
+  deleteBtn: { flex: 1, alignItems: 'center', padding: 16, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
+  deleteText: { color: '#EF4444', fontSize: 13, fontWeight: 'bold', letterSpacing: 0.5 },
+  logoutBtn: { alignItems: 'center', padding: 16, marginTop: 12, backgroundColor: 'rgba(239, 68, 68, 0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.2)' },
+  logoutText: { color: '#EF4444', fontSize: 14, fontWeight: 'bold', letterSpacing: 0.5 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: '80%', borderWidth: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },

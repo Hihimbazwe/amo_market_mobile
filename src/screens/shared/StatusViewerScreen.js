@@ -40,22 +40,52 @@ export default function StatusViewerScreen() {
   const [sending, setSending] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const progressAnimValue = useRef(0);
+  const previousItemRef = useRef({ index: initialIndex, item: 0 });
+  const pressInTime = useRef(0);
+  const isKeyboardOpenRef = useRef(false);
 
   const currentStatus = statuses?.[currentIndex];
   const items = currentStatus?.items || [];
   const activeItem = items[currentItemIndex];
 
   useEffect(() => {
+    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => {
+      isKeyboardOpenRef.current = true;
+    });
+    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => {
+      isKeyboardOpenRef.current = false;
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const id = progressAnim.addListener(({ value }) => {
+      progressAnimValue.current = value;
+    });
+    return () => progressAnim.removeListener(id);
+  }, [progressAnim]);
+
+  useEffect(() => {
     if (!currentStatus || isPaused) return;
     
-    // Reset animation
-    progressAnim.setValue(0);
+    let isNewItem = false;
+    if (previousItemRef.current.index !== currentIndex || previousItemRef.current.item !== currentItemIndex) {
+      isNewItem = true;
+      previousItemRef.current = { index: currentIndex, item: currentItemIndex };
+      progressAnim.setValue(0);
+      progressAnimValue.current = 0;
+    }
     
-    // Start animation
+    const remainingDuration = STATUS_DURATION * (1 - progressAnimValue.current);
+    
     Animated.timing(progressAnim, {
       toValue: 1,
-      duration: STATUS_DURATION,
-      useNativeDriver: false, // width animation doesn't support native driver well
+      duration: remainingDuration,
+      useNativeDriver: false,
     }).start(({ finished }) => {
       if (finished) {
         handleNext();
@@ -65,7 +95,7 @@ export default function StatusViewerScreen() {
     return () => {
       progressAnim.stopAnimation();
     };
-  }, [currentIndex, currentItemIndex]);
+  }, [currentIndex, currentItemIndex, isPaused, currentStatus]);
 
   const handleNext = () => {
     if (currentItemIndex < items.length - 1) {
@@ -87,7 +117,9 @@ export default function StatusViewerScreen() {
       setCurrentItemIndex(prevItems.length - 1);
     } else {
       // At very beginning
+      // At very beginning
       progressAnim.setValue(0);
+      progressAnimValue.current = 0;
       Animated.timing(progressAnim, {
         toValue: 1,
         duration: STATUS_DURATION,
@@ -99,8 +131,16 @@ export default function StatusViewerScreen() {
   };
 
    const handlePress = (evt) => {
+    const duration = Date.now() - pressInTime.current;
+    if (duration > 200) {
+      return; // Ignore if it was a long press
+    }
+    if (isKeyboardOpenRef.current) {
+      Keyboard.dismiss();
+      return; // Only dismiss keyboard, don't advance status
+    }
+    
     Keyboard.dismiss();
-    if (isPaused) return;
     const x = evt.nativeEvent.locationX;
     if (x < width * 0.3) {
       handlePrev();
@@ -165,11 +205,17 @@ export default function StatusViewerScreen() {
       </View>
 
       {/* Invisible overlay for tapping left/right */}
-      <TouchableOpacity
-        activeOpacity={1}
-        style={styles.tapOverlay}
+      <TouchableWithoutFeedback
+        onPressIn={() => {
+          if (isKeyboardOpenRef.current) Keyboard.dismiss();
+          pressInTime.current = Date.now();
+          setIsPaused(true);
+        }}
+        onPressOut={() => setIsPaused(false)}
         onPress={handlePress}
-      />
+      >
+        <View style={styles.tapOverlay} />
+      </TouchableWithoutFeedback>
 
       {/* Top Header UI */}
       <View style={styles.headerLayer}>
@@ -239,7 +285,7 @@ export default function StatusViewerScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.footerLayer}
         >
-          <View style={styles.replyBox}>
+          <View style={[styles.replyBox, { borderColor: colors.primary }]}>
             <TextInput
               style={styles.replyInput}
               placeholder="Reply to status..."
@@ -379,12 +425,11 @@ const styles = StyleSheet.create({
   replyBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1.5,
   },
   replyInput: {
     flex: 1,

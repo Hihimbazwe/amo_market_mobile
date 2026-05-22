@@ -43,6 +43,7 @@ import { productService } from '../../api/productService';
 import { useTheme } from '../../context/ThemeContext';
 import NotificationIcon from '../../components/NotificationIcon';
 import AddProductModal from '../../components/AddProductModal';
+import DeactivationBanner from '../../components/DeactivationBanner';
 import { useTranslation } from 'react-i18next';
 
 const StatCard = ({ label, value, icon: Icon, color, backgroundColor }) => (
@@ -75,9 +76,10 @@ const StockBadge = ({ stock, t }) => {
 
 const SellerInventoryScreen = ({ navigation }) => {
   const { toggleDrawer } = useContext(SellerDrawerContext);
-  const { user } = useAuth();
+  const { user, isSellerDeactivated } = useAuth();
   const { colors } = useTheme();
   const { t } = useTranslation(['dashboard', 'common']);
+  const isDeactivated = isSellerDeactivated;
   
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,9 +103,15 @@ const SellerInventoryScreen = ({ navigation }) => {
     if (!user?.id) return;
     setLoading(true);
     try {
+      if (isDeactivated) {
+        // Deactivated sellers see no items
+        setItems([]);
+        return;
+      }
       const data = await sellerService.getInventory(user.id);
       // Deduplicate by ID
       const uniqueItems = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setItems(uniqueItems);
       setItems(uniqueItems);
     } catch (error) {
       Alert.alert(t('error'), t('failedToFetchProducts'));
@@ -182,6 +190,10 @@ const SellerInventoryScreen = ({ navigation }) => {
   };
 
   const handleEditProductClick = async (product) => {
+    if (isDeactivated) {
+      Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
+      return;
+    }
     try {
       setLoading(true);
       const fullProduct = await productService.getProductById(product.id, user.id);
@@ -203,6 +215,10 @@ const SellerInventoryScreen = ({ navigation }) => {
   };
 
   const handleAddProduct = async (productData, mediaFiles) => {
+    if (isDeactivated) {
+      Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
+      return;
+    }
     if (!user || !user.id) return;
     setIsSubmitting(true);
     try {
@@ -239,6 +255,10 @@ const SellerInventoryScreen = ({ navigation }) => {
   };
 
   const handleDeleteProduct = (productId) => {
+    if (isDeactivated) {
+      Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
+      return;
+    }
     Alert.alert(
       t('deleteProduct'),
       t('deleteProductConfirm'),
@@ -258,6 +278,10 @@ const SellerInventoryScreen = ({ navigation }) => {
   };
 
   const handleTogglePublish = async (productId, currentStatus) => {
+    if (isDeactivated) {
+      Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
+      return;
+    }
     // Optimistic UI update for perfectly smooth publish/unpublish
     setItems(prev => prev.map(p => p.id === productId ? { ...p, published: !currentStatus } : p));
     try {
@@ -270,6 +294,10 @@ const SellerInventoryScreen = ({ navigation }) => {
   };
 
   const handleToggleHotDeal = async (product) => {
+    if (isDeactivated) {
+      Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
+      return;
+    }
     try {
       await productService.updateProduct(user.id, product.id, { isHotDeal: !product.isHotDeal });
       Alert.alert(t('success'), product.isHotDeal ? t('hotDealRemoved') : t('hotDealAdded'));
@@ -280,6 +308,10 @@ const SellerInventoryScreen = ({ navigation }) => {
   };
 
   const handleApplyDiscount = async () => {
+    if (isDeactivated) {
+      Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
+      return;
+    }
     if (!actionMenuProduct) return;
     const pct = parseInt(discountInput, 10);
     if (isNaN(pct) || pct < 1 || pct > 90) {
@@ -429,11 +461,16 @@ const SellerInventoryScreen = ({ navigation }) => {
         </TouchableOpacity>
         <CustomText variant="h2" style={{ flex: 1 }}>{t('inventory')}</CustomText>
         <NotificationIcon style={{ marginRight: 8 }} />
-        <TouchableOpacity onPress={() => setModalVisible(true)} style={[styles.addBtn, { backgroundColor: colors.primary }]}>
-          <Plus color="white" size={16} />
-          <CustomText style={styles.addBtnText}>Add Product</CustomText>
-        </TouchableOpacity>
+        {isDeactivated ? null : (
+          <TouchableOpacity onPress={() => setModalVisible(true)} style={[styles.addBtn, { backgroundColor: colors.primary }]}>
+            <Plus color="white" size={16} />
+            <CustomText style={styles.addBtnText}>Add Product</CustomText>
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Premium deactivation banner */}
+      <DeactivationBanner />
 
       <ScrollView 
         showsVerticalScrollIndicator={false}
@@ -749,6 +786,17 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '900',
+  },
+  deactivationBanner: {
+    backgroundColor: '#FDE68A',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  deactivationText: {
+    color: '#B45309',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   scrollContent: { padding: 16 },
   

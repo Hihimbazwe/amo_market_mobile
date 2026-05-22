@@ -20,6 +20,7 @@ import {
   CircleUser as UserIcon,
   MessageCircle,
   Truck,
+  ShieldOff,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -79,7 +80,7 @@ const NAV_GROUPS = (t) => [
 
 const CustomDrawer = ({ visible, onClose, navigation }) => {
   const { colors } = useTheme();
-  const { logout, user } = useAuth();
+  const { logout, user, isSellerDeactivated } = useAuth();
   const { t } = useTranslation(['dashboard', 'common']);
   const slideAnim = useRef(new Animated.Value(-width * 0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -163,18 +164,24 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
                 justifyContent: 'center',
                 marginRight: 10,
                 borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.1)'
+                borderColor: isSellerDeactivated ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.1)'
               }}>
                 {user?.image ? (
                   <Image source={{ uri: user.image }} style={{ width: 36, height: 36, borderRadius: 18 }} />
                 ) : (
-                  <UserIcon color={colors.primary} size={20} />
+                  <UserIcon color={isSellerDeactivated ? '#F59E0B' : colors.primary} size={20} />
                 )}
               </View>
               <View style={{ flex: 1 }}>
                 <CustomText style={[styles.userEmail, { color: colors.foreground, fontSize: 14, fontWeight: '700' }]} numberOfLines={1}>
                   {user?.name || t('seller')}
                 </CustomText>
+                {isSellerDeactivated && (
+                  <View style={styles.deactivatedBadge}>
+                    <ShieldOff size={9} color="#F59E0B" />
+                    <CustomText style={styles.deactivatedBadgeText}>DEACTIVATED</CustomText>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -327,4 +334,25 @@ const styles = StyleSheet.create({
     paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14,
   },
   logoutText: { color: '#EF4444', fontWeight: '700', fontSize: 15 },
+
+  // Deactivated account badge
+  deactivatedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.3)',
+  },
+  deactivatedBadgeText: {
+    color: '#F59E0B',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
 });

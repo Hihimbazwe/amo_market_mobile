@@ -13,6 +13,7 @@ import { authService } from '../../api/authService';
 import { chatService } from '../../api/chatService';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../context/NotificationContext';
+import AccountPrivacyModals from '../../components/AccountPrivacyModals';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -48,6 +49,8 @@ const BuyerSettingsScreen = () => {
   const [hideAvailability, setHideAvailability] = useState(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -191,6 +194,18 @@ const BuyerSettingsScreen = () => {
           </View>
         </View>
 
+        {/* ACCOUNT PRIVACY */}
+        <View style={styles.privacyRow}>
+          <TouchableOpacity style={styles.deactivateBtn} onPress={() => setShowDeactivateModal(true)}>
+            <CustomText style={styles.deactivateText}>{t('deactivateAccount') || 'Deactivate'}</CustomText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
+            <CustomText style={styles.deleteText}>{t('deleteAccount') || 'Delete'}</CustomText>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       <Modal
@@ -302,6 +317,13 @@ const BuyerSettingsScreen = () => {
         </TouchableOpacity>
       </Modal>
 
+      <AccountPrivacyModals 
+        showDeactivateModal={showDeactivateModal}
+        setShowDeactivateModal={setShowDeactivateModal}
+        showDeleteModal={showDeleteModal}
+        setShowDeleteModal={setShowDeleteModal}
+      />
+
     </SafeAreaView>
   );
 };
@@ -321,6 +343,11 @@ const styles = StyleSheet.create({
   settingSubtitle: { fontSize: 11, marginTop: 2 },
   actionText: { fontSize: 12, fontWeight: 'bold' },
   divider: { height: 1, marginHorizontal: 16 },
+  privacyRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 24 },
+  deactivateBtn: { flex: 1, alignItems: 'center', padding: 16, backgroundColor: 'rgba(245, 158, 11, 0.1)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.3)' },
+  deactivateText: { color: '#F59E0B', fontSize: 13, fontWeight: 'bold', letterSpacing: 0.5 },
+  deleteBtn: { flex: 1, alignItems: 'center', padding: 16, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
+  deleteText: { color: '#EF4444', fontSize: 13, fontWeight: 'bold', letterSpacing: 0.5 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',

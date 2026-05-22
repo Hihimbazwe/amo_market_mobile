@@ -39,6 +39,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * updateUser — merges partial updates into the current user object and
+   * persists the result to AsyncStorage.  Use this whenever the account
+   * status changes (e.g. deactivation) so we don't have to log the user out.
+   */
+  const updateUser = async (partialUpdate) => {
+    try {
+      const updated = { ...user, ...partialUpdate };
+      setUser(updated);
+      await AsyncStorage.setItem('@auth_user', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to update user state', e);
+    }
+  };
+
   const logout = async (isManual = true) => {
     try {
       setUser(null);
@@ -52,8 +67,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Derived helpers consumed by seller screens
+  const isSellerDeactivated = !!(user?.accountStatus && user.accountStatus !== 'ACTIVE');
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, updateUser, isSellerDeactivated }}>
       {children}
     </AuthContext.Provider>
   );

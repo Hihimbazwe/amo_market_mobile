@@ -13,6 +13,8 @@ import { authService } from '../../api/authService';
 import { chatService } from '../../api/chatService';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../context/NotificationContext';
+import AccountPrivacyModals from '../../components/AccountPrivacyModals';
+import DeactivationBanner from '../../components/DeactivationBanner';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -39,13 +41,15 @@ const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 
 const SellerSettingsScreen = () => {
   const { toggleDrawer } = React.useContext(SellerDrawerContext);
   const { isDarkMode, colors, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, isSellerDeactivated } = useAuth();
   const { t } = useTranslation(['dashboard', 'common']);
   const navigation = useNavigation();
   const { pushNotificationsEnabled, togglePushNotifications } = useNotifications();
   const [marketing, setMarketing] = useState(false);
   const [hideAvailability, setHideAvailability] = useState(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -114,6 +118,7 @@ const SellerSettingsScreen = () => {
         </TouchableOpacity>
         <CustomText variant="h2">{t('settings')}</CustomText>
       </View>
+      <DeactivationBanner />
       <ScrollView contentContainerStyle={styles.content}>
 
         {/* ACCOUNT */}
@@ -188,17 +193,20 @@ const SellerSettingsScreen = () => {
           </View>
         </View>
 
-        {/* STORE */}
-        <View style={styles.section}>
-          <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('store')}</CustomText>
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <SettingRow icon={Globe} title={t('marketplaceVisibility')} subtitle={t('showProductsToBuyers')} value={true} onValueChange={() => { }} colors={colors} />
-          </View>
+
+
+        {/* ACCOUNT PRIVACY */}
+        <View style={styles.privacyRow}>
+          <TouchableOpacity style={styles.deactivateBtn} onPress={() => setShowDeactivateModal(true)}>
+            <CustomText style={styles.deactivateText}>deactivate seller account</CustomText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
+            <CustomText style={styles.deleteText}>{t('deleteAccount') || 'Delete'}</CustomText>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.deleteBtn}>
-          <CustomText style={styles.deleteText}>{t('deactivateAccount')}</CustomText>
-        </TouchableOpacity>
+        <View style={{ height: 40 }} />
 
       </ScrollView>
 
@@ -261,6 +269,14 @@ const SellerSettingsScreen = () => {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      <AccountPrivacyModals 
+        showDeactivateModal={showDeactivateModal}
+        setShowDeactivateModal={setShowDeactivateModal}
+        showDeleteModal={showDeleteModal}
+        setShowDeleteModal={setShowDeleteModal}
+      />
+
     </SafeAreaView>
   );
 };
@@ -280,8 +296,11 @@ const styles = StyleSheet.create({
   settingSubtitle: { fontSize: 11, marginTop: 2 },
   actionText: { fontSize: 12, fontWeight: 'bold' },
   divider: { height: 1, marginHorizontal: 16 },
-  deleteBtn: { alignItems: 'center', padding: 20, marginTop: 20 },
-  deleteText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold', letterSpacing: 0.5 },
+  privacyRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 24 },
+  deactivateBtn: { flex: 1, alignItems: 'center', padding: 16, backgroundColor: 'rgba(245, 158, 11, 0.1)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.3)' },
+  deactivateText: { color: '#F59E0B', fontSize: 13, fontWeight: 'bold', letterSpacing: 0.5 },
+  deleteBtn: { flex: 1, alignItems: 'center', padding: 16, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
+  deleteText: { color: '#EF4444', fontSize: 15, fontWeight: 'bold', letterSpacing: 0.5 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
