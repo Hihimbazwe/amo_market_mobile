@@ -14,6 +14,7 @@ import { chatService } from '../../api/chatService';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../context/NotificationContext';
 import AccountPrivacyModals from '../../components/AccountPrivacyModals';
+import DeactivationBanner from '../../components/DeactivationBanner';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -116,6 +117,7 @@ const BuyerSettingsScreen = () => {
         </TouchableOpacity>
         <CustomText variant="h2">{t('settings')}</CustomText>
       </View>
+      <DeactivationBanner />
       <ScrollView contentContainerStyle={styles.content}>
 
         {/* ACCOUNT */}
@@ -197,7 +199,7 @@ const BuyerSettingsScreen = () => {
         {/* ACCOUNT PRIVACY */}
         <View style={styles.privacyRow}>
           <TouchableOpacity style={styles.deactivateBtn} onPress={() => setShowDeactivateModal(true)}>
-            <CustomText style={styles.deactivateText}>{t('deactivateAccount') || 'Deactivate'}</CustomText>
+            <CustomText style={styles.deactivateText}>{'Manage Features'}</CustomText>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>

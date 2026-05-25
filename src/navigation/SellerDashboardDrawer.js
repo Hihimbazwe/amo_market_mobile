@@ -80,7 +80,7 @@ const NAV_GROUPS = (t) => [
 
 const CustomDrawer = ({ visible, onClose, navigation }) => {
   const { colors } = useTheme();
-  const { logout, user, isSellerDeactivated } = useAuth();
+  const { logout, user, isSellerDeactivated, canSell, canChat } = useAuth();
   const { t } = useTranslation(['dashboard', 'common']);
   const slideAnim = useRef(new Animated.Value(-width * 0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -195,7 +195,14 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
             {NAV_GROUPS(t).map((group, gIdx) => (
               <View key={group.label} style={[styles.group, gIdx > 0 && { marginTop: 8 }]}>
                 <CustomText style={[styles.groupLabel, { color: colors.muted }]}>{group.label}</CustomText>
-                {group.items.map((item) => {
+                {group.items
+                  .filter((item) => {
+                    // Hide selling screens when selling is disabled
+                    const sellingScreens = ['SellerOverview', 'SellerInventory', 'SellerOrders', 'SellerDisputes', 'SellerWallet'];
+                    if (!canSell && sellingScreens.includes(item.screen)) return false;
+                    return true;
+                  })
+                  .map((item) => {
                   const ItemIcon = item.icon;
                   return (
                     <TouchableOpacity

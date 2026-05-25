@@ -345,4 +345,22 @@ export const authService = {
       throw error;
     }
   },
+
+  setFeatureFlags: async (userId, flags) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/user/feature-flags`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify(flags),
+      });
+      const responseText = await response.text();
+      let data;
+      try { data = JSON.parse(responseText); } catch (e) { throw new Error(responseText); }
+      if (!response.ok) throw new Error(data.error || 'Failed to update feature flags');
+      return data;
+    } catch (error) {
+      console.error('Set feature flags error:', error);
+      throw error;
+    }
+  },
 };

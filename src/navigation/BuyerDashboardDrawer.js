@@ -49,7 +49,7 @@ const { width } = Dimensions.get('window');
 const CustomDrawer = ({ visible, onClose, navigation }) => {
   const slideAnim = useRef(new Animated.Value(-width * 0.75)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const { logout, user } = useAuth();
+  const { logout, user, canChat } = useAuth();
   const { isDarkMode, colors, toggleTheme } = useTheme();
   const { t } = useTranslation(['dashboard', 'common']);
 
@@ -75,9 +75,11 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
     { name: 'Wishlist', label: t('wishlist'), icon: Heart },
     { name: 'Wallet', label: t('wallet'), icon: Wallet },
     { name: 'Disputes', label: t('disputes'), icon: AlertCircle },
-    // { name: 'Replacements', label: 'After-Sales', icon: RefreshCcw },
     { name: 'Settings', label: t('settings'), icon: Settings },
-  ];
+  ].filter((r) => {
+    if (!canChat && r.name === 'Chat') return false;
+    return true;
+  });
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>

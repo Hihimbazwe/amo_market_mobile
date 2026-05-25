@@ -69,9 +69,11 @@ export const AuthProvider = ({ children }) => {
 
   // Derived helpers consumed by seller screens
   const isSellerDeactivated = !!(user?.accountStatus && user.accountStatus !== 'ACTIVE');
+  const canSell = !isSellerDeactivated && !user?.sellingDisabled;
+  const canChat = !isSellerDeactivated && !user?.chatDisabled;
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, updateUser, isSellerDeactivated }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, updateUser, isSellerDeactivated, canSell, canChat }}>
       {children}
     </AuthContext.Provider>
   );

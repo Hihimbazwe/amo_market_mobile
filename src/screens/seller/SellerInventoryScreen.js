@@ -98,6 +98,7 @@ const SellerInventoryScreen = ({ navigation }) => {
   const [actionMenuProduct, setActionMenuProduct] = useState(null);
   const [discountModalVisible, setDiscountModalVisible] = useState(false);
   const [discountInput, setDiscountInput] = useState('');
+  const [isHotDealMode, setIsHotDealMode] = useState(false);
 
   const fetchInventory = async () => {
     if (!user?.id) return;
@@ -302,12 +303,29 @@ const SellerInventoryScreen = ({ navigation }) => {
       Alert.alert(t('error'), t('accountDeactivatedNotice') || 'Account deactivated. Action not allowed.');
       return;
     }
-    try {
-      await productService.updateProduct(user.id, product.id, { isHotDeal: !product.isHotDeal });
-      Alert.alert(t('success'), product.isHotDeal ? t('hotDealRemoved') : t('hotDealAdded'));
-      fetchInventory();
-    } catch (err) {
-      Alert.alert(t('error'), err.message || t('failedToUpdateProduct'));
+    if (product.isHotDeal) {
+      // Remove Hot Deal
+      try {
+        await productService.updateProduct(user.id, product.id, { 
+          isHotDeal: false,
+          isPromotion: false,
+          hotDealStartsAt: null,
+          hotDealEndsAt: null,
+          dealTitle: null,
+          discountPercent: null,
+          isDiscount: false
+        });
+        Alert.alert(t('success'), t('hotDealRemoved'));
+        fetchInventory();
+      } catch (err) {
+        Alert.alert(t('error'), err.message || t('failedToUpdateProduct'));
+      }
+    } else {
+      // Turn ON - open discount modal
+      setIsHotDealMode(true);
+      setDiscountInput('10');
+      setActionMenuProduct(product);
+      setDiscountModalVisible(true);
     }
   };
 
@@ -323,11 +341,30 @@ const SellerInventoryScreen = ({ navigation }) => {
       return;
     }
     setDiscountModalVisible(false);
+    
     try {
-      await productService.updateProduct(user.id, actionMenuProduct.id, { isDiscount: true, discountPercent: pct });
-      Alert.alert(t('success'), t('discountApplied'));
+      if (isHotDealMode) {
+        const now = new Date();
+        const end = new Date();
+        end.setDate(now.getDate() + 3);
+        await productService.updateProduct(user.id, actionMenuProduct.id, { 
+          isHotDeal: true, 
+          isPromotion: true,
+          isDiscount: true,
+          discountPercent: pct,
+          hotDealStartsAt: now.toISOString(),
+          hotDealEndsAt: end.toISOString(),
+          dealTitle: `${actionMenuProduct.category} Deals`
+        });
+        Alert.alert(t('success'), t('hotDealAdded') || 'Hot Deal Enabled');
+      } else {
+        await productService.updateProduct(user.id, actionMenuProduct.id, { isDiscount: true, discountPercent: pct });
+        Alert.alert(t('success'), t('discountApplied'));
+      }
+      setIsHotDealMode(false);
       fetchInventory();
     } catch (err) {
+      setIsHotDealMode(false);
       Alert.alert(t('error'), err.message || t('failedToApplyDiscount'));
     }
   };
@@ -635,7 +672,7 @@ const SellerInventoryScreen = ({ navigation }) => {
         
       {/* Action Menu Modal */}
       <Modal
-        visible={!!actionMenuProduct}
+        visible={!!actionMenuProduct && !discountModalVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setActionMenuProduct(null)}
@@ -729,20 +766,20 @@ const SellerInventoryScreen = ({ navigation }) => {
         visible={discountModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => { setDiscountModalVisible(false); setActionMenuProduct(null); }}
+        onRequestClose={() => { setDiscountModalVisible(false); setActionMenuProduct(null); setIsHotDealMode(false); }}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
-              <CustomText variant="h3">{t('addDiscount')}</CustomText>
-              <TouchableOpacity onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); }}>
+              <CustomText variant="h3">{isHotDealMode ? t('mark As HotDeal') : t('addDiscount')}</CustomText>
+              <TouchableOpacity onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); setIsHotDealMode(false); }}>
                 <X size={24} color={colors.foreground} />
               </TouchableOpacity>
             </View>
             <View style={styles.modalBody}>
               <CustomText style={styles.modalItemTitle}>{actionMenuProduct?.title}</CustomText>
               <CustomText variant="caption" style={{ marginBottom: 16 }}>
-                {t('enterDiscountPercent')} (1-90)
+                {isHotDealMode ? t('enterDiscountPercent') + ' (1-90)' : t('enterDiscountPercent') + ' (1-90)'}
               </CustomText>
               <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
                 <TextInput 
@@ -755,7 +792,7 @@ const SellerInventoryScreen = ({ navigation }) => {
               </View>
             </View>
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn]} onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); }}>
+              <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn]} onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); setIsHotDealMode(false); }}>
                 <CustomText style={{ fontWeight: '700' }}>{t('cancel')}</CustomText>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleApplyDiscount}>

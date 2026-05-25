@@ -202,7 +202,7 @@ const SellerSettingsScreen = () => {
             onPress={() => setShowDeactivateModal(true)}
           >
              <CustomText style={[styles.deactivateBtnText, isSellerDeactivated && { color: colors.primary }]}>
-               {isSellerDeactivated ? 'Reactivate Account' : 'Deactivate Account'}
+               {'Manage Features'}
              </CustomText>
           </TouchableOpacity>
           
