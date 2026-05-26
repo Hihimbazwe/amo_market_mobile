@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,6 +10,8 @@ import {
   Platform,
   ScrollView,
   Image,
+  Modal,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,6 +47,56 @@ function formatTime(date) {
   } else {
     return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
   }
+}
+
+function normalizeSearch(value) {
+  return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (!a) return b.length;
+  if (!b) return a.length;
+
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  const curr = new Array(b.length + 1).fill(0);
+
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
+  }
+
+  return prev[b.length];
+}
+
+function conversationSearchScore(query, conversation) {
+  const q = query.trim().toLowerCase();
+  const qn = normalizeSearch(q);
+  const name = conversation.participantName || '';
+  const normalizedName = normalizeSearch(name);
+  const lastMessage = normalizeSearch(conversation.lastMessage);
+
+  if (!qn) return 0;
+  if (normalizedName === qn) return 0;
+  if (normalizedName.startsWith(qn)) return 5;
+  if (normalizedName.includes(qn)) return 10;
+
+  const distance = editDistance(qn, normalizedName);
+  if (distance <= Math.max(1, Math.ceil(Math.max(qn.length, normalizedName.length) * 0.34))) {
+    return 25 + distance;
+  }
+
+  const parts = q.split(/\s+/).map(normalizeSearch).filter(Boolean);
+  const matchedParts = parts.filter(part => normalizedName.includes(part)).length;
+  if (matchedParts > 0) return 70 - matchedParts;
+
+  if (lastMessage.includes(qn)) return 95;
+
+  return 999;
 }
 
 const renderRightActions = (progress, dragX, item, onSwipeAction) => {
@@ -148,6 +200,34 @@ const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
   </Swipeable>
 );
 
+const SearchUserItem = ({ item, onPress, loading, colors }) => (
+  <TouchableOpacity
+    style={[styles.searchUserItem, { backgroundColor: colors.background }]}
+    onPress={() => onPress(item)}
+    activeOpacity={0.75}
+    disabled={loading}
+  >
+    <View style={[styles.searchUserAvatar, { backgroundColor: colors.primary + '18', borderColor: colors.primary + '33', overflow: 'hidden' }]}>
+      {item.image ? (
+        <Image source={{ uri: item.image }} style={{ width: '100%', height: '100%' }} />
+      ) : (
+        <CustomText style={[styles.searchUserAvatarText, { color: colors.primary }]}>
+          {item.initials}
+        </CustomText>
+      )}
+    </View>
+    <View style={styles.searchUserBody}>
+      <CustomText style={[styles.searchUserName, { color: colors.foreground }]} numberOfLines={1}>
+        {item.name}
+      </CustomText>
+      <CustomText style={[styles.searchUserRole, { color: colors.muted }]} numberOfLines={1}>
+        {(item.role || 'USER').toString().toLowerCase()}
+      </CustomText>
+    </View>
+    {loading ? <ActivityIndicator size="small" color={colors.primary} /> : <MessageCircle color={colors.muted} size={20} />}
+  </TouchableOpacity>
+);
+
 // Add Lock to name row instead for better visibility
 
 export default function ChatListScreen() {
@@ -158,8 +238,15 @@ export default function ChatListScreen() {
   const [statuses, setStatuses] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState('');
+  const [userResults, setUserResults] = useState([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [startingChatId, setStartingChatId] = useState(null);
+  const [inviteVisible, setInviteVisible] = useState(false);
+  const [inviteContact, setInviteContact] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'archived' | 'locked'
   const [loading, setLoading] = useState(true);
+  const searchRequestRef = useRef(0);
 
   // Try to grab whichever drawer context is available
   const buyerCtx = useContext(BuyerDrawerContext);
@@ -197,10 +284,10 @@ export default function ChatListScreen() {
       // Update filtered synchronously to prevent flickering "No conversations" text
       let res = sorted;
       if (search) {
-        res = res.filter(c => 
-          c.participantName.toLowerCase().includes(search.toLowerCase()) ||
-          c.lastMessage.toLowerCase().includes(search.toLowerCase())
-        );
+        res = res
+          .map(c => ({ ...c, _searchScore: conversationSearchScore(search, c) }))
+          .filter(c => c._searchScore < 999)
+          .sort((a, b) => a._searchScore - b._searchScore || new Date(b.time) - new Date(a.time));
       }
       if (filterType === 'unread') {
         res = res.filter(c => c.unreadCount > 0);
@@ -258,15 +345,37 @@ export default function ChatListScreen() {
 
     // Text Search filter
     if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(c =>
-        c.participantName.toLowerCase().includes(q) ||
-        (c.lastMessage && c.lastMessage.toLowerCase().includes(q))
-      );
+      result = result
+        .map(c => ({ ...c, _searchScore: conversationSearchScore(search, c) }))
+        .filter(c => c._searchScore < 999)
+        .sort((a, b) => a._searchScore - b._searchScore || new Date(b.time) - new Date(a.time));
     }
     
     setFiltered(result);
   }, [search, filterType, conversations]);
+
+  useEffect(() => {
+    const q = search.trim();
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
+
+    if (!user?.id || q.length < 2) {
+      setUserResults([]);
+      setSearchingUsers(false);
+      return;
+    }
+
+    setSearchingUsers(true);
+    const timer = setTimeout(async () => {
+      const results = await chatService.searchUsers(q, user.id);
+      if (searchRequestRef.current === requestId) {
+        setUserResults(results);
+        setSearchingUsers(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [search, user?.id]);
 
   const handleLockedTabPress = async () => {
     if (filterType === 'locked') return;
@@ -298,6 +407,101 @@ export default function ChatListScreen() {
       navigation.navigate('ChatDetail', { conversation: conv, authenticated: true });
     } else {
       navigation.navigate('ChatDetail', { conversation: conv });
+    }
+  };
+
+  const handleOpenUserResult = async (person) => {
+    if (!person?.id || !user?.id || startingChatId) return;
+
+    const existing = conversations.find(c => c.participantId === person.id && !c.hasDeleted);
+    if (existing) {
+      handleOpen(existing);
+      return;
+    }
+
+    setStartingChatId(person.id);
+    try {
+      const conversationId = await chatService.createConversation(person.id, user.id);
+      const conversation = {
+        id: conversationId,
+        participantId: person.id,
+        participantName: person.name,
+        participantColor: colors.primary,
+        participantInitials: person.initials || (person.name || 'U').charAt(0).toUpperCase(),
+        participantImage: person.image || null,
+        lastMessage: 'Started a conversation',
+        time: new Date(),
+        unreadCount: 0,
+        isOnline: false,
+        isPinned: false,
+        isArchived: false,
+        hasDeleted: false,
+        isHidden: false,
+        isLocked: false,
+        isBlockedByMe: false,
+      };
+      navigation.navigate('ChatDetail', { conversation });
+      loadData();
+    } catch (e) {
+      Alert.alert('Error', 'Could not start this conversation.');
+    } finally {
+      setStartingChatId(null);
+    }
+  };
+
+  const openConversationFromInvite = (conversationId, person) => {
+    const conversation = {
+      id: conversationId,
+      participantId: person.id,
+      participantName: person.name || 'AMO User',
+      participantColor: colors.primary,
+      participantInitials: (person.name || 'U').charAt(0).toUpperCase(),
+      participantImage: person.image || null,
+      lastMessage: 'Started a conversation',
+      time: new Date(),
+      unreadCount: 0,
+      isOnline: false,
+      isPinned: false,
+      isArchived: false,
+      hasDeleted: false,
+      isHidden: false,
+      isLocked: false,
+      isBlockedByMe: false,
+    };
+    navigation.navigate('ChatDetail', { conversation });
+    loadData();
+  };
+
+  const handleInviteSubmit = async () => {
+    const contact = inviteContact.trim();
+    if (!contact || inviteLoading || !user?.id) return;
+
+    setInviteLoading(true);
+    try {
+      const result = await chatService.inviteToChat(contact, user.id);
+      if (result.status === 'existing') {
+        setInviteVisible(false);
+        setInviteContact('');
+        openConversationFromInvite(result.conversationId, result.user);
+        return;
+      }
+
+      if (result.type === 'phone') {
+        const separator = Platform.OS === 'ios' ? '&' : '?';
+        const body = encodeURIComponent(`Join me on AMO Isoko chat: ${result.inviteUrl}`);
+        await Linking.openURL(`sms:${result.contact}${separator}body=${body}`);
+        setInviteVisible(false);
+        setInviteContact('');
+        return;
+      }
+
+      Alert.alert('Invite Sent', 'We sent an invitation email with a secure chat link.');
+      setInviteVisible(false);
+      setInviteContact('');
+    } catch (e) {
+      Alert.alert('Invite Failed', e.message || 'Could not create this invite.');
+    } finally {
+      setInviteLoading(false);
     }
   };
 
@@ -495,6 +699,47 @@ export default function ChatListScreen() {
     );
   };
 
+  const renderSearchSuggestions = () => {
+    const q = search.trim();
+    if (q.length < 2) return null;
+
+    return (
+      <View style={styles.searchSuggestions}>
+        <View style={styles.searchSuggestionsHeader}>
+          <CustomText style={[styles.searchSuggestionsTitle, { color: colors.foreground }]}>People</CustomText>
+          {searchingUsers && <ActivityIndicator size="small" color={colors.primary} />}
+        </View>
+        {userResults.map((item) => (
+          <SearchUserItem
+            key={item.id}
+            item={item}
+            onPress={handleOpenUserResult}
+            loading={startingChatId === item.id}
+            colors={colors}
+          />
+        ))}
+        {!searchingUsers && userResults.length === 0 && (
+          <TouchableOpacity
+            style={[styles.invitePrompt, { borderColor: colors.glassBorder, backgroundColor: colors.glass }]}
+            onPress={() => {
+              setInviteContact(search.trim());
+              setInviteVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <MessageCircle color={colors.primary} size={20} />
+            <View style={{ flex: 1 }}>
+              <CustomText style={[styles.invitePromptTitle, { color: colors.foreground }]}>Invite to chat</CustomText>
+              <CustomText style={[styles.invitePromptSub, { color: colors.muted }]} numberOfLines={2}>
+                No account found. Invite them by email or phone number.
+              </CustomText>
+            </View>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -515,7 +760,7 @@ export default function ChatListScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search conversations..."
+            placeholder="Search people or conversations..."
             placeholderTextColor={colors.muted}
             style={[styles.searchInput, { color: colors.foreground }]}
           />
@@ -565,13 +810,20 @@ export default function ChatListScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          ListHeaderComponent={renderStatusBar}
+          ListHeaderComponent={
+            <>
+              {renderStatusBar()}
+              {renderSearchSuggestions()}
+            </>
+          }
           ListEmptyComponent={
             <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 100 }}>
               <MessageCircle color={colors.glassBorder} size={56} />
-              <CustomText style={[styles.emptyText, { color: colors.muted, marginTop: 16 }]}>No conversations yet</CustomText>
+              <CustomText style={[styles.emptyText, { color: colors.muted, marginTop: 16 }]}>
+                {search.trim() ? 'No matching conversations' : 'No conversations yet'}
+              </CustomText>
               <CustomText style={[styles.emptySubText, { color: colors.muted, textAlign: 'center', marginTop: 8 }]}>
-                Start a conversation from a product page or order
+                {search.trim() ? 'Matching people appear above' : 'Start a conversation from a product page or order'}
               </CustomText>
             </View>
           }
@@ -582,6 +834,42 @@ export default function ChatListScreen() {
           contentContainerStyle={{ paddingBottom: 20, flexGrow: 1 }}
         />
       )}
+
+      <Modal visible={inviteVisible} transparent animationType="fade" onRequestClose={() => setInviteVisible(false)}>
+        <View style={styles.inviteOverlay}>
+          <View style={[styles.inviteCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+            <CustomText style={[styles.inviteTitle, { color: colors.foreground }]}>Invite to Chat</CustomText>
+            <CustomText style={[styles.inviteText, { color: colors.muted }]}>
+              Enter an email or phone number. If they already have an account, the chat opens immediately.
+            </CustomText>
+            <TextInput
+              value={inviteContact}
+              onChangeText={setInviteContact}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="Email or phone number"
+              placeholderTextColor={colors.muted}
+              style={[styles.inviteInput, { color: colors.foreground, borderColor: colors.glassBorder, backgroundColor: colors.background }]}
+            />
+            <View style={styles.inviteActions}>
+              <TouchableOpacity
+                onPress={() => setInviteVisible(false)}
+                style={[styles.inviteButton, { backgroundColor: colors.background }]}
+                disabled={inviteLoading}
+              >
+                <CustomText style={[styles.inviteButtonText, { color: colors.muted }]}>Cancel</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleInviteSubmit}
+                style={[styles.inviteButton, { backgroundColor: colors.primary, opacity: inviteLoading ? 0.6 : 1 }]}
+                disabled={inviteLoading}
+              >
+                {inviteLoading ? <ActivityIndicator size="small" color="#fff" /> : <CustomText style={styles.invitePrimaryText}>Continue</CustomText>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -625,6 +913,125 @@ const styles = StyleSheet.create({
     flex: 1, 
     fontSize: 16,
     marginLeft: 12,
+  },
+  searchSuggestions: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  searchSuggestionsHeader: {
+    height: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  searchSuggestionsTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    opacity: 0.7,
+  },
+  searchUserItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  searchUserAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginRight: 12,
+  },
+  searchUserAvatarText: {
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  searchUserBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  searchUserName: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  searchUserRole: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  invitePrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  invitePromptTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  invitePromptSub: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  inviteOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  inviteCard: {
+    width: '100%',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 20,
+  },
+  inviteTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  inviteText: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  inviteInput: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    marginBottom: 18,
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  inviteButton: {
+    minWidth: 104,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  inviteButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  invitePrimaryText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
   },
   pillsRow: { 
     marginVertical: 4,

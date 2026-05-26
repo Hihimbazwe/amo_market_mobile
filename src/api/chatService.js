@@ -97,6 +97,37 @@ export const chatService = {
     }
   },
 
+  searchUsers: async (query, userId) => {
+    try {
+      const q = query.trim();
+      if (q.length < 2) return [];
+      const res = await fetch(`${BASE_URL}/api/mobile/chat/users/search?q=${encodeURIComponent(q)}`, {
+        headers: buildHeaders(userId)
+      });
+      if (!res.ok) throw new Error('API failed');
+      return await res.json();
+    } catch (e) {
+      console.warn('API searchUsers failed:', e);
+      return [];
+    }
+  },
+
+  inviteToChat: async (contact, userId) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/mobile/chat/invite`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ contact })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not create invite');
+      return data;
+    } catch (e) {
+      console.error('API inviteToChat failed:', e);
+      throw e;
+    }
+  },
+
   sendMessage: async (conversationId, userId, text, statusItemId = null, replyToId = null) => {
     try {
       console.log('[DEBUG-API] sendMessage started for:', conversationId);

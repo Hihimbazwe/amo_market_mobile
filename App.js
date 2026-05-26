@@ -300,6 +300,7 @@ const RootNavigator = () => {
 
   const linking = {
     prefixes: [
+      'amo://',
       hostUri ? `exp://${hostUri}/--` : 'exp://1ui--vo-ihyacinthe-8081.exp.direct/--',
       'exp://'
     ],
@@ -309,6 +310,7 @@ const RootNavigator = () => {
         Auth: {
           initialRouteName: 'Login',
           screens: {
+            Register: 'invite/:inviteToken',
             ResetPassword: 'reset-password',
           },
         },

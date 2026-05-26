@@ -6,6 +6,7 @@ const BASE_URL = API_BASE_URL;
 // ngrok's HTML interstitial page that breaks non-browser (mobile) fetch calls
 const commonHeaders = {
   'Content-Type': 'application/json',
+  'Accept': 'application/json',
   'ngrok-skip-browser-warning': 'true',
 };
 
@@ -348,14 +349,21 @@ export const authService = {
 
   setFeatureFlags: async (userId, flags) => {
     try {
-      const response = await fetchWithTimeout(`${BASE_URL}/api/user/feature-flags`, {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/mobile/user/feature-flags`, {
         method: 'POST',
         headers: buildHeaders(userId),
         body: JSON.stringify(flags),
       });
       const responseText = await response.text();
       let data;
-      try { data = JSON.parse(responseText); } catch (e) { throw new Error(responseText); }
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        if (responseText?.includes('<html') || responseText?.includes('<!DOCTYPE')) {
+          throw new Error('Server returned an HTML page instead of JSON. Restart the API server and confirm the ngrok URL points to this backend.');
+        }
+        throw new Error(responseText || 'Invalid server response');
+      }
       if (!response.ok) throw new Error(data.error || 'Failed to update feature flags');
       return data;
     } catch (error) {

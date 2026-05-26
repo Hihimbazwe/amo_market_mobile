@@ -22,7 +22,7 @@ const GoogleIcon = () => (
   </Svg>
 );
 
-const RegisterScreen = ({ navigation }) => {
+const RegisterScreen = ({ navigation, route }) => {
   const { colors, isDarkMode } = useTheme();
   const { login } = useAuth();
   const [role, setRole] = useState('BUYER');
@@ -139,10 +139,36 @@ const RegisterScreen = ({ navigation }) => {
         email,
         password,
         role,
+        ...(route.params?.inviteToken && { inviteToken: route.params.inviteToken }),
         ...(role === 'AGENT' && { province, district, sector, cell, village, phone, coverageArea })
       };
       
       const result = await authService.register(userData);
+      if (result.inviteConversation) {
+        await AsyncStorage.setItem('@auto_logout_redirect', JSON.stringify({
+          name: 'ChatDetail',
+          params: {
+            conversation: {
+              id: result.inviteConversation.id,
+              participantId: result.inviteConversation.participantId,
+              participantName: result.inviteConversation.participantName || 'AMO User',
+              participantColor: '#e67e22',
+              participantInitials: (result.inviteConversation.participantName || 'U').charAt(0).toUpperCase(),
+              participantImage: result.inviteConversation.participantImage || null,
+              lastMessage: 'Started a conversation',
+              time: new Date(),
+              unreadCount: 0,
+              isOnline: false,
+              isPinned: false,
+              isArchived: false,
+              hasDeleted: false,
+              isHidden: false,
+              isLocked: false,
+              isBlockedByMe: false,
+            }
+          }
+        }));
+      }
       Alert.alert('Success', 'Account created! Please check your email for verification.');
       navigation.navigate('VerifyOTP', { email });
     } catch (error) {
