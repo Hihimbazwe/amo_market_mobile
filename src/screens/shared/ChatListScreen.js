@@ -12,12 +12,14 @@ import {
   Image,
   Modal,
   Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { Menu, Search, MessageCircle, Plus, Archive, Trash2, Pin, PinOff, Lock } from 'lucide-react-native';
+import * as Contacts from 'expo-contacts';
+import { Menu, Search, MessageCircle, Plus, Archive, Trash2, Pin, PinOff, Lock, Users, X } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
@@ -244,6 +246,10 @@ export default function ChatListScreen() {
   const [inviteVisible, setInviteVisible] = useState(false);
   const [inviteContact, setInviteContact] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [contacts, setContacts] = useState([]);
+  const [contactSearch, setContactSearch] = useState('');
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'archived' | 'locked'
   const [loading, setLoading] = useState(true);
   const searchRequestRef = useRef(0);
@@ -470,6 +476,114 @@ export default function ChatListScreen() {
     };
     navigation.navigate('ChatDetail', { conversation });
     loadData();
+  };
+
+  const handleChooseFromContacts = async () => {
+    setLoadingContacts(true);
+
+    try {
+      if (!Contacts || typeof Contacts.requestPermissionsAsync !== 'function') {
+        throw new Error('Contacts feature is not supported on this platform.');
+      }
+
+      const isAvailable = await Contacts.isAvailableAsync();
+      if (!isAvailable) {
+        throw new Error('Contacts are not available on this device.');
+      }
+
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Contacts permission is required. You can still enter a number manually.'
+        );
+        setLoadingContacts(false);
+        return;
+      }
+
+      const { data } = await Contacts.getContactsAsync({
+        fields: [
+          Contacts.Fields.Name,
+          Contacts.Fields.PhoneNumbers,
+          Contacts.Fields.Emails,
+        ],
+        pageSize: 2000,
+      });
+
+      if (!data || data.length === 0) {
+        Alert.alert('No Contacts', 'No contacts found on your device.');
+        setLoadingContacts(false);
+        return;
+      }
+
+      const formatted = data.map(c => {
+        const phoneNumbers = c.phoneNumbers || [];
+        const validPhoneObj = phoneNumbers.find(p => p.number && p.number.replace(/[^\d+]/g, '').trim());
+        const phone = validPhoneObj ? validPhoneObj.number.replace(/[^\d+]/g, '') : null;
+
+        const emails = c.emails || [];
+        const validEmailObj = emails.find(e => e.email && e.email.trim());
+        const email = validEmailObj ? validEmailObj.email : null;
+
+        const initials = c.name
+          ? c.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
+          : 'U';
+        return { id: c.id, name: c.name || 'Unknown Contact', phone, email, initials, matchedUser: null };
+      }).filter(c => c.phone || c.email);
+
+      // Sort alphabetically
+      formatted.sort((a, b) => a.name.localeCompare(b.name));
+      setContacts(formatted);
+
+      // Dismiss the invite modal
+      setInviteVisible(false);
+      setLoadingContacts(false);
+
+      // Open the picker after a small delay to let the invite modal finish closing
+      setTimeout(() => {
+        setShowContactPicker(true);
+      }, 400);
+
+      // Do backend matching in the background — does NOT block the picker
+      if (user?.id && formatted.length > 0) {
+        chatService.checkContacts(formatted, user.id)
+          .then(({ matched }) => {
+            if (!matched || matched.length === 0) return;
+            setContacts(prev => {
+              const updated = prev.map(c => {
+                const match = matched.find(
+                  m => (c.phone && m.phone === c.phone) || (c.email && m.email === c.email)
+                );
+                return match ? { ...c, matchedUser: match } : c;
+              });
+              // Re-sort: AMO users first
+              updated.sort((a, b) => {
+                if (a.matchedUser && !b.matchedUser) return -1;
+                if (!a.matchedUser && b.matchedUser) return 1;
+                return a.name.localeCompare(b.name);
+              });
+              return updated;
+            });
+          })
+          .catch(() => {}); // silent fail — picker already open
+      }
+    } catch (err) {
+      console.warn('Failed to read contacts:', err);
+      Alert.alert('Error', err.message || 'Failed to read contacts from your device.');
+      setLoadingContacts(false);
+    }
+  };
+
+  const handleSelectContact = (contact) => {
+    const selectedValue = contact.phone || contact.email;
+    if (selectedValue) {
+      setInviteContact(selectedValue);
+    }
+    setShowContactPicker(false);
+    // Let the contact picker fully close first, then reopen the invite modal
+    setTimeout(() => {
+      setInviteVisible(true);
+    }, 400);
   };
 
   const handleInviteSubmit = async () => {
@@ -838,10 +952,19 @@ export default function ChatListScreen() {
       <Modal visible={inviteVisible} transparent animationType="fade" onRequestClose={() => setInviteVisible(false)}>
         <View style={styles.inviteOverlay}>
           <View style={[styles.inviteCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
-            <CustomText style={[styles.inviteTitle, { color: colors.foreground }]}>Invite to Chat</CustomText>
+            <TouchableOpacity 
+              onPress={() => setInviteVisible(false)} 
+              style={styles.inviteCloseBtn}
+              disabled={inviteLoading}
+            >
+              <X color={colors.foreground} size={20} />
+            </TouchableOpacity>
+
+            <CustomText style={[styles.inviteTitle, { color: colors.foreground, paddingRight: 24 }]}>Invite to Chat</CustomText>
             <CustomText style={[styles.inviteText, { color: colors.muted }]}>
               Enter an email or phone number. If they already have an account, the chat opens immediately.
             </CustomText>
+            
             <TextInput
               value={inviteContact}
               onChangeText={setInviteContact}
@@ -851,24 +974,118 @@ export default function ChatListScreen() {
               placeholderTextColor={colors.muted}
               style={[styles.inviteInput, { color: colors.foreground, borderColor: colors.glassBorder, backgroundColor: colors.background }]}
             />
+
             <View style={styles.inviteActions}>
               <TouchableOpacity
-                onPress={() => setInviteVisible(false)}
-                style={[styles.inviteButton, { backgroundColor: colors.background }]}
-                disabled={inviteLoading}
+                onPress={handleChooseFromContacts}
+                style={[styles.inviteButton, { flex: 1, minWidth: 0, borderColor: colors.primary + '80', borderWidth: 1, backgroundColor: colors.primary + '0a', paddingHorizontal: 4 }]}
+                disabled={inviteLoading || loadingContacts}
               >
-                <CustomText style={[styles.inviteButtonText, { color: colors.muted }]}>Cancel</CustomText>
+                {loadingContacts ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    <Users color={colors.primary} size={14} />
+                    <CustomText style={[styles.inviteContactsBtnText, { color: colors.primary, fontSize: 12, marginLeft: 4 }]} numberOfLines={1}>Contacts</CustomText>
+                  </View>
+                )}
               </TouchableOpacity>
+
               <TouchableOpacity
                 onPress={handleInviteSubmit}
-                style={[styles.inviteButton, { backgroundColor: colors.primary, opacity: inviteLoading ? 0.6 : 1 }]}
+                style={[styles.inviteButton, { flex: 1, minWidth: 0, backgroundColor: colors.primary, opacity: inviteLoading ? 0.6 : 1, paddingHorizontal: 4 }]}
                 disabled={inviteLoading}
               >
-                {inviteLoading ? <ActivityIndicator size="small" color="#fff" /> : <CustomText style={styles.invitePrimaryText}>Continue</CustomText>}
+                {inviteLoading ? <ActivityIndicator size="small" color="#fff" /> : <CustomText style={[styles.invitePrimaryText, { fontSize: 12 }]} numberOfLines={1}>Continue</CustomText>}
               </TouchableOpacity>
             </View>
           </View>
         </View>
+      </Modal>
+
+      <Modal visible={showContactPicker} transparent animationType="slide" onRequestClose={() => setShowContactPicker(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.pickerOverlay}
+        >
+          <View style={[styles.pickerContent, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+            <View style={styles.pickerHeader}>
+              <CustomText style={[styles.pickerTitle, { color: colors.foreground }]}>Select a Contact ({contacts.length})</CustomText>
+              <TouchableOpacity onPress={() => setShowContactPicker(false)} style={styles.pickerCloseBtn}>
+                <X color={colors.foreground} size={20} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.pickerSearchRow, { backgroundColor: colors.background }]}>
+              <Search color={colors.muted} size={18} />
+              <TextInput
+                value={contactSearch}
+                onChangeText={setContactSearch}
+                placeholder="Search contacts..."
+                placeholderTextColor={colors.muted}
+                style={[styles.pickerSearchInput, { color: colors.foreground }]}
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <FlatList
+              style={styles.pickerFlatList}
+              data={contacts.filter(c => {
+                const q = contactSearch.toLowerCase();
+                return (
+                  c.name.toLowerCase().includes(q) ||
+                  (c.phone && c.phone.includes(q)) ||
+                  (c.email && c.email.toLowerCase().includes(q))
+                );
+              })}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.pickerListContent}
+              showsVerticalScrollIndicator={true}
+              initialNumToRender={30}
+              maxToRenderPerBatch={40}
+              windowSize={10}
+              removeClippedSubviews={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => handleSelectContact(item)}
+                  style={[styles.contactItem, { borderBottomColor: colors.glassBorder }]}
+                >
+                  <View style={[styles.contactAvatar, { backgroundColor: colors.primary + '18' }]}>
+                    <CustomText style={[styles.contactAvatarText, { color: colors.primary }]}>{item.initials}</CustomText>
+                  </View>
+                  <View style={styles.contactInfo}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <CustomText style={[styles.contactName, { color: colors.foreground }]}>{item.name}</CustomText>
+                      {item.matchedUser && (
+                        <View style={{ marginLeft: 8, backgroundColor: '#25D366' + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                          <CustomText style={{ color: '#25D366', fontSize: 10, fontWeight: '800' }}>ON AMO</CustomText>
+                        </View>
+                      )}
+                    </View>
+                    <CustomText style={[styles.contactDetail, { color: colors.muted }]}>
+                      {item.phone || item.email}
+                    </CustomText>
+                  </View>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
+                  <CustomText style={{ color: colors.muted, fontSize: 13 }}>No matching contacts found</CustomText>
+                </View>
+              }
+              ListFooterComponent={
+                Platform.OS === 'ios' ? (
+                  <View style={{ paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.glassBorder, marginTop: 12, alignItems: 'center' }}>
+                    <CustomText style={{ color: colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 16 }}>
+                      Can't see all your contacts? Go to iOS Settings &gt; Amo Market &gt; Contacts and select "All Contacts".
+                    </CustomText>
+                  </View>
+                ) : null
+              }
+            />
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -992,6 +1209,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     padding: 20,
+    position: 'relative',
+  },
+  inviteCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 4,
+    zIndex: 10,
   },
   inviteTitle: {
     fontSize: 20,
@@ -1192,5 +1417,101 @@ const styles = StyleSheet.create({
     right: -2,
     borderWidth: 2,
     borderColor: '#030712',
+  },
+  inviteContactsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginVertical: 12,
+    width: '100%',
+  },
+  inviteContactsBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  pickerContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '95%',
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  pickerFlatList: {
+    flex: 1,
+    minHeight: 0,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  pickerCloseBtn: {
+    padding: 6,
+  },
+  pickerSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  pickerSearchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    padding: 0,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  contactAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  contactAvatarText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  contactDetail: {
+    fontSize: 12,
+  },
+  pickerListContent: {
+    paddingBottom: 40,
   },
 });

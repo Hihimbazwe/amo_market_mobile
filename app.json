@@ -38,7 +38,8 @@
     },
     "owner": "ihyacinthe",
     "plugins": [
-      "expo-video"
+      "expo-video",
+      "expo-contacts"
     ]
   }
 }

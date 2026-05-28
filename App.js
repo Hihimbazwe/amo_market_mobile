@@ -124,6 +124,7 @@ const MessagesStack = () => (
     <Stack.Screen name="MessagesMain" component={ChatListScreen} />
     <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
     <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
+    <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
   </Stack.Navigator>
 );
 

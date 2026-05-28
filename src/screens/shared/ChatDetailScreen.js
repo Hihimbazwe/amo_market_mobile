@@ -17,12 +17,13 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, MoreVertical, Image as ImageIcon, CornerUpLeft } from 'lucide-react-native';
+import { ArrowLeft, Send, MoreVertical, Image as ImageIcon, CornerUpLeft, ShoppingBag, ExternalLink, Tag } from 'lucide-react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { chatService } from '../../api/chatService';
+import { productService } from '../../api/productService';
 import { useNotifications } from '../../context/NotificationContext';
 import { usePresence } from '../../context/PresenceContext';
 import PresenceDot from '../../components/PresenceDot';
@@ -108,9 +109,41 @@ const TypingDotsPulsing = ({ colors }) => {
   );
 };
 
-const Bubble = ({ msg, colors, onAction, onSwipeReply }) => {
+const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
   const isMe = msg.senderId === 'me';
   const swipeableRef = useRef(null);
+
+  const isProductMsg = msg.text && msg.text.startsWith('🛍️ Product:');
+  let productInfo = null;
+  let cleanMessageText = msg.text;
+
+  if (isProductMsg) {
+    try {
+      const lines = msg.text.split('\n');
+      const titleLine = lines[0].replace('🛍️ Product: ', '').trim();
+      const priceLine = lines[1].replace('💰 Price: ', '').trim();
+      const imageLine = lines[2].replace('🖼️ Image: ', '').trim();
+      const idLine = lines[3].replace('🆔 ID: ', '').trim();
+      
+      let restOfText = '';
+      if (lines.length > 4) {
+        restOfText = lines.slice(4).join('\n').trim();
+      }
+      if (restOfText.startsWith('\n')) {
+        restOfText = restOfText.trim();
+      }
+      cleanMessageText = restOfText;
+
+      productInfo = {
+        id: idLine,
+        title: titleLine,
+        price: priceLine,
+        image: imageLine
+      };
+    } catch (e) {
+      console.log('Failed to parse product msg', e);
+    }
+  }
 
   const handleLongPress = () => {
     if (onAction) {
@@ -192,10 +225,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply }) => {
           </View>
         )}
         <View style={{ maxWidth: '80%' }}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onLongPress={handleLongPress}
-            delayLongPress={250}
+          <View
             style={[
               styles.bubble,
               isMe
@@ -206,71 +236,240 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply }) => {
               isMe && isSameSenderAsNext && { borderBottomRightRadius: 16 },
               isMe && isSameSenderAsPrev && { borderTopRightRadius: 4 },
               !isMe && isSameSenderAsNext && { borderBottomLeftRadius: 16 },
-              !isMe && isSameSenderAsPrev && { borderTopLeftRadius: 4 }
+              !isMe && isSameSenderAsPrev && { borderTopLeftRadius: 4 },
+              productInfo && { padding: 0, overflow: 'hidden' }
             ]}
           >
-            {msg.statusItem && (
-              <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                {(msg.statusItem.type === 'image' || msg.statusItem.type === 'video') ? (
-                  <Image source={{ uri: msg.statusItem.content }} style={styles.statusReplyImage} />
+            {productInfo && (
+              <TouchableOpacity
+                onPress={() => onNavigateProduct && onNavigateProduct(productInfo.id)}
+                activeOpacity={0.8}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isMe ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.03)',
+                  padding: 10,
+                  borderBottomWidth: 1,
+                  borderBottomColor: isMe ? 'rgba(255,255,255,0.18)' : colors.glassBorder,
+                }}
+              >
+                {productInfo.image ? (
+                  <Image 
+                    source={{ uri: productInfo.image }} 
+                    style={{ width: 44, height: 44, borderRadius: 8, marginRight: 10 }} 
+                    resizeMode="cover" 
+                  />
                 ) : (
-                  <View style={[styles.statusReplyColorBlock, { backgroundColor: msg.statusItem.backgroundColor || colors.primary }]} />
+                  <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.05)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                    <ShoppingBag size={18} color={isMe ? '#fff' : colors.primary} />
+                  </View>
                 )}
-                <View style={{ flex: 1, marginLeft: 8 }}>
-                  <CustomText style={[styles.statusReplyTitle, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={1}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <CustomText style={{ fontSize: 12, fontWeight: '700', color: isMe ? '#fff' : colors.foreground }} numberOfLines={1}>
+                    {productInfo.title}
+                  </CustomText>
+                  <CustomText style={{ fontSize: 11, fontWeight: '800', color: isMe ? 'rgba(255,255,255,0.9)' : colors.primary }}>
+                    {productInfo.price}
+                  </CustomText>
+                </View>
+                <ExternalLink size={12} color={isMe ? 'rgba(255,255,255,0.6)' : colors.muted} style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onLongPress={handleLongPress}
+              delayLongPress={250}
+              style={
+                productInfo 
+                  ? { paddingHorizontal: 12, paddingVertical: 10 }
+                  : undefined
+              }
+            >
+              {msg.statusItem && (
+                <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                  {(msg.statusItem.type === 'image' || msg.statusItem.type === 'video') ? (
+                    <Image source={{ uri: msg.statusItem.content }} style={styles.statusReplyImage} />
+                  ) : (
+                    <View style={[styles.statusReplyColorBlock, { backgroundColor: msg.statusItem.backgroundColor || colors.primary }]} />
+                  )}
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <CustomText style={[styles.statusReplyTitle, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={1}>
+                      Status Reply
+                    </CustomText>
+                    <CustomText style={[styles.statusReplySubtitle, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]} numberOfLines={1}>
+                      {msg.statusItem.type === 'text' ? msg.statusItem.content : 'Media'}
+                    </CustomText>
+                  </View>
+                </View>
+              )}
+
+              {!msg.statusItem && msg.statusItemId && (
+                <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(230, 126, 34, 0.1)' }]}>
+                  <ImageIcon size={10} color={isMe ? '#fff' : '#e67e22'} />
+                  <CustomText style={[styles.statusReplyText, { color: isMe ? '#fff' : '#e67e22' }]}>
                     Status Reply
                   </CustomText>
-                  <CustomText style={[styles.statusReplySubtitle, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]} numberOfLines={1}>
-                    {msg.statusItem.type === 'text' ? msg.statusItem.content : 'Media'}
+                </View>
+              )}
+
+              {msg.replyTo && (
+                <View style={[styles.quotedBubble, { backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+                  <View style={[styles.quotedBorder, { backgroundColor: colors.primary }]} />
+                  <View style={styles.quotedBody}>
+                    <CustomText style={[styles.quotedSender, { color: colors.primary }]} numberOfLines={1}>
+                      {msg.replyTo.senderName}
+                    </CustomText>
+                    <CustomText style={[styles.quotedText, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={2}>
+                      {msg.replyTo.text}
+                    </CustomText>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.bubbleTextWrapper}>
+                <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}>
+                  {cleanMessageText}
+                  <CustomText style={styles.invisibleSpacer}>
+                    {'   '}{formatMsgTime(msg.timestamp)}{!msg.isDeleted && isMe && ' ✓✓'}
+                  </CustomText>
+                </CustomText>
+                
+                <View style={styles.timestampWrap}>
+                  <CustomText style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
+                    {formatMsgTime(msg.timestamp)}
+                    {!msg.isDeleted && isMe && ' ✓✓'}
                   </CustomText>
                 </View>
               </View>
-            )}
-
-            {!msg.statusItem && msg.statusItemId && (
-              <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(230, 126, 34, 0.1)' }]}>
-                <ImageIcon size={10} color={isMe ? '#fff' : '#e67e22'} />
-                <CustomText style={[styles.statusReplyText, { color: isMe ? '#fff' : '#e67e22' }]}>
-                  Status Reply
-                </CustomText>
-              </View>
-            )}
-
-            {msg.replyTo && (
-              <View style={[styles.quotedBubble, { backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                <View style={[styles.quotedBorder, { backgroundColor: colors.primary }]} />
-                <View style={styles.quotedBody}>
-                  <CustomText style={[styles.quotedSender, { color: colors.primary }]} numberOfLines={1}>
-                    {msg.replyTo.senderName}
-                  </CustomText>
-                  <CustomText style={[styles.quotedText, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={2}>
-                    {msg.replyTo.text}
-                  </CustomText>
-                </View>
-              </View>
-            )}
-            
-            <View style={styles.bubbleTextWrapper}>
-              <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}>
-                {msg.text}
-                <CustomText style={styles.invisibleSpacer}>
-                  {'   '}{formatMsgTime(msg.timestamp)}{!msg.isDeleted && isMe && ' ✓✓'}
-                </CustomText>
-              </CustomText>
-              
-              <View style={styles.timestampWrap}>
-                <CustomText style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
-                  {formatMsgTime(msg.timestamp)}
-                  {!msg.isDeleted && isMe && ' ✓✓'}
-                </CustomText>
-              </View>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Swipeable>
   );
 };
+
+const ProductContextCard = ({ context, onNavigateProduct, colors }) => {
+  const handlePress = () => {
+    if (onNavigateProduct && context?.id) {
+      onNavigateProduct(context.id, context.routeProduct);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handlePress}
+      activeOpacity={0.85}
+      style={[
+        productCardStyles.card,
+        { backgroundColor: colors.card, borderColor: colors.primary + '30' },
+      ]}
+    >
+      {/* Accent bar */}
+      <View style={[productCardStyles.accentBar, { backgroundColor: colors.primary }]} />
+
+      {/* Thumbnail */}
+      <View style={[productCardStyles.thumb, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '25' }]}>
+        {context.image ? (
+          <Image source={{ uri: context.image }} style={productCardStyles.thumbImg} resizeMode="cover" />
+        ) : (
+          <ShoppingBag size={20} color={colors.primary} />
+        )}
+      </View>
+
+      {/* Text */}
+      <View style={productCardStyles.textBlock}>
+        <View style={[productCardStyles.badge, { backgroundColor: colors.primary + '15' }]}>
+          <Tag size={9} color={colors.primary} />
+          <CustomText style={[productCardStyles.badgeLabel, { color: colors.primary }]}>Product Inquiry</CustomText>
+        </View>
+        <CustomText style={[productCardStyles.title, { color: colors.foreground }]} numberOfLines={1}>
+          {context.title}
+        </CustomText>
+        <CustomText style={[productCardStyles.price, { color: colors.primary }]}>
+          Rwf {(context.price || 0).toLocaleString()}
+        </CustomText>
+      </View>
+
+      {/* Link icon */}
+      <ExternalLink size={16} color={colors.muted} style={{ marginLeft: 4 }} />
+    </TouchableOpacity>
+  );
+};
+
+const productCardStyles = {
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingRight: 12,
+    paddingLeft: 0,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  accentBar: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 4,
+    marginRight: 10,
+    marginLeft: 0,
+  },
+  thumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginRight: 10,
+    overflow: 'hidden',
+  },
+  thumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  textBlock: {
+    flex: 1,
+    gap: 2,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 4,
+    marginBottom: 2,
+  },
+  badgeLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  title: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  price: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 1,
+  },
+};
+// ──────────────────────────────────────────────────────────────────────────
 
 export default function ChatDetailScreen() {
   const { colors } = useTheme();
@@ -280,6 +479,13 @@ export default function ChatDetailScreen() {
   const route = useRoute();
   const { conversation } = route.params || {};
   const participantId = conversation?.participantId || conversation?.otherUser?.id;
+  const [productContext, setProductContext] = useState(conversation?.productContext || null);
+
+  useEffect(() => {
+    if (conversation?.productContext) {
+      setProductContext(conversation.productContext);
+    }
+  }, [conversation?.productContext]);
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -290,6 +496,26 @@ export default function ChatDetailScreen() {
   const [isHidden, setIsHidden] = useState(true); // Don't show status until first fetch to avoid flicker
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
+
+  const navigateToProductDetails = async (productId, routeProduct = null) => {
+    if (routeProduct) {
+      navigation.navigate('ProductDetail', { product: routeProduct });
+      return;
+    }
+    
+    try {
+      const fullProduct = await productService.getProductById(productId, user?.id);
+      if (fullProduct) {
+        navigation.navigate('ProductDetail', { product: fullProduct });
+      } else {
+        Alert.alert('Error', 'Product details could not be found.');
+      }
+    } catch (e) {
+      console.warn('Failed to load product details:', e);
+      Alert.alert('Error', 'Could not open product details page.');
+    }
+  };
+
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const { addListener, sendTyping, sendStopTyping } = usePresence();
@@ -641,10 +867,18 @@ export default function ChatDetailScreen() {
     setReplyingTo(null);
     setInput('');
 
+    // Prepend productContext if present, then clear it
+    let finalMsgText = text;
+    if (productContext) {
+      finalMsgText = `🛍️ Product: ${productContext.title}\n💰 Price: RWF ${productContext.price}\n🖼️ Image: ${productContext.image || ''}\n🆔 ID: ${productContext.id || ''}\n\n${text}`;
+      setProductContext(null);
+      navigation.setParams({ conversation: { ...conversation, productContext: null } });
+    }
+
     const tempId = `m-${Date.now()}`;
     const myMsg = {
       id: tempId,
-      text,
+      text: finalMsgText,
       senderId: 'me',
       timestamp: new Date(),
       replyTo: replyingTo ? {
@@ -661,7 +895,7 @@ export default function ChatDetailScreen() {
        try {
          const pId = cid.startsWith('new-') ? cid.replace('new-', '') : cid.replace('temp_', '');
          cid = await chatService.createConversation(pId, user?.id);
-         navigation.setParams({ conversation: { ...conversation, id: cid } });
+         navigation.setParams({ conversation: { ...conversation, id: cid, productContext: null } });
        } catch (e) {
          setMessages((prev) => prev.filter(m => m.id !== tempId));
          Alert.alert('Error', 'Could not create conversation.');
@@ -671,7 +905,7 @@ export default function ChatDetailScreen() {
 
     try {
       const statusItemId = route.params?.statusId || null;
-      const realMsg = await chatService.sendMessage(cid, user.id, text, statusItemId, rId);
+      const realMsg = await chatService.sendMessage(cid, user.id, finalMsgText, statusItemId, rId);
       
       // Stop typing immediately on send
       if (cid) chatService.stopTyping(cid, user.id);
@@ -831,7 +1065,7 @@ export default function ChatDetailScreen() {
                     <View style={[styles.dateSeparatorLine, { backgroundColor: colors.glassBorder }]} />
                   </View>
                 )}
-                <Bubble msg={enhancedMsg} colors={colors} onAction={handleBubbleAction} onSwipeReply={handleSwipeReply} />
+                <Bubble msg={enhancedMsg} colors={colors} onAction={handleBubbleAction} onSwipeReply={handleSwipeReply} onNavigateProduct={navigateToProductDetails} />
               </View>
             );
           }}
@@ -839,6 +1073,15 @@ export default function ChatDetailScreen() {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
           onLayout={scrollToBottom}
+          ListHeaderComponent={
+            productContext ? (
+              <ProductContextCard
+                context={productContext}
+                onNavigateProduct={navigateToProductDetails}
+                colors={colors}
+              />
+            ) : null
+          }
           ListFooterComponent={
             typing ? (
               <View style={styles.typingRow}>

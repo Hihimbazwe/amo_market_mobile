@@ -85,7 +85,26 @@ const HomeScreen = ({ navigation }) => {
 
   const heroProducts = useMemo(() => {
     if (!liveProducts || liveProducts.length === 0) return [null];
-    const hotDeals = liveProducts.filter(p => p.isHotDeal);
+    const hotDeals = liveProducts.filter(p => p.isHotDeal).map(p => ({
+      id: p.id,
+      slug: p.slug || p.id,
+      name: p.title,
+      title: p.title, // Keep title for existing UI binding
+      price: p.price,
+      originalPrice: p.originalPrice || p.price,
+      discountType: p.discountType || "PERCENTAGE",
+      discountPercent: p.discountPercent ?? 0,
+      discountFixedAmount: p.discountFixedAmount ?? 0,
+      bogoBuyQuantity: p.bogoBuyQuantity ?? null,
+      bogoGetQuantity: p.bogoGetQuantity ?? null,
+      dealTitle: p.dealTitle ?? null,
+      category: p.category,
+      stock: p.stock ?? null,
+      hotDealEndsAt: p.hotDealEndsAt || null,
+      image: p.media?.[0]?.url ?? null,
+      media: p.media, // Keep media for existing UI binding
+      isHotDeal: true
+    }));
     if (hotDeals.length > 0) return hotDeals.slice(0, 5);
     return liveProducts.slice(0, 5);
   }, [liveProducts]);

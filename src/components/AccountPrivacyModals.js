@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Modal, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { ShoppingBag, MessageCircle, Trash2, ChevronRight } from 'lucide-react-native';
+import { ShoppingBag, MessageCircle, Trash2, ChevronRight, XCircle } from 'lucide-react-native';
 import CustomText from './CustomText';
 import CustomInput from './CustomInput';
 import { useTranslation } from 'react-i18next';
@@ -25,11 +25,11 @@ const OPTIONS = [
     desc: 'Restrict all messaging. Selling features remain fully functional.',
   },
   {
-    key: 'delete',
-    icon: Trash2,
+    key: 'both',
+    icon: XCircle,
     color: '#EF4444',
-    title: 'Delete Account',
-    desc: 'Soft-delete your account. All features are restricted after a 30-day grace period.',
+    title: 'Disable Selling & Chat',
+    desc: 'Restrict marketplace selling and all messaging at the same time.',
   },
 ];
 
@@ -79,11 +79,22 @@ const AccountPrivacyModals = ({
             ? 'Messaging is restricted. Your selling features remain fully functional.'
             : 'Your chat features have been restored.',
         );
-      } else if (selected === 'delete') {
-        setShowDeactivateModal(false);
-        setSelected(null);
-        setTimeout(() => setShowDeleteModal(true), 300);
-        return;
+      } else if (selected === 'both') {
+        const bothCurrentlyDisabled = !!user?.sellingDisabled && !!user?.chatDisabled;
+        const result = await authService.setFeatureFlags(user.id, {
+          sellingDisabled: !bothCurrentlyDisabled,
+          chatDisabled: !bothCurrentlyDisabled,
+        });
+        await updateUser({
+          sellingDisabled: result.sellingDisabled,
+          chatDisabled: result.chatDisabled,
+        });
+        Alert.alert(
+          result.sellingDisabled && result.chatDisabled ? 'Features Disabled' : 'Features Enabled',
+          result.sellingDisabled && result.chatDisabled
+            ? 'Selling and chat features are now restricted.'
+            : 'Selling and chat features have been restored.',
+        );
       }
       setShowDeactivateModal(false);
       setSelected(null);
@@ -140,7 +151,7 @@ const AccountPrivacyModals = ({
             <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
               <CustomText style={[styles.sheetTitle, { color: colors.foreground }]}>Manage Account Features</CustomText>
               <CustomText style={[styles.sheetSub, { color: colors.muted }]}>
-                Choose which feature to disable, or delete your account.
+                Choose which feature access you want to manage.
               </CustomText>
             </View>
 
@@ -152,7 +163,8 @@ const AccountPrivacyModals = ({
                 // Show current state for selling/chat
                 const isCurrentlyDisabled =
                   opt.key === 'selling' ? user?.sellingDisabled :
-                  opt.key === 'chat' ? user?.chatDisabled : false;
+                  opt.key === 'chat' ? user?.chatDisabled :
+                  opt.key === 'both' ? user?.sellingDisabled && user?.chatDisabled : false;
 
                 return (
                   <TouchableOpacity
@@ -169,10 +181,10 @@ const AccountPrivacyModals = ({
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <CustomText style={[styles.optionTitle, { color: opt.key === 'delete' ? opt.color : colors.foreground }]}>
-                          {opt.key !== 'delete' && isCurrentlyDisabled ? opt.title.replace('Disable', 'Re-enable') : opt.title}
+                        <CustomText style={[styles.optionTitle, { color: colors.foreground }]}>
+                          {isCurrentlyDisabled ? opt.title.replace('Disable', 'Re-enable') : opt.title}
                         </CustomText>
-                        {opt.key !== 'delete' && isCurrentlyDisabled && (
+                        {isCurrentlyDisabled && (
                           <View style={[styles.activeBadge, { backgroundColor: `${opt.color}20`, borderColor: `${opt.color}40` }]}>
                             <CustomText style={[styles.activeBadgeText, { color: opt.color }]}>ACTIVE</CustomText>
                           </View>

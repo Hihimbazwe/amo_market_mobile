@@ -112,6 +112,25 @@ export const chatService = {
     }
   },
 
+  checkContacts: async (contacts, userId) => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(`${BASE_URL}/api/mobile/chat/users/check-contacts`, {
+        method: 'POST',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ contacts }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error('API failed');
+      return await res.json();
+    } catch (e) {
+      console.warn('API checkContacts failed:', e);
+      return { matched: [] };
+    }
+  },
+
   inviteToChat: async (contact, userId) => {
     try {
       const res = await fetch(`${BASE_URL}/api/mobile/chat/invite`, {

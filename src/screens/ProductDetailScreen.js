@@ -282,17 +282,37 @@ const ProductDetailScreen = ({ route, navigation }) => {
       navigation.navigate('Login');
       return;
     }
+    const sellerId = product.seller.userId || product.seller.id;
     navigation.navigate('ChatDetail', {
       conversation: {
-        id: `new-${product.seller.userId || product.seller.id}`,
+        id: `new-${sellerId}`,
+        participantId: sellerId,
+        participantName: product.seller.name,
+        participantImage: product.seller.image || null,
+        participantColor: '#e67e22',
+        participantInitials: (product.seller.name || 'S').charAt(0).toUpperCase(),
         otherUser: {
-          id: product.seller.userId || product.seller.id,
+          id: sellerId,
           name: product.seller.name,
-          image: product.seller.image
-        }
+          image: product.seller.image,
+        },
+        // Product context — rendered as a pinned reference card in the chat
+        productContext: {
+          id: product.id,
+          title: product.title,
+          price: product.price,
+          image: media[0]?.url || 
+                 routeProduct?.image || 
+                 routeProduct?.imageUrl || 
+                 (routeProduct?.images && routeProduct.images.length > 0 ? routeProduct.images[0] : null) || 
+                 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80',
+          sellerName: product.seller.name,
+          routeProduct: routeProduct,
+        },
       }
     });
   };
+
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

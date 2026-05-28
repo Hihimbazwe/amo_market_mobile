@@ -94,11 +94,18 @@ const SellerInventoryScreen = ({ navigation }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // New states for actions
   const [actionMenuProduct, setActionMenuProduct] = useState(null);
   const [discountModalVisible, setDiscountModalVisible] = useState(false);
-  const [discountInput, setDiscountInput] = useState('');
+  const [discountSaving, setDiscountSaving] = useState(false);
   const [isHotDealMode, setIsHotDealMode] = useState(false);
+  const [dealType, setDealType] = useState('PERCENTAGE'); // "PERCENTAGE", "FIXED", "BOGO"
+  const [discountInput, setDiscountInput] = useState('');
+  const [fixedDiscountInput, setFixedDiscountInput] = useState('');
+  const [bogoBuyInput, setBogoBuyInput] = useState('2');
+  const [bogoGetInput, setBogoGetInput] = useState('1');
+  const [dealTitleInput, setDealTitleInput] = useState('');
+  const [hotDealStartInput, setHotDealStartInput] = useState('');
+  const [hotDealEndInput, setHotDealEndInput] = useState('');
 
   const fetchInventory = async () => {
     if (!user?.id) return;
@@ -323,7 +330,17 @@ const SellerInventoryScreen = ({ navigation }) => {
     } else {
       // Turn ON - open discount modal
       setIsHotDealMode(true);
-      setDiscountInput('10');
+      setDealType(product.discountType || 'PERCENTAGE');
+      setDiscountInput(product.discountPercent ? String(product.discountPercent) : '10');
+      setFixedDiscountInput(product.discountFixedAmount ? String(product.discountFixedAmount) : '');
+      setBogoBuyInput(product.bogoBuyQuantity ? String(product.bogoBuyQuantity) : '2');
+      setBogoGetInput(product.bogoGetQuantity ? String(product.bogoGetQuantity) : '1');
+      setDealTitleInput(product.dealTitle || `${product.category} Deals`);
+      const now = new Date();
+      const end = new Date(now);
+      end.setDate(now.getDate() + 3);
+      setHotDealStartInput(now.toISOString());
+      setHotDealEndInput(end.toISOString());
       setActionMenuProduct(product);
       setDiscountModalVisible(true);
     }
@@ -336,35 +353,60 @@ const SellerInventoryScreen = ({ navigation }) => {
     }
     if (!actionMenuProduct) return;
     const pct = parseInt(discountInput, 10);
-    if (isNaN(pct) || pct < 1 || pct > 90) {
+    const fixedAmount = parseInt(fixedDiscountInput.replace(/\D/g, ''), 10);
+    const bogoBuy = parseInt(bogoBuyInput, 10);
+    const bogoGet = parseInt(bogoGetInput, 10);
+
+    if (dealType === 'PERCENTAGE' && (isNaN(pct) || pct < 1 || pct > 90)) {
       Alert.alert(t('error'), t('invalidDiscountPercent'));
       return;
     }
-    setDiscountModalVisible(false);
-    
+    if (dealType === 'FIXED' && (isNaN(fixedAmount) || fixedAmount < 1)) {
+      Alert.alert(t('error'), 'Invalid fixed discount amount');
+      return;
+    }
+    if (dealType === 'BOGO' && (isNaN(bogoBuy) || bogoBuy < 1 || isNaN(bogoGet) || bogoGet < 1)) {
+      Alert.alert(t('error'), 'Invalid BOGO quantities');
+      return;
+    }
+    if (isHotDealMode && (!hotDealStartInput || !hotDealEndInput)) {
+      Alert.alert(t('error'), 'Start and end dates are required for Hot Deals');
+      return;
+    }
+
+    const payload = {
+      isDiscount: true,
+      discountType: dealType,
+      discountPercent: dealType === 'PERCENTAGE' ? pct : null,
+      discountFixedAmount: dealType === 'FIXED' ? fixedAmount : null,
+      bogoBuyQuantity: dealType === 'BOGO' ? bogoBuy : null,
+      bogoGetQuantity: dealType === 'BOGO' ? bogoGet : null,
+      dealTitle: dealTitleInput.trim() || null,
+    };
+
+    setDiscountSaving(true);
     try {
       if (isHotDealMode) {
-        const now = new Date();
-        const end = new Date();
-        end.setDate(now.getDate() + 3);
-        await productService.updateProduct(user.id, actionMenuProduct.id, { 
-          isHotDeal: true, 
-          isPromotion: true,
-          isDiscount: true,
-          discountPercent: pct,
-          hotDealStartsAt: now.toISOString(),
-          hotDealEndsAt: end.toISOString(),
-          dealTitle: `${actionMenuProduct.category} Deals`
-        });
-        Alert.alert(t('success'), t('hotDealAdded') || 'Hot Deal Enabled');
+        payload.isHotDeal = true;
+        payload.isPromotion = true;
+        payload.hotDealStartsAt = new Date(hotDealStartInput).toISOString();
+        payload.hotDealEndsAt = new Date(hotDealEndInput).toISOString();
+        if (!payload.dealTitle) {
+          payload.dealTitle = `${actionMenuProduct.category} Deals`;
+        }
+        await productService.updateProduct(user.id, actionMenuProduct.id, payload);
+        Alert.alert(t('success'), t('hotDealAdded') || '🔥 Hot Deal Enabled!');
       } else {
-        await productService.updateProduct(user.id, actionMenuProduct.id, { isDiscount: true, discountPercent: pct });
+        await productService.updateProduct(user.id, actionMenuProduct.id, payload);
         Alert.alert(t('success'), t('discountApplied'));
       }
+      setDiscountSaving(false);
+      setDiscountModalVisible(false);
+      setActionMenuProduct(null);
       setIsHotDealMode(false);
       fetchInventory();
     } catch (err) {
-      setIsHotDealMode(false);
+      setDiscountSaving(false);
       Alert.alert(t('error'), err.message || t('failedToApplyDiscount'));
     }
   };
@@ -375,7 +417,14 @@ const SellerInventoryScreen = ({ navigation }) => {
       return;
     }
     try {
-      await productService.updateProduct(user.id, product.id, { isDiscount: false, discountPercent: null });
+      await productService.updateProduct(user.id, product.id, { 
+        isDiscount: false, 
+        discountPercent: null,
+        discountFixedAmount: null,
+        bogoBuyQuantity: null,
+        bogoGetQuantity: null,
+        dealTitle: null
+      });
       Alert.alert(t('success'), t('discountRemoved'));
       fetchInventory();
     } catch (err) {
@@ -736,7 +785,13 @@ const SellerInventoryScreen = ({ navigation }) => {
                 setActionMenuProduct(null);
                 handleRemoveDiscount(p);
               } else {
-                setDiscountInput('10');
+                const p = actionMenuProduct;
+                setDealType(p.discountType || 'PERCENTAGE');
+                setDiscountInput(p.discountPercent ? String(p.discountPercent) : '10');
+                setFixedDiscountInput(p.discountFixedAmount ? String(p.discountFixedAmount) : '');
+                setBogoBuyInput(p.bogoBuyQuantity ? String(p.bogoBuyQuantity) : '2');
+                setBogoGetInput(p.bogoGetQuantity ? String(p.bogoGetQuantity) : '1');
+                setDealTitleInput(p.dealTitle || '');
                 setDiscountModalVisible(true);
               }
             }}>
@@ -769,35 +824,243 @@ const SellerInventoryScreen = ({ navigation }) => {
         onRequestClose={() => { setDiscountModalVisible(false); setActionMenuProduct(null); setIsHotDealMode(false); }}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border, maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
-              <CustomText variant="h3">{isHotDealMode ? t('mark As HotDeal') : t('addDiscount')}</CustomText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {isHotDealMode ? <Flame size={18} color="#EF4444" /> : <Tag size={18} color="#F97316" />}
+                <CustomText variant="h3">{isHotDealMode ? t('mark As HotDeal') : t('addDiscount')}</CustomText>
+              </View>
               <TouchableOpacity onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); setIsHotDealMode(false); }}>
                 <X size={24} color={colors.foreground} />
               </TouchableOpacity>
             </View>
+            <ScrollView style={{ flexGrow: 0 }} showsVerticalScrollIndicator={false}>
             <View style={styles.modalBody}>
-              <CustomText style={styles.modalItemTitle}>{actionMenuProduct?.title}</CustomText>
-              <CustomText variant="caption" style={{ marginBottom: 16 }}>
-                {isHotDealMode ? t('enterDiscountPercent') + ' (1-90)' : t('enterDiscountPercent') + ' (1-90)'}
+              <CustomText variant="caption" style={{ marginBottom: 16, lineHeight: 20 }}>
+                {isHotDealMode
+                  ? "Hot Deal products are featured on the homepage with a 🔥 badge and sell faster."
+                  : "Apply a discount to reduce the product price for all customers."}
               </CustomText>
-              <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
-                <TextInput 
-                  style={[styles.stockInput, { color: colors.foreground }]}
-                  keyboardType="numeric"
-                  value={discountInput}
-                  onChangeText={setDiscountInput}
-                  autoFocus
-                />
+
+              {(() => {
+                const originalPrice = actionMenuProduct?.price || 0;
+                const pct = parseInt(discountInput) || 0;
+                const fixedAmt = parseInt(fixedDiscountInput) || 0;
+                
+                let discountedPrice = originalPrice;
+                if (dealType === 'PERCENTAGE' && pct > 0 && pct <= 100) {
+                  discountedPrice = originalPrice - (originalPrice * pct) / 100;
+                } else if (dealType === 'FIXED') {
+                  discountedPrice = Math.max(0, originalPrice - fixedAmt);
+                }
+
+                return (
+                  <View style={{ backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 16, gap: 6 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <CustomText variant="caption" style={{ color: colors.muted }}>Original Price:</CustomText>
+                      <CustomText style={{ fontWeight: '700', color: colors.muted }}>Rwf {originalPrice.toLocaleString()}</CustomText>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <CustomText style={{ fontWeight: '700', color: colors.foreground }}>{dealType === 'BOGO' ? 'Offer:' : 'New Price:'}</CustomText>
+                      <CustomText style={{ fontWeight: '900', color: '#F97316', fontSize: 16 }}>
+                        {dealType === 'BOGO' ? `Buy ${bogoBuyInput || 0} get ${bogoGetInput || 0} free` : `Rwf ${discountedPrice.toLocaleString()}`}
+                      </CustomText>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Deal Type Selection */}
+              <View style={{ marginBottom: 16 }}>
+                <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Deal Type</CustomText>
+                <View style={styles.dealTypeSelector}>
+                  {['PERCENTAGE', 'FIXED', 'BOGO'].map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[styles.dealTypeBtn, dealType === type ? { backgroundColor: colors.primary + '15', borderColor: colors.primary + '60' } : { backgroundColor: colors.glass, borderColor: colors.border }]}
+                      onPress={() => setDealType(type)}
+                    >
+                      <CustomText style={{ fontSize: 12, fontWeight: '900', color: dealType === type ? colors.primary : colors.muted }}>
+                        {type === 'PERCENTAGE' ? '% Off' : type === 'FIXED' ? 'RWF Off' : 'Buy X Get Y'}
+                      </CustomText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
+
+              {isHotDealMode && (
+                <View style={{ marginBottom: 16 }}>
+                  <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t('dealTitle') || 'Deal Title (Optional)'}</CustomText>
+                  <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                    <TextInput 
+                      style={[styles.stockInput, { color: colors.foreground, textAlign: 'left' }]}
+                      value={dealTitleInput}
+                      onChangeText={setDealTitleInput}
+                      placeholder={`${actionMenuProduct?.category || 'Category'} Deals`}
+                      placeholderTextColor={colors.muted}
+                    />
+                  </View>
+                </View>
+              )}
+
+              {dealType === 'PERCENTAGE' && (
+                <View style={{ marginBottom: 16 }}>
+                  <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t('enter Discount Percent')} (1-90)</CustomText>
+                  <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                    <TextInput 
+                      style={[styles.stockInput, { color: colors.foreground }]}
+                      keyboardType="numeric"
+                      value={discountInput}
+                      onChangeText={setDiscountInput}
+                      autoFocus
+                    />
+                  </View>
+                </View>
+              )}
+
+              {dealType === 'FIXED' && (
+                <View style={{ marginBottom: 16 }}>
+                  <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Discount Amount (RWF)</CustomText>
+                  <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                    <TextInput 
+                      style={[styles.stockInput, { color: colors.foreground }]}
+                      keyboardType="numeric"
+                      value={fixedDiscountInput}
+                      onChangeText={setFixedDiscountInput}
+                      autoFocus
+                    />
+                  </View>
+                </View>
+              )}
+
+              {dealType === 'BOGO' && (
+                <View style={{ marginBottom: 16, flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Buy Qty</CustomText>
+                    <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                      <TextInput 
+                        style={[styles.stockInput, { color: colors.foreground }]}
+                        keyboardType="numeric"
+                        value={bogoBuyInput}
+                        onChangeText={setBogoBuyInput}
+                      />
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Get Free</CustomText>
+                    <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                      <TextInput 
+                        style={[styles.stockInput, { color: colors.foreground }]}
+                        keyboardType="numeric"
+                        value={bogoGetInput}
+                        onChangeText={setBogoGetInput}
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Hot Deal — Start / End dates */}
+              {isHotDealMode && (
+                <View style={{ marginBottom: 16 }}>
+                  <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Flash Sale Duration</CustomText>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                    {[
+                      { label: '1 hour',   hours: 1 },
+                      { label: '6 hours',  hours: 6 },
+                      { label: 'Weekend',  hours: 72 },
+                    ].map((opt) => {
+                      const start = new Date(hotDealStartInput || Date.now());
+                      const endMs = start.getTime() + opt.hours * 60 * 60 * 1000;
+                      const selectedEnd = new Date(hotDealEndInput || 0);
+                      const isActive = Math.abs(selectedEnd.getTime() - endMs) < 60000;
+                      return (
+                        <TouchableOpacity
+                          key={opt.label}
+                          style={[styles.dealTypeBtn, isActive
+                            ? { backgroundColor: colors.primary + '15', borderColor: colors.primary + '60' }
+                            : { backgroundColor: colors.glass, borderColor: colors.border }
+                          ]}
+                          onPress={() => {
+                            const s = new Date();
+                            const e = new Date(s.getTime() + opt.hours * 60 * 60 * 1000);
+                            setHotDealStartInput(s.toISOString());
+                            setHotDealEndInput(e.toISOString());
+                          }}
+                        >
+                          <CustomText style={{ fontSize: 11, fontWeight: '900', color: isActive ? colors.primary : colors.muted }}>{opt.label}</CustomText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Start Date</CustomText>
+                      <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border, height: 44 }]}>
+                        <CustomText style={{ color: colors.foreground, fontSize: 12, fontWeight: '600' }}>
+                          {hotDealStartInput ? new Date(hotDealStartInput).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </CustomText>
+                      </View>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>End Date</CustomText>
+                      <View style={[styles.stockInputBox, { backgroundColor: colors.glass, borderColor: colors.border, height: 44 }]}>
+                        <CustomText style={{ color: colors.foreground, fontSize: 12, fontWeight: '600' }}>
+                          {hotDealEndInput ? new Date(hotDealEndInput).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </CustomText>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Quick % preset buttons */}
+              {dealType === 'PERCENTAGE' && (
+                <View style={{ marginBottom: 16 }}>
+                  <CustomText variant="caption" style={{ fontSize: 10, fontWeight: '900', color: colors.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Quick Options</CustomText>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {[10, 20, 30, 50].map((v) => (
+                      <TouchableOpacity
+                        key={v}
+                        style={[styles.dealTypeBtn, discountInput === String(v)
+                          ? { backgroundColor: colors.primary + '15', borderColor: colors.primary + '60' }
+                          : { backgroundColor: colors.glass, borderColor: colors.border }
+                        ]}
+                        onPress={() => setDiscountInput(String(v))}
+                      >
+                        <CustomText style={{ fontSize: 12, fontWeight: '900', color: discountInput === String(v) ? colors.primary : colors.muted }}>-{v}%</CustomText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
             </View>
+            </ScrollView>
             <View style={styles.modalFooter}>
-              <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn]} onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); setIsHotDealMode(false); }}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.cancelBtn]}
+                disabled={discountSaving}
+                onPress={() => { setDiscountModalVisible(false); setActionMenuProduct(null); setIsHotDealMode(false); }}
+              >
                 <CustomText style={{ fontWeight: '700' }}>{t('cancel')}</CustomText>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleApplyDiscount}>
-                <Save size={18} color="white" />
-                <CustomText style={{ color: 'white', fontWeight: '700', marginLeft: 8 }}>{t('apply')}</CustomText>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.saveBtn, {
+                  backgroundColor: colors.primary,
+                  opacity: discountSaving ? 0.8 : 1
+                }]}
+                onPress={handleApplyDiscount}
+                disabled={discountSaving}
+              >
+                {discountSaving
+                  ? <ActivityIndicator size="small" color="white" />
+                  : <>
+                      <CustomText style={{ color: 'white', fontWeight: '900', fontSize: 14 }}>
+                        {isHotDealMode ? '🔥 Confirm Hot Deal' : 'Apply Discount'}
+                      </CustomText>
+                    </>
+                }
               </TouchableOpacity>
             </View>
           </View>
@@ -968,7 +1231,9 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   stockInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  stockValue: { fontSize: 16, fontWeight: '900' },
+  stockValue: { fontSize: 13, fontWeight: '800' },
+  dealTypeSelector: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  dealTypeBtn: { flex: 1, paddingVertical: 8, borderWidth: 1, borderRadius: 8, alignItems: 'center' },
   editBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   editBtnText: { fontSize: 12, fontWeight: '700', marginLeft: 6 },
 
