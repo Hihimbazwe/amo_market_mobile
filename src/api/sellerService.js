@@ -517,6 +517,49 @@ export const sellerService = {
     }
   },
 
+  getPaymentMethods: async (userId) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/payment-methods`, {
+        method: 'GET',
+        headers: buildHeaders(userId),
+      });
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+      }
+      if (!response.ok) throw new Error(data.error || `Failed to fetch payment methods (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('getPaymentMethods error:', error);
+      throw error;
+    }
+  },
+
+  updatePaymentMethods: async (userId, acceptedPayments) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/seller/payment-methods`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ acceptedPayments }),
+      });
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+      }
+      if (!response.ok) throw new Error(data.error || `Failed to update payment methods (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('updatePaymentMethods error:', error);
+      throw error;
+    }
+  },
+
   updateProfile: async (userId, profileData) => {
     try {
       const response = await fetch(`${BASE_URL}/api/seller/profile`, {

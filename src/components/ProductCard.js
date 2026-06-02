@@ -16,6 +16,8 @@ const ProductCard = ({ product, onPress, hideBadge = false, style }) => {
     toggleWishlist(product.id);
   };
 
+
+
   const imageUrl = product.media && product.media.length > 0 
     ? product.media[0].url 
     : 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80';
@@ -64,6 +66,8 @@ const ProductCard = ({ product, onPress, hideBadge = false, style }) => {
             fill={isFavorite ? '#ef4444' : 'transparent'} 
           />
         </TouchableOpacity>
+
+
       </View>
       
       <View style={styles.info}>
@@ -76,6 +80,32 @@ const ProductCard = ({ product, onPress, hideBadge = false, style }) => {
              Rwf {(product.price || 0).toLocaleString()}
           </CustomText>
         </View>
+
+        {/* Real Rating Row */}
+        {(() => {
+          const avg = product.avgRating || 0;
+          const count = product.reviewCount || product._count?.reviews || 0;
+          if (avg <= 0 && count === 0) return null;
+          const displayAvg = avg > 0 ? avg : 0;
+          return (
+            <View style={styles.ratingRow}>
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star
+                    key={s}
+                    size={10}
+                    color="#FBBF24"
+                    fill={s <= Math.round(displayAvg) ? '#FBBF24' : 'none'}
+                  />
+                ))}
+              </View>
+              <CustomText style={[styles.ratingText, { color: colors.muted }]}>
+                {displayAvg > 0 ? displayAvg.toFixed(1) : ''}
+                {count > 0 ? ` (${count})` : ''}
+              </CustomText>
+            </View>
+          );
+        })()}
  
         <View style={styles.locationRow}>
           <MapPin size={10} color={colors.muted} />
@@ -138,6 +168,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
+
   info: {
     padding: 12,
   },
@@ -165,6 +196,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     flex: 1,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 4,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 1,
+  },
+  ratingText: {
+    fontSize: 9,
+    fontWeight: '600',
   },
 });
 

@@ -13,15 +13,20 @@ import {
   TouchableWithoutFeedback,
   Animated,
   Image,
+  Linking,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Contacts from 'expo-contacts';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, MoreVertical, Image as ImageIcon, CornerUpLeft, ShoppingBag, ExternalLink, Tag } from 'lucide-react-native';
+import { ArrowLeft, Send, MoreVertical, Image as ImageIcon, CornerUpLeft, ShoppingBag, ExternalLink, Tag, Paperclip, FileText, UserPlus, X, Phone, Video } from 'lucide-react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useCall } from '../../contexts/CallContext';
 import { chatService } from '../../api/chatService';
 import { productService } from '../../api/productService';
 import { useNotifications } from '../../context/NotificationContext';
@@ -57,6 +62,19 @@ function formatMsgTime(date) {
   const d = new Date(date);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+const ATTACHMENT_PREFIX = '__AMO_ATTACHMENT__:';
+
+const parseAttachmentMessage = (text) => {
+  if (!text || !text.startsWith(ATTACHMENT_PREFIX)) return null;
+  try {
+    return JSON.parse(text.slice(ATTACHMENT_PREFIX.length));
+  } catch {
+    return null;
+  }
+};
+
+const buildAttachmentMessage = (payload) => `${ATTACHMENT_PREFIX}${JSON.stringify(payload)}`;
 
 const formatDateSeparator = (date) => {
   if (!date) return '';
@@ -116,6 +134,11 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
   const isProductMsg = msg.text && msg.text.startsWith('🛍️ Product:');
   let productInfo = null;
   let cleanMessageText = msg.text;
+  const attachment = parseAttachmentMessage(msg.text);
+
+  if (attachment) {
+    cleanMessageText = attachment.caption || '';
+  }
 
   if (isProductMsg) {
     try {
@@ -237,9 +260,53 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
               isMe && isSameSenderAsPrev && { borderTopRightRadius: 4 },
               !isMe && isSameSenderAsNext && { borderBottomLeftRadius: 16 },
               !isMe && isSameSenderAsPrev && { borderTopLeftRadius: 4 },
-              productInfo && { padding: 0, overflow: 'hidden' }
+              (productInfo || attachment) && { padding: 0, overflow: 'hidden' }
             ]}
           >
+            {attachment && (
+              <View style={[
+                styles.attachmentCard,
+                { backgroundColor: isMe ? 'rgba(0,0,0,0.12)' : colors.background, borderColor: isMe ? 'rgba(255,255,255,0.2)' : colors.glassBorder }
+              ]}>
+                {attachment.type === 'image' && attachment.uri ? (
+                  <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} resizeMode="cover" />
+                ) : attachment.type === 'contact' ? (
+                  <View style={styles.attachmentRow}>
+                    <View style={[styles.attachmentIcon, { backgroundColor: isMe ? 'rgba(255,255,255,0.14)' : colors.primary + '14' }]}>
+                      <UserPlus size={20} color={isMe ? '#fff' : colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <CustomText style={[styles.attachmentTitle, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={1}>
+                        {attachment.name || 'Contact'}
+                      </CustomText>
+                      <CustomText style={[styles.attachmentMeta, { color: isMe ? 'rgba(255,255,255,0.75)' : colors.muted }]} numberOfLines={1}>
+                        {attachment.phone || attachment.email || 'Shared contact'}
+                      </CustomText>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.attachmentRow}
+                    activeOpacity={attachment.url ? 0.75 : 1}
+                    onPress={() => attachment.url && Linking.openURL(attachment.url).catch(() => Alert.alert('Could not open document link'))}
+                  >
+                    <View style={[styles.attachmentIcon, { backgroundColor: isMe ? 'rgba(255,255,255,0.14)' : colors.primary + '14' }]}>
+                      <FileText size={20} color={isMe ? '#fff' : colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <CustomText style={[styles.attachmentTitle, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={1}>
+                        {attachment.name || 'Document'}
+                      </CustomText>
+                      <CustomText style={[styles.attachmentMeta, { color: isMe ? 'rgba(255,255,255,0.75)' : colors.muted }]} numberOfLines={1}>
+                        {attachment.url || 'Document reference'}
+                      </CustomText>
+                    </View>
+                    {attachment.url ? <ExternalLink size={14} color={isMe ? 'rgba(255,255,255,0.75)' : colors.muted} /> : null}
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
             {productInfo && (
               <TouchableOpacity
                 onPress={() => onNavigateProduct && onNavigateProduct(productInfo.id)}
@@ -281,7 +348,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
               onLongPress={handleLongPress}
               delayLongPress={250}
               style={
-                productInfo 
+                productInfo || attachment
                   ? { paddingHorizontal: 12, paddingVertical: 10 }
                   : undefined
               }
@@ -474,6 +541,7 @@ const productCardStyles = {
 export default function ChatDetailScreen() {
   const { colors } = useTheme();
   const { user, isSellerDeactivated } = useAuth();
+  const { startCall } = useCall();
   const { refreshUnread } = useNotifications();
   const navigation = useNavigation();
   const route = useRoute();
@@ -496,6 +564,14 @@ export default function ChatDetailScreen() {
   const [isHidden, setIsHidden] = useState(true); // Don't show status until first fetch to avoid flicker
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [attachmentVisible, setAttachmentVisible] = useState(false);
+  const [contactPickerVisible, setContactPickerVisible] = useState(false);
+  const [attachmentContacts, setAttachmentContacts] = useState([]);
+  const [attachmentContactSearch, setAttachmentContactSearch] = useState('');
+  const [loadingAttachmentContacts, setLoadingAttachmentContacts] = useState(false);
+  const [imageCaptionVisible, setImageCaptionVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imageCaption, setImageCaption] = useState('');
 
   const navigateToProductDetails = async (productId, routeProduct = null) => {
     if (routeProduct) {
@@ -766,9 +842,11 @@ export default function ChatDetailScreen() {
           const data = await chatService.getMessages(cid, user.id);
           if (data) {
             // Only update if lengths diff or last message diff to avoid over-rendering janks
+            // Preserve temp messages (IDs starting with 'm-') during polling to prevent flickering
             setMessages(prev => {
+               const tempMessages = prev.filter(m => m.id && m.id.startsWith('m-'));
                if (prev.length !== data.length || (data.length > 0 && prev[prev.length-1]?.id !== data[data.length-1]?.id)) {
-                 return data;
+                 return [...data, ...tempMessages];
                }
                return prev;
             });
@@ -838,6 +916,175 @@ export default function ChatDetailScreen() {
     if (listRef.current && messages.length > 0) {
       listRef.current.scrollToEnd({ animated: true });
     }
+  };
+
+  const sendAttachmentMessage = async (payload) => {
+    if (isSellerDeactivated) {
+      Alert.alert('Account Restricted', 'Your seller account is deactivated. You cannot send messages until your account is reactivated.');
+      return;
+    }
+    if (!user?.id) return;
+
+    const finalMsgText = buildAttachmentMessage(payload);
+    const tempId = `m-${Date.now()}`;
+    const myMsg = {
+      id: tempId,
+      text: finalMsgText,
+      senderId: 'me',
+      timestamp: new Date(),
+      replyTo: replyingTo ? {
+        id: replyingTo.id,
+        text: replyingTo.text,
+        senderName: replyingTo.senderId === 'me' ? 'You' : (replyingTo.senderName || 'Other')
+      } : null
+    };
+
+    const rId = replyingTo?.id;
+    setReplyingTo(null);
+    setMessages((prev) => [...prev, myMsg]);
+
+    let cid = conversation.id;
+    if (cid.startsWith('new-') || cid.startsWith('temp_')) {
+      try {
+        const pId = cid.startsWith('new-') ? cid.replace('new-', '') : cid.replace('temp_', '');
+        cid = await chatService.createConversation(pId, user.id);
+        navigation.setParams({ conversation: { ...conversation, id: cid, productContext: null } });
+      } catch (e) {
+        setMessages((prev) => prev.filter(m => m.id !== tempId));
+        Alert.alert('Error', 'Could not create conversation.');
+        return;
+      }
+    }
+
+    try {
+      const realMsg = await chatService.sendMessage(cid, user.id, finalMsgText, null, rId);
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...realMsg, replyTo: myMsg.replyTo || realMsg.replyTo } : m)));
+    } catch (e) {
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
+      Alert.alert('Attachment Failed', e.message || 'Failed to send attachment.');
+    }
+  };
+
+  const handlePickImageAttachment = async () => {
+    setAttachmentVisible(false);
+    Alert.alert(
+      'Select Image',
+      'Choose how you want to add an image',
+      [
+        {
+          text: 'Camera',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+              return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: false,
+              quality: 0.2,
+              base64: true,
+            });
+
+            if (!result.canceled && result.assets?.[0]) {
+              const asset = result.assets[0];
+              const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+              setSelectedImage(uri);
+              setImageCaption('');
+              setImageCaptionVisible(true);
+            }
+          }
+        },
+        {
+          text: 'Gallery',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Required', 'Gallery access is needed to send images.');
+              return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: false,
+              quality: 0.2,
+              base64: true,
+            });
+
+            if (!result.canceled && result.assets?.[0]) {
+              const asset = result.assets[0];
+              const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+              setSelectedImage(uri);
+              setImageCaption('');
+              setImageCaptionVisible(true);
+            }
+          }
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const handleOpenContactAttachmentPicker = async () => {
+    setAttachmentVisible(false);
+    setLoadingAttachmentContacts(true);
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Contacts permission is needed to send contacts.');
+        return;
+      }
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
+      });
+      const formatted = (data || []).map(c => {
+        const phone = c.phoneNumbers?.find(p => p.number)?.number;
+        const email = c.emails?.find(e => e.email)?.email;
+        return { id: c.id, name: c.name || 'Unknown Contact', phone, email };
+      }).filter(c => c.phone || c.email).sort((a, b) => a.name.localeCompare(b.name));
+      setAttachmentContacts(formatted);
+      setAttachmentContactSearch('');
+      setContactPickerVisible(true);
+    } catch (e) {
+      Alert.alert('Contacts Error', e.message || 'Could not load contacts.');
+    } finally {
+      setLoadingAttachmentContacts(false);
+    }
+  };
+
+  const handlePickDocumentAttachment = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        setAttachmentVisible(false);
+        return;
+      }
+
+      const asset = result.assets[0];
+      const documentName = asset.name || 'Document';
+      const documentUri = asset.uri;
+
+      setAttachmentVisible(false);
+      // For now, we'll send the document as a reference
+      // In a production app, you would upload the file to a server and get a URL
+      await sendAttachmentMessage({ type: 'document', name: documentName, url: documentUri });
+    } catch (e) {
+      setAttachmentVisible(false);
+      Alert.alert('Document Error', e.message || 'Could not pick document.');
+    }
+  };
+
+  const handleSendImageWithCaption = async () => {
+    if (!selectedImage) return;
+    setImageCaptionVisible(false);
+    await sendAttachmentMessage({ type: 'image', uri: selectedImage, caption: imageCaption });
+    setSelectedImage(null);
+    setImageCaption('');
   };
 
   const handleSend = async () => {
@@ -986,9 +1233,17 @@ export default function ChatDetailScreen() {
           )}
         </View>
 
-        <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)} activeOpacity={0.7}>
-          <MoreVertical color={colors.muted} size={20} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.headerAction, { marginRight: 4 }]} onPress={() => startCall(participantId, conversation?.participantName, false)} activeOpacity={0.7}>
+            <Phone color={colors.primary} size={20} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.headerAction, { marginRight: 4 }]} onPress={() => startCall(participantId, conversation?.participantName, true)} activeOpacity={0.7}>
+            <Video color={colors.primary} size={20} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)} activeOpacity={0.7}>
+            <MoreVertical color={colors.muted} size={20} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Options Modal */}
@@ -1149,6 +1404,13 @@ export default function ChatDetailScreen() {
             </View>
           )}
           <View style={styles.inputBar}>
+            <TouchableOpacity
+              onPress={() => setAttachmentVisible(true)}
+              style={[styles.attachBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+              activeOpacity={0.8}
+            >
+              <Paperclip color={colors.primary} size={20} />
+            </TouchableOpacity>
             <View style={[styles.inputWrap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
               {editingMessageId && (
                 <CustomText style={{ fontSize: 10, color: colors.primary, marginBottom: 2, fontWeight: '700' }}>
@@ -1204,6 +1466,103 @@ export default function ChatDetailScreen() {
       </KeyboardAvoidingView>
 
       {/* ── Report Modal ── */}
+      <Modal visible={attachmentVisible} transparent animationType="fade" onRequestClose={() => setAttachmentVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setAttachmentVisible(false)}>
+          <View style={styles.attachmentOverlay}>
+            <View style={[styles.attachmentSheet, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+              <TouchableOpacity style={styles.attachmentOption} onPress={handlePickImageAttachment}>
+                <View style={[styles.attachmentOptionIcon, { backgroundColor: colors.primary + '16' }]}>
+                  <ImageIcon color={colors.primary} size={20} />
+                </View>
+                <CustomText style={[styles.attachmentOptionText, { color: colors.foreground }]}>Image</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.attachmentOption} onPress={handlePickDocumentAttachment}>
+                <View style={[styles.attachmentOptionIcon, { backgroundColor: colors.primary + '16' }]}>
+                  <FileText color={colors.primary} size={20} />
+                </View>
+                <CustomText style={[styles.attachmentOptionText, { color: colors.foreground }]}>Document</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.attachmentOption} onPress={handleOpenContactAttachmentPicker}>
+                <View style={[styles.attachmentOptionIcon, { backgroundColor: colors.primary + '16' }]}>
+                  <UserPlus color={colors.primary} size={20} />
+                </View>
+                <CustomText style={[styles.attachmentOptionText, { color: colors.foreground }]}>Contact</CustomText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal visible={contactPickerVisible} transparent animationType="slide" onRequestClose={() => setContactPickerVisible(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerContent, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+            <View style={styles.pickerHeader}>
+              <CustomText style={[styles.pickerTitle, { color: colors.foreground }]}>Send Contact</CustomText>
+              <TouchableOpacity onPress={() => setContactPickerVisible(false)} style={styles.pickerCloseBtn}>
+                <X color={colors.foreground} size={20} />
+              </TouchableOpacity>
+            </View>
+            <TextInput value={attachmentContactSearch} onChangeText={setAttachmentContactSearch} placeholder="Search contacts..." placeholderTextColor={colors.muted} style={[styles.contactSearchInput, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.glassBorder }]} />
+            {loadingAttachmentContacts ? <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} /> : (
+              <FlatList
+                data={attachmentContacts.filter(c => c.name.toLowerCase().includes(attachmentContactSearch.toLowerCase()) || (c.phone || '').includes(attachmentContactSearch) || (c.email || '').toLowerCase().includes(attachmentContactSearch.toLowerCase()))}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={[styles.contactPickRow, { borderBottomColor: colors.glassBorder }]} onPress={() => { setContactPickerVisible(false); sendAttachmentMessage({ type: 'contact', name: item.name, phone: item.phone, email: item.email }); }}>
+                    <View style={[styles.attachmentIcon, { backgroundColor: colors.primary + '14' }]}>
+                      <UserPlus size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <CustomText style={[styles.attachmentTitle, { color: colors.foreground }]}>{item.name}</CustomText>
+                      <CustomText style={[styles.attachmentMeta, { color: colors.muted }]}>{item.phone || item.email}</CustomText>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={imageCaptionVisible} transparent animationType="fade" onRequestClose={() => { setImageCaptionVisible(false); setSelectedImage(null); setImageCaption(''); }}>
+        <TouchableWithoutFeedback onPress={() => { setImageCaptionVisible(false); setSelectedImage(null); setImageCaption(''); }}>
+          <View style={styles.pickerOverlay}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.pickerContent, { backgroundColor: colors.card, borderColor: colors.glassBorder, height: 'auto', paddingBottom: 24 }]}>
+                  <View style={styles.pickerHeader}>
+                    <CustomText style={[styles.pickerTitle, { color: colors.foreground }]}>Add Caption</CustomText>
+                    <TouchableOpacity onPress={() => { setImageCaptionVisible(false); setSelectedImage(null); setImageCaption(''); }} style={styles.pickerCloseBtn}>
+                      <X color={colors.foreground} size={20} />
+                    </TouchableOpacity>
+                  </View>
+                  {selectedImage && (
+                    <Image source={{ uri: selectedImage }} style={styles.captionPreviewImage} resizeMode="cover" />
+                  )}
+                  <TextInput
+                    value={imageCaption}
+                    onChangeText={setImageCaption}
+                    placeholder="Add a caption... (optional)"
+                    placeholderTextColor={colors.muted}
+                    style={[styles.contactSearchInput, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.glassBorder, marginTop: 12, marginBottom: 12 }]}
+                    multiline
+                    maxLength={500}
+                    textAlignVertical="top"
+                  />
+                  <TouchableOpacity
+                    onPress={handleSendImageWithCaption}
+                    style={[styles.sendImageBtn, { backgroundColor: colors.primary }]}
+                    activeOpacity={0.8}
+                  >
+                    <CustomText style={[styles.sendImageBtnText, { color: '#fff' }]}>Send Image</CustomText>
+                  </TouchableOpacity>
+                </View>
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <Modal
         visible={reportVisible}
         transparent
@@ -1459,12 +1818,139 @@ const styles = StyleSheet.create({
     maxHeight: 120,
   },
   input: { fontSize: 15, lineHeight: 20 },
+  attachBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sendBtn: {
     width: 46,
     height: 46,
     borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  attachmentCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    margin: 8,
+    overflow: 'hidden',
+  },
+  attachmentImage: {
+    width: 220,
+    height: 180,
+    borderRadius: 12,
+  },
+  attachmentRow: {
+    minWidth: 220,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+  },
+  attachmentIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  attachmentMeta: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  attachmentOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+    padding: 16,
+    paddingBottom: 120,
+  },
+  attachmentSheet: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  attachmentOption: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 8,
+  },
+  attachmentOptionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentOptionText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  pickerContent: {
+    height: '82%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  pickerCloseBtn: {
+    padding: 6,
+  },
+  contactSearchInput: {
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  contactPickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  captionPreviewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  sendImageBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendImageBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 
   // Report Modal

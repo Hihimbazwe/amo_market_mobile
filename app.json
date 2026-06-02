@@ -9,9 +9,9 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#030712"
     },
     "ios": {
       "supportsTablet": true
@@ -20,12 +20,12 @@
       "package": "com.ihyacinthe.amo_mobile_market",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#030712"
       },
       "edgeToEdgeEnabled": true
     },
     "notification": {
-      "icon": "./assets/logo.png",
+      "icon": "./assets/icon.png",
       "color": "#e67e22"
     },
     "web": {

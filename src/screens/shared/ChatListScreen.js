@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Contacts from 'expo-contacts';
-import { Menu, Search, MessageCircle, Plus, Archive, Trash2, Pin, PinOff, Lock, Users, X } from 'lucide-react-native';
+import { Menu, Search, MessageCircle, Plus, Archive, Trash2, Pin, PinOff, Lock, Users, X, Settings, Radio, Megaphone } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
@@ -252,6 +252,12 @@ export default function ChatListScreen() {
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [filterType, setFilterType] = useState('all'); // 'all' | 'unread' | 'archived' | 'locked'
   const [loading, setLoading] = useState(true);
+  const [localConversations, setLocalConversations] = useState([]);
+  const [createMenuVisible, setCreateMenuVisible] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [createType, setCreateType] = useState('channel');
+  const [createTitle, setCreateTitle] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
   const searchRequestRef = useRef(0);
 
   // Try to grab whichever drawer context is available
@@ -279,7 +285,7 @@ export default function ChatListScreen() {
       chatService.getStatuses(user?.id, true) // Pass userId for prioritization
     ]).then(([convData, statusData]) => {
       // Sort pinned to top dynamically
-      const sorted = convData.sort((a, b) => {
+      const sorted = [...localConversations, ...convData].sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
         return new Date(b.time) - new Date(a.time);
@@ -305,7 +311,7 @@ export default function ChatListScreen() {
       console.warn('API load failed:', err);
       setLoading(false);
     });
-  }, [user?.id, filterType, search]);
+  }, [user?.id, filterType, search, localConversations]);
 
   useFocusEffect(
     useCallback(() => {
@@ -408,7 +414,70 @@ export default function ChatListScreen() {
     }
   };
 
+  const openChatSettings = () => {
+    Alert.alert(
+      'Chat Settings',
+      'Manage how conversations are shown on this device.',
+      [
+        { text: filterType === 'archived' ? 'Show All Chats' : 'Show Archived', onPress: () => setFilterType(filterType === 'archived' ? 'all' : 'archived') },
+        { text: filterType === 'unread' ? 'Show All Chats' : 'Show Unread', onPress: () => setFilterType(filterType === 'unread' ? 'all' : 'unread') },
+        { text: 'Locked Chats', onPress: handleLockedTabPress },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const openCreateModal = (type) => {
+    setCreateMenuVisible(false);
+    setCreateType(type);
+    setCreateTitle('');
+    setCreateDescription('');
+    setCreateModalVisible(true);
+  };
+
+  const handleCreateSpace = () => {
+    const title = createTitle.trim();
+    if (!title) {
+      Alert.alert('Name Required', `Please enter a ${createType} name.`);
+      return;
+    }
+
+    const config = {
+      channel: { prefix: 'Channel', icon: '#0ea5e9', last: 'Channel created' },
+      group: { prefix: 'Group', icon: '#22c55e', last: 'Group created' },
+      ad: { prefix: 'Ad', icon: '#f59e0b', last: 'Advertisement draft created' },
+    }[createType];
+
+    const conversation = {
+      id: `local-${createType}-${Date.now()}`,
+      participantId: `local-${createType}-${Date.now()}`,
+      participantName: `${config.prefix}: ${title}`,
+      participantColor: config.icon,
+      participantInitials: createType === 'ad' ? 'AD' : title.split(' ').filter(Boolean).map(p => p[0]).join('').slice(0, 2).toUpperCase(),
+      participantImage: null,
+      lastMessage: createDescription.trim() || config.last,
+      time: new Date(),
+      unreadCount: 0,
+      isOnline: false,
+      isPinned: true,
+      isArchived: false,
+      hasDeleted: false,
+      isHidden: false,
+      isLocked: false,
+      isBlockedByMe: false,
+      isLocalSpace: true,
+      spaceType: createType,
+    };
+
+    setLocalConversations(prev => [conversation, ...prev]);
+    setCreateModalVisible(false);
+  };
+
   const handleOpen = async (conv) => {
+    if (conv.isLocalSpace) {
+      navigation.navigate('ChatDetail', { conversation: conv });
+      return;
+    }
     if (conv.isLocked) {
       navigation.navigate('ChatDetail', { conversation: conv, authenticated: true });
     } else {
@@ -502,13 +571,19 @@ export default function ChatListScreen() {
       }
 
       const { data } = await Contacts.getContactsAsync({
-        fields: [
-          Contacts.Fields.Name,
-          Contacts.Fields.PhoneNumbers,
-          Contacts.Fields.Emails,
-        ],
-        pageSize: 2000,
-      });
+  fields: [
+    Contacts.Fields.Name,
+    Contacts.Fields.PhoneNumbers,
+    Contacts.Fields.Emails,
+    Contacts.Fields.FirstName,
+    Contacts.Fields.LastName,
+  ],
+});
+
+// 👇 Add these two lines right here
+console.log('📱 Total contacts from device:', data?.length);
+console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
+
 
       if (!data || data.length === 0) {
         Alert.alert('No Contacts', 'No contacts found on your device.');
@@ -858,14 +933,28 @@ export default function ChatListScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={toggleDrawer} style={styles.headerIconBtn}>
-          <Menu color={colors.foreground} size={24} />
-        </TouchableOpacity>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <CustomText style={[styles.headerTitle, { color: colors.foreground }]}>Messages</CustomText>
-        </View>
-        <View style={{ width: 40 }} />
-      </View>
+  <TouchableOpacity onPress={toggleDrawer} style={styles.headerIconBtn}>
+    <Menu color={colors.foreground} size={24} />
+  </TouchableOpacity>
+  <View style={{ flex: 1, alignItems: 'center' }}>
+    <CustomText style={[styles.headerTitle, { color: colors.foreground }]}>Messages</CustomText>
+  </View>
+ <TouchableOpacity
+    onPress={() => {
+      setInviteVisible(true);
+    }}
+    style={[styles.headerIconBtn, {
+      backgroundColor: '#e67e22',
+      borderRadius: 20,
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    }]}
+  >
+    <Plus color="#ffffff" size={20} />
+  </TouchableOpacity>
+</View>
 
       {/* Search Bar & Filters */}
       <View style={styles.topFilterSection}>
@@ -911,6 +1000,12 @@ export default function ChatListScreen() {
             onPress={handleLockedTabPress}
           >
             <CustomText style={[styles.pillText, { color: filterType === 'locked' ? '#fff' : colors.muted }]}>Locked</CustomText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.settingsPill, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+            onPress={openChatSettings}
+          >
+            <Settings color={colors.muted} size={17} />
           </TouchableOpacity>
         </ScrollView>
       </View>

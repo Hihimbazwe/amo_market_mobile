@@ -327,5 +327,36 @@ export const productService = {
       console.error('postComment error:', error);
       throw error;
     }
-  }
+  },
+
+  // Report a product/seller as a scam.
+  // Uses the mobile-specific endpoint that authenticates via x-user-id header.
+  reportSeller: async (userId, productId, { reason, comment, isAnonymous = false }) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/mobile/products/${productId}/report`, {
+        method: 'POST',
+        headers: {
+          ...commonHeaders,
+          'x-user-id': userId,
+        },
+        body: JSON.stringify({ reason, comment, isAnonymous }),
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid server response: ${text.slice(0, 100)}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to submit report (${response.status})`);
+      }
+      return data;
+    } catch (error) {
+      console.error('reportSeller error:', error);
+      throw error;
+    }
+  },
 };

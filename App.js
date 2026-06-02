@@ -49,6 +49,9 @@ import { BuyerDrawerContext } from './src/context/BuyerDrawerContext';
 import { SellerDrawerContext } from './src/context/SellerDrawerContext';
 import { CourierDrawerContext } from './src/context/CourierDrawerContext';
 import { AgentDrawerContext } from './src/context/AgentDrawerContext';
+
+import { CallProvider } from './src/contexts/CallContext';
+import CallScreen from './src/screens/shared/CallScreen';
 // Network Performance Logger
 const originalFetch = global.fetch;
 global.fetch = async (...args) => {
@@ -398,7 +401,10 @@ export default function App() {
                 <CartProvider>
                   <WishlistProvider>
                     <SafeAreaProvider>
-                      <RootNavigator />
+                      <CallProvider>
+                        <RootNavigator />
+                        <CallScreen />
+                      </CallProvider>
                     </SafeAreaProvider>
                   </WishlistProvider>
                 </CartProvider>

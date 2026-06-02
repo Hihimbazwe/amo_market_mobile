@@ -109,7 +109,7 @@ const SellerStoreScreen = ({ route, navigation }) => {
             ) : (
               <View style={[styles.avatarPlaceholderInner, { backgroundColor: colors.primary + '20' }]}>
                 <CustomText style={[styles.initials, { color: colors.primary }]}>
-                  {(sellerName || seller?.user?.name || 'S')[0].toUpperCase()}
+                  {(seller?.locationName || seller?.storeName || sellerName || seller?.user?.name || 'S')[0].toUpperCase()}
                 </CustomText>
               </View>
             )}
@@ -123,7 +123,7 @@ const SellerStoreScreen = ({ route, navigation }) => {
 
         <View style={styles.storeNameSection}>
           <CustomText variant="h1" style={styles.storeName}>
-            {sellerName || seller?.user?.name || 'Seller Store'}
+            {seller?.locationName || seller?.storeName || sellerName || seller?.user?.name || 'Seller Store'}
           </CustomText>
           <View style={styles.locationTag}>
             <MapPin size={12} color={colors.primary} />

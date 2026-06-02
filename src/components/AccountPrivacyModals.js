@@ -17,20 +17,20 @@ const OPTIONS = [
     title: 'Disable Selling',
     desc: 'Hide your listings and block marketplace actions. Chat stays active.',
   },
-  {
-    key: 'chat',
-    icon: MessageCircle,
-    color: '#3B82F6',
-    title: 'Disable Chat',
-    desc: 'Restrict all messaging. Selling features remain fully functional.',
-  },
-  {
-    key: 'both',
-    icon: XCircle,
-    color: '#EF4444',
-    title: 'Disable Selling & Chat',
-    desc: 'Restrict marketplace selling and all messaging at the same time.',
-  },
+  // {
+  //   key: 'chat',
+  //   icon: MessageCircle,
+  //   color: '#3B82F6',
+  //   title: 'Disable Chat',
+  //   desc: 'Restrict all messaging. Selling features remain fully functional.',
+  // },
+  // {
+  //   key: 'both',
+  //   icon: XCircle,
+  //   color: '#EF4444',
+  //   title: 'Disable Selling & Chat',
+  //   desc: 'Restrict marketplace selling and all messaging at the same time.',
+  // },
 ];
 
 const AccountPrivacyModals = ({
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
   },
   sheet: {
     borderTopLeftRadius: 28,

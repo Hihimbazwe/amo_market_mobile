@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Switch, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { Menu, Bell, Lock, Shield, Globe, Moon, User, ChevronRight, XCircle, ShieldCheck, CreditCard } from 'lucide-react-native';
+import { Menu, Bell, Lock, Shield, Moon, User, ChevronRight, XCircle, ShieldCheck, CreditCard, Smartphone, Banknote } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
@@ -11,10 +11,18 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../api/authService';
 import { chatService } from '../../api/chatService';
+import { sellerService } from '../../api/sellerService';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../context/NotificationContext';
 import AccountPrivacyModals from '../../components/AccountPrivacyModals';
 import DeactivationBanner from '../../components/DeactivationBanner';
+
+const PAYMENT_METHODS = [
+  { id: 'MTN_MOMO', label: 'MTN MoMo', icon: Smartphone },
+  { id: 'AIRTEL_MONEY', label: 'Airtel Money', icon: Smartphone },
+  { id: 'CARD', label: 'Card', icon: CreditCard },
+  { id: 'CASH_ON_DELIVERY', label: 'Cash', icon: Banknote },
+];
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -50,6 +58,9 @@ const SellerSettingsScreen = () => {
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showPaymentsModal, setShowPaymentsModal] = useState(false);
+  const [acceptedPayments, setAcceptedPayments] = useState(['MTN_MOMO', 'AIRTEL_MONEY', 'CARD', 'CASH_ON_DELIVERY']);
+  const [savingPayments, setSavingPayments] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -57,8 +68,43 @@ const SellerSettingsScreen = () => {
         setHideAvailability(res.hideAvailability);
         setLoadingPrivacy(false);
       });
+      sellerService.getPaymentMethods(user.id)
+        .then(res => setAcceptedPayments(res.acceptedPayments?.length ? res.acceptedPayments : ['MTN_MOMO', 'AIRTEL_MONEY', 'CARD', 'CASH_ON_DELIVERY']))
+        .catch(err => console.log('[SellerSettings] Payment methods error:', err));
     }
   }, [user?.id]);
+
+  const selectedPaymentLabel = PAYMENT_METHODS
+    .filter(method => acceptedPayments.includes(method.id))
+    .map(method => method.label)
+    .join(', ');
+
+  const togglePaymentMethod = (methodId) => {
+    setAcceptedPayments(current => {
+      if (current.includes(methodId)) {
+        return current.length === 1 ? current : current.filter(id => id !== methodId);
+      }
+      return [...current, methodId];
+    });
+  };
+
+  const savePaymentMethods = async () => {
+    if (!acceptedPayments.length) {
+      Alert.alert(t('error'), 'Select at least one payment method.');
+      return;
+    }
+    setSavingPayments(true);
+    try {
+      const updated = await sellerService.updatePaymentMethods(user.id, acceptedPayments);
+      setAcceptedPayments(updated.acceptedPayments || acceptedPayments);
+      setShowPaymentsModal(false);
+      Alert.alert(t('success'), 'Payment methods updated successfully.');
+    } catch (error) {
+      Alert.alert(t('error'), error.message || 'Failed to update payment methods.');
+    } finally {
+      setSavingPayments(false);
+    }
+  };
 
   const toggleAvailability = async () => {
     const newValue = !hideAvailability;
@@ -161,6 +207,21 @@ const SellerSettingsScreen = () => {
               </View>
               <ChevronRight color={colors.muted} size={18} />
             </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <TouchableOpacity style={styles.navRow} onPress={() => setShowPaymentsModal(true)} activeOpacity={0.7}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
+                <CreditCard color={colors.muted} size={20} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>Payment Method</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]} numberOfLines={1}>
+                  {selectedPaymentLabel || 'Choose accepted methods'}
+                </CustomText>
+              </View>
+              <ChevronRight color={colors.muted} size={18} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -202,7 +263,7 @@ const SellerSettingsScreen = () => {
             onPress={() => setShowDeactivateModal(true)}
           >
              <CustomText style={[styles.deactivateBtnText, isSellerDeactivated && { color: colors.primary }]}>
-               {'Manage Features'}
+               {'Disable Selling'}
              </CustomText>
           </TouchableOpacity>
           
@@ -282,6 +343,59 @@ const SellerSettingsScreen = () => {
         setShowDeleteModal={setShowDeleteModal}
       />
 
+      <Modal
+        visible={showPaymentsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentsModal(false)}
+      >
+        <View style={[styles.modalOverlay, styles.paymentModalOverlay]}>
+          <View style={[styles.paymentModalContent, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <CustomText variant="h2">Payment Method</CustomText>
+              <TouchableOpacity onPress={() => setShowPaymentsModal(false)}>
+                <XCircle color={colors.muted} size={24} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.paymentOptions}>
+              {PAYMENT_METHODS.map((method) => {
+                const Icon = method.icon;
+                const selected = acceptedPayments.includes(method.id);
+                return (
+                  <View
+                    key={method.id}
+                    style={[
+                      styles.paymentOption,
+                      { borderColor: colors.border, backgroundColor: colors.glass }
+                    ]}
+                  >
+                    <Icon color={selected ? colors.foreground : colors.muted} size={20} />
+                    <CustomText style={[styles.paymentOptionText, { color: colors.foreground }]}>
+                      {method.label}
+                    </CustomText>
+                    <Switch
+                      value={selected}
+                      onValueChange={() => togglePaymentMethod(method.id)}
+                      trackColor={{ false: colors.border, true: '#10B981' }}
+                      thumbColor="white"
+                      style={styles.paymentToggle}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+
+            <CustomButton
+              title={savingPayments ? 'Saving...' : 'Save Payment Method'}
+              onPress={savePaymentMethods}
+              loading={savingPayments}
+              style={{ marginTop: 20 }}
+            />
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -318,6 +432,18 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     borderWidth: 1,
   },
+  paymentModalOverlay: {
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  paymentModalContent: {
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxHeight: '78%',
+    borderWidth: 1,
+    transform: [{ translateY: -24 }],
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -326,6 +452,26 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     marginBottom: 24,
+  },
+  paymentOptions: {
+    gap: 12,
+  },
+  paymentOption: {
+    minHeight: 54,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  paymentOptionText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  paymentToggle: {
+    transform: [{ scaleX: 0.78 }, { scaleY: 0.78 }, { translateY: 6 }],
   },
 });
 

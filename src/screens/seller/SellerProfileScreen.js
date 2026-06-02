@@ -181,7 +181,7 @@ const SellerProfileScreen = () => {
       setName(data.name || '');
       // sellerProfile nested fields
       const sp = data.sellerProfile || {};
-      setStoreName(sp.storeName || sp.name || '');
+      setStoreName(sp.storeName || sp.locationName || sp.name || '');
       setPhone(sp.phone || '');
       // Location fields are inside sellerProfile
       if (sp.locationLat) {
@@ -212,7 +212,7 @@ const SellerProfileScreen = () => {
     try {
       const updated = await sellerService.updateProfile(user.id, { name, storeName, phone });
       if (updated.user) {
-        login({ ...user, name: updated.user.name, storeName: updated.storeName });
+        login({ ...user, name: updated.user.name, storeName: updated.storeName || updated.locationName });
       }
       Alert.alert(t('success'), t('sellerProfileUpdated'));
       fetchProfile();

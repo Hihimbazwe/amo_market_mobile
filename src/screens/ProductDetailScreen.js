@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,7 +11,10 @@ import {
   Alert,
   FlatList,
   ActivityIndicator,
-  Platform
+  Platform,
+  Modal,
+  TextInput,
+  Switch
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -35,7 +38,11 @@ import {
   ShoppingBag,
   Play,
   UserPlus,
-  UserCheck
+  UserCheck,
+  ShieldAlert,
+  AlertTriangle,
+  X,
+  CheckCircle2
 } from 'lucide-react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import CustomText from '../components/CustomText';
@@ -50,6 +57,18 @@ import { orderService } from '../api/orderService';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
+
+const PAYMENT_METHODS = [
+  { id: 'MOBILE_MONEY', aliases: ['MOBILE_MONEY', 'MTN_MOMO'], label: 'MoMo' },
+  { id: 'AIRTEL_MONEY', aliases: ['AIRTEL_MONEY'], label: 'Airtel' },
+  { id: 'CARD', aliases: ['CARD'], label: 'Card' },
+  { id: 'CASH_ON_DELIVERY', aliases: ['CASH_ON_DELIVERY', 'CASH'], label: 'Cash' },
+];
+
+const normalizeAcceptedPayments = (methods) => {
+  if (!Array.isArray(methods)) return [];
+  return [...new Set(methods.map(method => method === 'MOBILE_MONEY' ? 'MTN_MOMO' : method))];
+};
 
 const VideoComponent = ({ url }) => {
   const player = useVideoPlayer(url, (player) => {
@@ -69,8 +88,9 @@ const VideoComponent = ({ url }) => {
 };
 
 const ProductDetailScreen = ({ route, navigation }) => {
-  const { product: routeProduct } = route.params || {};
+  const { product: initialRouteProduct } = route.params || {};
   const { colors, isDarkMode } = useTheme();
+  const [routeProduct, setRouteProduct] = useState(initialRouteProduct);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -93,9 +113,51 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
+  // Scam report modal states
+  const [scamModalVisible, setScamModalVisible] = useState(false);
+  const [scamReason, setScamReason] = useState('OTHER');
+  const [scamComment, setScamComment] = useState('');
+  const [scamAnonymous, setScamAnonymous] = useState(false);
+  const [submittingScam, setSubmittingScam] = useState(false);
+  const [scamReported, setScamReported] = useState(false);
+
   const isFavorite = routeProduct?.id ? isInWishlist(routeProduct.id) : false;
   const media = routeProduct?.media || [];
   const hasImages = media.length > 0;
+  const [sellerPaymentMethods, setSellerPaymentMethods] = useState([]);
+  const ownerAcceptedPayments = normalizeAcceptedPayments(
+    sellerPaymentMethods.length > 0 ? sellerPaymentMethods : routeProduct?.seller?.acceptedPayments
+  );
+
+  useEffect(() => {
+    let active = true;
+    const loadLatestProduct = async () => {
+      if (!initialRouteProduct?.id) return;
+      try {
+        const latest = await productService.getProductById(initialRouteProduct.id, user?.id);
+        if (active && latest) setRouteProduct(latest);
+      } catch (err) {
+        console.log('[ProductDetail] Latest product load error:', err);
+      }
+    };
+    loadLatestProduct();
+    return () => { active = false; };
+  }, [initialRouteProduct?.id, user?.id]);
+
+  useEffect(() => {
+    const loadSellerPaymentMethods = async () => {
+      if (!product?.seller || !product?.seller?.id) return;
+      try {
+        const sellerData = await sellerService.getPublicProfile(product.seller.id);
+        if (sellerData?.acceptedPayments) {
+          setSellerPaymentMethods(sellerData.acceptedPayments);
+        }
+      } catch (err) {
+        console.log('[ProductDetail] Failed to load seller payment methods:', err);
+      }
+    };
+    loadSellerPaymentMethods();
+  }, [routeProduct?.seller?.id || routeProduct?.sellerId]);
 
   const product = {
     id: routeProduct?.id,
@@ -120,15 +182,19 @@ const ProductDetailScreen = ({ route, navigation }) => {
     seller: {
       id: routeProduct?.sellerId || routeProduct?.seller?.id,
       userId: routeProduct?.seller?.userId || routeProduct?.sellerId,
-      name: routeProduct?.seller?.user?.name || 'AMO Seller',
+      name: routeProduct?.seller?.locationName || routeProduct?.seller?.storeName || routeProduct?.seller?.user?.name || 'AMO Seller',
       rating: routeProduct?.seller?.rating || 4.8,
       reviewsCount: routeProduct?.seller?._count?.reviews || 12,
       isVerified: routeProduct?.seller?.kycVerified || false,
       image: routeProduct?.seller?.user?.image || null,
       response: routeProduct?.seller?.responseTime || '2h',
       sales: routeProduct?.seller?.salesCount || '1.2k+',
+      acceptedPayments: ownerAcceptedPayments,
     }
   };
+  const acceptedPaymentLabels = PAYMENT_METHODS
+    .filter(method => method.aliases.some(alias => product.seller.acceptedPayments.includes(alias)))
+    .map(method => method.label);
 
   useEffect(() => {
     const loadSocialData = async () => {
@@ -165,12 +231,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (user?.id && product.seller.id) {
+      if (user?.id && product?.seller?.id) {
         sellerService.getFollowStatus(user.id, product.seller.id)
           .then(data => setIsFollowing(data.isFollowing))
           .catch(err => console.log('[DEBUG] Follow status error:', err));
       }
-    }, [user?.id, product.seller.id])
+    }, [user?.id, product?.seller?.id])
   );
 
   const handleFollow = async () => {
@@ -209,6 +275,49 @@ const ProductDetailScreen = ({ route, navigation }) => {
       Alert.alert("Error", "Failed to post comment.");
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const SCAM_REASONS = [
+    { value: 'FAKE_PRODUCT',        label: 'Fake / Counterfeit Product' },
+    { value: 'NEVER_DELIVERED',     label: 'Never Delivered' },
+    { value: 'WRONG_ITEM',          label: 'Wrong Item Sent' },
+    { value: 'SELLER_DISAPPEARED',  label: 'Seller Disappeared' },
+    { value: 'PRICE_FRAUD',         label: 'Price Fraud' },
+    { value: 'OTHER',               label: 'Other' },
+  ];
+
+  const handleOpenScamReport = () => {
+    if (!user) {
+      Alert.alert('Login Required', 'Please log in to report a seller.');
+      navigation.navigate('Login');
+      return;
+    }
+    setScamReason('OTHER');
+    setScamComment('');
+    setScamAnonymous(false);
+    setScamReported(false);
+    setScamModalVisible(true);
+  };
+
+  const handleSubmitScamReport = async () => {
+    if (scamComment.trim().length < 10) {
+      Alert.alert('More Detail Needed', 'Please describe the issue in at least 10 characters.');
+      return;
+    }
+    setSubmittingScam(true);
+    try {
+      await productService.reportSeller(user.id, product.id, {
+        reason: scamReason,
+        comment: scamComment.trim(),
+        isAnonymous: scamAnonymous,
+      });
+      setScamReported(true);
+    } catch (err) {
+      const msg = err?.message || 'Failed to submit report.';
+      Alert.alert('Report Failed', msg);
+    } finally {
+      setSubmittingScam(false);
     }
   };
 
@@ -283,32 +392,35 @@ const ProductDetailScreen = ({ route, navigation }) => {
       return;
     }
     const sellerId = product.seller.userId || product.seller.id;
-    navigation.navigate('ChatDetail', {
-      conversation: {
-        id: `new-${sellerId}`,
-        participantId: sellerId,
-        participantName: product.seller.name,
-        participantImage: product.seller.image || null,
-        participantColor: '#e67e22',
-        participantInitials: (product.seller.name || 'S').charAt(0).toUpperCase(),
-        otherUser: {
-          id: sellerId,
-          name: product.seller.name,
-          image: product.seller.image,
-        },
-        // Product context — rendered as a pinned reference card in the chat
-        productContext: {
-          id: product.id,
-          title: product.title,
-          price: product.price,
-          image: media[0]?.url || 
-                 routeProduct?.image || 
-                 routeProduct?.imageUrl || 
-                 (routeProduct?.images && routeProduct.images.length > 0 ? routeProduct.images[0] : null) || 
-                 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80',
-          sellerName: product.seller.name,
-          routeProduct: routeProduct,
-        },
+    navigation.navigate('Messages', {
+      screen: 'ChatDetail',
+      params: {
+        conversation: {
+          id: `new-${sellerId}`,
+          participantId: sellerId,
+          participantName: product.seller.name,
+          participantImage: product.seller.image || null,
+          participantColor: '#e67e22',
+          participantInitials: (product.seller.name || 'S').charAt(0).toUpperCase(),
+          otherUser: {
+            id: sellerId,
+            name: product.seller.name,
+            image: product.seller.image,
+          },
+          // Product context — rendered as a pinned reference card in the chat
+          productContext: {
+            id: product.id,
+            title: product.title,
+            price: product.price,
+            image: media[0]?.url || 
+                   routeProduct?.image || 
+                   routeProduct?.imageUrl || 
+                   (routeProduct?.images && routeProduct.images.length > 0 ? routeProduct.images[0] : null) || 
+                   'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80',
+            sellerName: product.seller.name,
+            routeProduct: routeProduct,
+          },
+        }
       }
     });
   };
@@ -482,7 +594,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
               {product.seller.image ? (
                 <Image source={{ uri: product.seller.image }} style={styles.avatarImage} />
               ) : (
-                <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>{product.seller.name[0]}</CustomText>
+                <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>{(product.seller.name || 'S')[0]}</CustomText>
               )}
             </View>
             <View style={styles.sellerDetails}>
@@ -526,13 +638,36 @@ const ProductDetailScreen = ({ route, navigation }) => {
                     </>
                   )}
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.visitShopBtn,
+                    {
+                      backgroundColor: 'rgba(239,68,68,0.06)',
+                      borderColor: '#ef444460',
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      gap: 4
+                    }
+                  ]}
+                  onPress={handleOpenScamReport}
+                >
+                  <ShieldAlert size={14} color="#ef4444" />
+                  <CustomText style={{ color: '#ef4444', fontSize: 12, fontWeight: 'bold' }}>Report</CustomText>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
 
           <View style={styles.statsGrid}>
             {[
-              { label: 'Rating', value: product.seller.rating },
+              {
+                label: 'Rating',
+                value: (() => {
+                  const r = routeProduct?.seller?.rating || 0;
+                  return r > 0 ? r.toFixed(1) + ' ★' : 'New';
+                })()
+              },
               { label: 'Sales', value: product.seller.sales },
               { label: 'Response', value: product.seller.response }
             ].map((stat, i) => (
@@ -542,6 +677,22 @@ const ProductDetailScreen = ({ route, navigation }) => {
               </View>
             ))}
           </View>
+
+          {acceptedPaymentLabels.length > 0 && (
+            <View style={[styles.paymentSection, { backgroundColor: 'rgba(74, 222, 128, 0.05)', borderColor: 'rgba(74, 222, 128, 0.2)' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <CreditCard size={16} color="#4ade80" />
+                <CustomText style={{ color: '#4ade80', fontWeight: 'bold', marginLeft: 8 }}>WE ACCEPT</CustomText>
+              </View>
+              <View style={styles.paymentMethods}>
+                {acceptedPaymentLabels.map(m => (
+                  <View key={m} style={styles.paymentMethod}>
+                    <CustomText style={styles.paymentMethodText}>{m}</CustomText>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }} style={{ marginTop: 20 }}>
@@ -749,6 +900,135 @@ const ProductDetailScreen = ({ route, navigation }) => {
           <View style={{ height: 120 }} />
         </View>
       </ScrollView>
+
+      {/* ─── Scam Report Modal ─── */}
+      <Modal
+        visible={scamModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setScamModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <ShieldAlert size={20} color="#ef4444" />
+                <CustomText style={styles.modalTitle}>Report Seller as Scam</CustomText>
+              </View>
+              <TouchableOpacity onPress={() => setScamModalVisible(false)} style={styles.modalCloseBtn}>
+                <X size={20} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            {scamReported ? (
+              /* ─── Success state ─── */
+              <View style={styles.successContainer}>
+                <CheckCircle2 size={56} color="#4ade80" />
+                <CustomText style={styles.successTitle}>Report Submitted</CustomText>
+                <CustomText style={[styles.successSubtitle, { color: colors.muted }]}>
+                  Thank you. Our safety team will review this report and take action promptly.
+                </CustomText>
+                <TouchableOpacity
+                  style={[styles.doneBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => setScamModalVisible(false)}
+                >
+                  <CustomText style={styles.doneBtnText}>Done</CustomText>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Warning */}
+                <View style={[styles.warningBanner, { backgroundColor: 'rgba(239,68,68,0.08)', borderColor: '#ef444430' }]}>
+                  <AlertTriangle size={14} color="#ef4444" />
+                  <CustomText style={[styles.warningText, { color: '#ef4444' }]}>
+                    False reports are taken seriously and may result in account restrictions.
+                  </CustomText>
+                </View>
+
+                {/* Reason picker */}
+                <CustomText style={[styles.fieldLabel, { color: colors.muted }]}>SELECT REASON</CustomText>
+                <View style={styles.reasonGrid}>
+                  {SCAM_REASONS.map((r) => (
+                    <TouchableOpacity
+                      key={r.value}
+                      style={[
+                        styles.reasonPill,
+                        { borderColor: scamReason === r.value ? '#ef4444' : colors.border,
+                          backgroundColor: scamReason === r.value ? 'rgba(239,68,68,0.12)' : colors.background }
+                      ]}
+                      onPress={() => setScamReason(r.value)}
+                    >
+                      <CustomText style={[
+                        styles.reasonPillText,
+                        { color: scamReason === r.value ? '#ef4444' : colors.muted }
+                      ]}>
+                        {r.label}
+                      </CustomText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Description */}
+                <CustomText style={[styles.fieldLabel, { color: colors.muted }]}>DESCRIPTION *</CustomText>
+                <TextInput
+                  style={[
+                    styles.scamTextInput,
+                    { color: colors.text || colors.foreground,
+                      backgroundColor: colors.background,
+                      borderColor: colors.border }
+                  ]}
+                  placeholder="Describe the issue in detail (min 10 characters)…"
+                  placeholderTextColor={colors.muted}
+                  value={scamComment}
+                  onChangeText={setScamComment}
+                  multiline
+                  scrollEnabled={true}
+                  nestedScrollEnabled={true}
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+
+                {/* Anonymous toggle */}
+                <View style={styles.anonymousRow}>
+                  <View style={{ flex: 1 }}>
+                    <CustomText style={{ fontWeight: '600', fontSize: 13 }}>Report Anonymously</CustomText>
+                    <CustomText style={[{ fontSize: 11, marginTop: 2 }, { color: colors.muted }]}>
+                      Your identity will not be shared with the seller
+                    </CustomText>
+                  </View>
+                  <Switch
+                    value={scamAnonymous}
+                    onValueChange={setScamAnonymous}
+                    trackColor={{ false: colors.border, true: '#ef444480' }}
+                    thumbColor={scamAnonymous ? '#ef4444' : colors.muted}
+                  />
+                </View>
+
+                {/* Submit */}
+                <TouchableOpacity
+                  style={[
+                    styles.submitScamBtn,
+                    { backgroundColor: '#ef4444', opacity: submittingScam ? 0.7 : 1 }
+                  ]}
+                  onPress={handleSubmitScamReport}
+                  disabled={submittingScam}
+                >
+                  {submittingScam ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <ShieldAlert size={16} color="#fff" />
+                      <CustomText style={styles.submitScamBtnText}>Submit Report</CustomText>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       <View style={[styles.bottomBar, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
         <TouchableOpacity
@@ -1264,6 +1544,157 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4ade80',
     textTransform: 'uppercase',
+  },
+
+  // ── Report Scam Button ──
+  reportScamBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  reportScamBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ef4444',
+  },
+
+  // ── Scam Report Modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#ef4444',
+  },
+  modalCloseBtn: {
+    padding: 6,
+    borderRadius: 10,
+  },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  reasonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  reasonPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  reasonPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  scamTextInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 13,
+    minHeight: 100,
+    marginBottom: 20,
+  },
+  anonymousRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  submitScamBtn: {
+    height: 50,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  submitScamBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  successContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 12,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#4ade80',
+    marginTop: 8,
+  },
+  successSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 8,
+  },
+  doneBtn: {
+    marginTop: 16,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  doneBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
   },
 });
 
