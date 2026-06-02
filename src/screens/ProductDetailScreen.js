@@ -639,22 +639,24 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   )}
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.visitShopBtn,
-                    {
-                      backgroundColor: 'rgba(239,68,68,0.06)',
-                      borderColor: '#ef444460',
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      gap: 4
-                    }
-                  ]}
-                  onPress={handleOpenScamReport}
-                >
-                  <ShieldAlert size={14} color="#ef4444" />
-                  <CustomText style={{ color: '#ef4444', fontSize: 12, fontWeight: 'bold' }}>Report</CustomText>
-                </TouchableOpacity>
+                {eligibleOrderId && (
+                  <TouchableOpacity
+                    style={[
+                      styles.visitShopBtn,
+                      {
+                        backgroundColor: 'rgba(239,68,68,0.06)',
+                        borderColor: '#ef444460',
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        gap: 4
+                      }
+                    ]}
+                    onPress={handleOpenScamReport}
+                  >
+                    <ShieldAlert size={14} color="#ef4444" />
+                    <CustomText style={{ color: '#ef4444', fontSize: 12, fontWeight: 'bold' }}>Report</CustomText>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
@@ -972,23 +974,27 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
                 {/* Description */}
                 <CustomText style={[styles.fieldLabel, { color: colors.muted }]}>DESCRIPTION *</CustomText>
-                <TextInput
-                  style={[
-                    styles.scamTextInput,
-                    { color: colors.text || colors.foreground,
-                      backgroundColor: colors.background,
-                      borderColor: colors.border }
-                  ]}
-                  placeholder="Describe the issue in detail (min 10 characters)…"
-                  placeholderTextColor={colors.muted}
-                  value={scamComment}
-                  onChangeText={setScamComment}
-                  multiline
-                  scrollEnabled={true}
-                  nestedScrollEnabled={true}
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
+                <View style={{ height: 120, width: '100%', marginBottom: 20 }}>
+                  <TextInput
+                    style={[
+                      styles.scamTextInput,
+                      { color: colors.text || colors.foreground,
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        flex: 1,
+                        marginBottom: 0 }
+                    ]}
+                    placeholder="Describe the issue in detail (min 10 characters)…"
+                    placeholderTextColor={colors.muted}
+                    value={scamComment}
+                    onChangeText={setScamComment}
+                    multiline
+                    scrollEnabled={true}
+                    nestedScrollEnabled={true}
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                </View>
 
                 {/* Anonymous toggle */}
                 <View style={styles.anonymousRow}>

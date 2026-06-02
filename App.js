@@ -159,10 +159,18 @@ const AppTabs = () => {
   const { unreadChatCount } = useNotifications();
   const { colors } = useTheme();
 
+  const isSellingDisabled = user?.sellingDisabled === true;
+
   return (
     <Tab.Navigator
       lazy={false}
-      initialRouteName={['SELLER', 'COURIER', 'AGENT'].includes(user?.role?.toUpperCase()) ? 'Me' : 'Home'}
+      initialRouteName={
+        isSellingDisabled
+          ? 'Messages'
+          : ['SELLER', 'COURIER', 'AGENT'].includes(user?.role?.toUpperCase())
+            ? 'Me'
+            : 'Home'
+      }
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: [styles.tabBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }],
@@ -183,15 +191,17 @@ const AppTabs = () => {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen 
-        name="Cart" 
-        component={CartScreen} 
-        options={{
-          tabBarBadge: cartCount > 0 ? cartCount : null,
-          tabBarBadgeStyle: { backgroundColor: '#e67e22', fontSize: 10 }
-        }}
-      />
+      {!isSellingDisabled && <Tab.Screen name="Home" component={HomeStack} />}
+      {!isSellingDisabled && (
+        <Tab.Screen 
+          name="Cart" 
+          component={CartScreen} 
+          options={{
+            tabBarBadge: cartCount > 0 ? cartCount : null,
+            tabBarBadgeStyle: { backgroundColor: '#e67e22', fontSize: 10 }
+          }}
+        />
+      )}
       <Tab.Screen
         name="Messages"
         component={MessagesStack}
