@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Image, KeyboardAvoidingView, Platform, Alert, Modal, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
-import Svg, { Text as SvgText, Defs, LinearGradient, Stop, Path, G } from 'react-native-svg';
+import Svg, { Text as SvgText, Defs, LinearGradient, Stop, Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomText from '../components/CustomText';
@@ -11,6 +11,12 @@ import { authService } from '../api/authService';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { StatusBar } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_WEB_CLIENT_ID = '775752591684-hiqe6hbaivkjjqbv6022av3cn0svgstv.apps.googleusercontent.com';
 
 const GoogleIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 48 48">
@@ -28,19 +34,73 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const [googleModalVisible, setGoogleModalVisible] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const [customGoogleName, setCustomGoogleName] = useState('');
-  const [showCustomGoogleForm, setShowCustomGoogleForm] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [useNativeGoogle, setUseNativeGoogle] = useState(false);
 
-  const handleGoogleSignIn = async (gEmail, gName, gImage) => {
+  // expo-auth-session Google OAuth (works in standard Expo Go)
+  // androidClientId & iosClientId reuse the web client ID for Expo Go proxy testing
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    androidClientId: GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ['profile', 'email'],
+  });
+
+  // Handle OAuth response from expo-auth-session
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      if (authentication?.accessToken) {
+        handleExpoGoogleToken(authentication.accessToken);
+      } else {
+        setGoogleLoading(false);
+      }
+    } else if (response?.type === 'error') {
+      setGoogleLoading(false);
+      Alert.alert('Google Sign-In Failed', response.error?.message || 'Authentication failed');
+    } else if (response?.type === 'dismiss' || response?.type === 'cancel') {
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  const handleExpoGoogleToken = async (accessToken) => {
+    setGoogleLoading(true);
+    try {
+      // Fetch user info from Google using the access token
+      const userInfoResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userInfo = await userInfoResponse.json();
+      if (!userInfo.email) throw new Error('Could not retrieve Google account email');
+      await handleGoogleAuthSuccess(userInfo.email, userInfo.name, userInfo.picture);
+    } catch (error) {
+      Alert.alert('Google Sign-In Failed', error.message || 'Something went wrong');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // Initialize Native Google Sign-In configuration
+  useEffect(() => {
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      GoogleSignin.configure({
+        webClientId: GOOGLE_WEB_CLIENT_ID,
+        offlineAccess: false,
+      });
+      setUseNativeGoogle(true);
+      console.log('[DEBUG] Native Google Sign-In available (dev client)');
+    } catch (e) {
+      setUseNativeGoogle(false);
+      console.log('[DEBUG] Expo Go detected — using expo-auth-session for Google Sign-In');
+    }
+  }, []);
+
+  const handleGoogleAuthSuccess = async (gEmail, gName, gImage) => {
     setGoogleLoading(true);
     try {
       const result = await authService.loginWithGoogle(gEmail, gName, gImage);
       await login(result);
-      
-      setGoogleModalVisible(false);
 
       // Check if there is an auto-logout redirect to restore
       const savedRedirect = await AsyncStorage.getItem('@auto_logout_redirect');
@@ -48,7 +108,7 @@ const LoginScreen = ({ navigation }) => {
         try {
           const redirectObj = JSON.parse(savedRedirect);
           await AsyncStorage.removeItem('@auto_logout_redirect');
-          
+
           if (redirectObj && redirectObj.name) {
             console.log('[SESSION_RESTORE] Restoring screen:', redirectObj.name);
 
@@ -107,6 +167,55 @@ const LoginScreen = ({ navigation }) => {
 
     } catch (error) {
       Alert.alert('Google Sign-In Failed', error.message || 'Something went wrong');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleSignInPress = async () => {
+    if (!useNativeGoogle) {
+      // Expo Go fallback: use expo-auth-session (real Google OAuth via browser)
+      setGoogleLoading(true);
+      try {
+        await promptAsync();
+      } catch (e) {
+        Alert.alert('Google Sign-In Failed', e.message || 'Something went wrong');
+        setGoogleLoading(false);
+      }
+      // loading state will be cleared inside handleExpoGoogleToken or response useEffect
+      return;
+    }
+
+    // Native Google Sign-In (dev client / production APK)
+    setGoogleLoading(true);
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+
+      const gEmail = userInfo.data?.user?.email;
+      const gName = userInfo.data?.user?.name;
+      const gImage = userInfo.data?.user?.photo;
+
+      if (!gEmail) throw new Error('Google Sign-in did not return an email address');
+
+      await handleGoogleAuthSuccess(gEmail, gName, gImage);
+    } catch (error) {
+      let statusCodes;
+      try {
+        const signinPkg = require('@react-native-google-signin/google-signin');
+        statusCodes = signinPkg.statusCodes;
+      } catch (err) {}
+
+      let msg = error.message || 'Something went wrong';
+      if (statusCodes && error.code === statusCodes.SIGN_IN_CANCELLED) {
+        msg = 'Sign-in was cancelled';
+      } else if (statusCodes && error.code === statusCodes.IN_PROGRESS) {
+        msg = 'Sign-in is already in progress';
+      } else if (statusCodes && error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        msg = 'Play services not available or outdated';
+      }
+      Alert.alert('Google Sign-In Failed', msg);
     } finally {
       setGoogleLoading(false);
     }
@@ -246,10 +355,32 @@ const LoginScreen = ({ navigation }) => {
               >AMO Market</SvgText>
             </Svg>
           </View>
-          <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 12, marginTop: 12 }}>Welcome Back</CustomText>
-          <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted }]}>
+          <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 8, marginTop: 8 }}>Welcome Back</CustomText>
+          <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted, marginBottom: 16 }]}>
             Sign in to your AMO account to continue shopping.
           </CustomText>
+
+          <TouchableOpacity 
+            style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }, { width: '100%', marginBottom: 16 }]}
+            onPress={handleGoogleSignInPress}
+            activeOpacity={0.8}
+            disabled={googleLoading}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#1e293b" />
+            ) : (
+              <>
+                <GoogleIcon />
+                <CustomText style={styles.googleButtonText}>Sign in with Google</CustomText>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={[styles.separator, { marginVertical: 12, width: '100%' }]}>
+            <View style={[styles.line, { backgroundColor: colors.border }]} />
+            <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
+            <View style={[styles.line, { backgroundColor: colors.border }]} />
+          </View>
 
           <View style={styles.form}>
             <CustomInput 
@@ -284,8 +415,6 @@ const LoginScreen = ({ navigation }) => {
             <CustomText style={[styles.dataAssurance, { color: colors.muted }]}>
               Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
             </CustomText>
-
-
            </View>
 
            <TouchableOpacity 
@@ -299,6 +428,7 @@ const LoginScreen = ({ navigation }) => {
          </View>
        </ScrollView>
 
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -311,15 +441,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 5,
   },
   backButton: {
     marginRight: 16,
-    padding: 8,
+    padding: 6,
     borderRadius: 12,
   },
   content: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -328,11 +461,11 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   forgotPass: {
     alignSelf: 'flex-end',
-    marginBottom: 24,
+    marginBottom: 16,
     marginTop: -8,
   },
   forgotPassText: {
@@ -343,13 +476,13 @@ const styles = StyleSheet.create({
 
   subtitle: {
     textAlign: 'center',
-    marginBottom: 48,
+    marginBottom: 20,
   },
   button: {
     width: '100%',
   },
   link: {
-    marginTop: 24,
+    marginTop: 12,
   },
   linkText: {
     fontSize: 14,
@@ -357,14 +490,14 @@ const styles = StyleSheet.create({
   dataAssurance: {
     fontSize: 11,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 10,
     lineHeight: 16,
     paddingHorizontal: 10,
   },
   separator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: 12,
   },
   line: {
     flex: 1,
@@ -388,52 +521,6 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     fontSize: 15,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  modalLoading: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  formContainer: {
-    paddingVertical: 10,
-  },
-  accountsList: {
-    paddingVertical: 10,
-  },
-  accountItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  accountAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 16,
-  },
-  accountDetails: {
-    flex: 1,
-  },
-  cancelBtn: {
-    alignItems: 'center',
-    paddingVertical: 12,
   },
 });
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image, Modal, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator } from 'react-native';
 import { ArrowLeft, ShoppingBag, Store, UserCheck, XCircle } from 'lucide-react-native';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop, Path, G } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +11,12 @@ import { authService } from '../api/authService';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { StatusBar } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_WEB_CLIENT_ID = '775752591684-hiqe6hbaivkjjqbv6022av3cn0svgstv.apps.googleusercontent.com';
 
 const GoogleIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 48 48">
@@ -26,19 +32,69 @@ const RegisterScreen = ({ navigation, route }) => {
   const { colors, isDarkMode } = useTheme();
   const { login } = useAuth();
   const [role, setRole] = useState('BUYER');
-  const [googleModalVisible, setGoogleModalVisible] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const [customGoogleName, setCustomGoogleName] = useState('');
-  const [showCustomGoogleForm, setShowCustomGoogleForm] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [useNativeGoogle, setUseNativeGoogle] = useState(false);
 
-  const handleGoogleSignIn = async (gEmail, gName, gImage) => {
+  // expo-auth-session Google OAuth (works in standard Expo Go)
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    scopes: ['profile', 'email'],
+  });
+
+  // Handle OAuth response from expo-auth-session
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      if (authentication?.accessToken) {
+        handleExpoGoogleToken(authentication.accessToken);
+      } else {
+        setGoogleLoading(false);
+      }
+    } else if (response?.type === 'error') {
+      setGoogleLoading(false);
+      Alert.alert('Google Sign-In Failed', response.error?.message || 'Authentication failed');
+    } else if (response?.type === 'dismiss' || response?.type === 'cancel') {
+      setGoogleLoading(false);
+    }
+  }, [response]);
+
+  const handleExpoGoogleToken = async (accessToken) => {
+    setGoogleLoading(true);
+    try {
+      const userInfoResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userInfo = await userInfoResponse.json();
+      if (!userInfo.email) throw new Error('Could not retrieve Google account email');
+      await handleGoogleAuthSuccess(userInfo.email, userInfo.name, userInfo.picture);
+    } catch (error) {
+      Alert.alert('Google Sign-In Failed', error.message || 'Something went wrong');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // Initialize Native Google Sign-In configuration
+  useEffect(() => {
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      GoogleSignin.configure({
+        webClientId: GOOGLE_WEB_CLIENT_ID,
+        offlineAccess: false,
+      });
+      setUseNativeGoogle(true);
+      console.log('[DEBUG] Native Google Sign-In available (dev client)');
+    } catch (e) {
+      setUseNativeGoogle(false);
+      console.log('[DEBUG] Expo Go detected — using expo-auth-session for Google Sign-In');
+    }
+  }, []);
+
+  const handleGoogleAuthSuccess = async (gEmail, gName, gImage) => {
     setGoogleLoading(true);
     try {
       const result = await authService.loginWithGoogle(gEmail, gName, gImage);
       await login(result);
-      
-      setGoogleModalVisible(false);
 
       // Check if there is an auto-logout redirect to restore
       const savedRedirect = await AsyncStorage.getItem('@auto_logout_redirect');
@@ -46,48 +102,27 @@ const RegisterScreen = ({ navigation, route }) => {
         try {
           const redirectObj = JSON.parse(savedRedirect);
           await AsyncStorage.removeItem('@auto_logout_redirect');
-          
+
           if (redirectObj && redirectObj.name) {
             console.log('[SESSION_RESTORE] Restoring screen:', redirectObj.name);
 
-            // 1. Root Stacks / Screens outside tabs
             if (['Checkout', 'ProductDetail', 'OrderSuccess', 'Notifications', 'GlobalSearch', 'ChatDetail', 'StatusViewer'].includes(redirectObj.name)) {
               navigation.navigate(redirectObj.name, redirectObj.params);
               return;
             }
-
-            // 2. Base Tabs
             if (['Home', 'Cart', 'Messages', 'Me'].includes(redirectObj.name)) {
               navigation.navigate('MainApp', { screen: redirectObj.name, params: redirectObj.params });
               return;
             }
-
-            // 3. Nested inside Home Stack
             if (['HomeMain', 'SellerStore'].includes(redirectObj.name)) {
-              navigation.navigate('MainApp', {
-                screen: 'Home',
-                params: { screen: redirectObj.name, params: redirectObj.params }
-              });
+              navigation.navigate('MainApp', { screen: 'Home', params: { screen: redirectObj.name, params: redirectObj.params } });
               return;
             }
-
-            // 4. Nested inside Messages Stack
             if (['MessagesMain'].includes(redirectObj.name)) {
-              navigation.navigate('MainApp', {
-                screen: 'Messages',
-                params: { screen: redirectObj.name, params: redirectObj.params }
-              });
+              navigation.navigate('MainApp', { screen: 'Messages', params: { screen: redirectObj.name, params: redirectObj.params } });
               return;
             }
-
-            // 5. Drawer screens inside 'Me'
-            navigation.navigate('MainApp', {
-              screen: 'Me',
-              params: {
-                screen: redirectObj.name,
-                params: redirectObj.params
-              }
-            });
+            navigation.navigate('MainApp', { screen: 'Me', params: { screen: redirectObj.name, params: redirectObj.params } });
             return;
           }
         } catch (e) {
@@ -95,7 +130,6 @@ const RegisterScreen = ({ navigation, route }) => {
         }
       }
 
-      // Redirect based on role
       const redirectRole = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
       if (['SELLER', 'COURIER', 'AGENT'].includes(redirectRole)) {
         navigation.navigate('MainApp', { screen: 'Me' });
@@ -109,6 +143,55 @@ const RegisterScreen = ({ navigation, route }) => {
       setGoogleLoading(false);
     }
   };
+
+  const handleGoogleSignInPress = async () => {
+    if (!useNativeGoogle) {
+      // Expo Go fallback: use expo-auth-session (real Google OAuth via browser)
+      setGoogleLoading(true);
+      try {
+        await promptAsync();
+      } catch (e) {
+        Alert.alert('Google Sign-In Failed', e.message || 'Something went wrong');
+        setGoogleLoading(false);
+      }
+      return;
+    }
+
+    // Native Google Sign-In (dev client / production APK)
+    setGoogleLoading(true);
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+
+      const gEmail = userInfo.data?.user?.email;
+      const gName = userInfo.data?.user?.name;
+      const gImage = userInfo.data?.user?.photo;
+
+      if (!gEmail) throw new Error('Google Sign-in did not return an email address');
+
+      await handleGoogleAuthSuccess(gEmail, gName, gImage);
+    } catch (error) {
+      let statusCodes;
+      try {
+        const signinPkg = require('@react-native-google-signin/google-signin');
+        statusCodes = signinPkg.statusCodes;
+      } catch (err) {}
+
+      let msg = error.message || 'Something went wrong';
+      if (statusCodes && error.code === statusCodes.SIGN_IN_CANCELLED) {
+        msg = 'Sign-in was cancelled';
+      } else if (statusCodes && error.code === statusCodes.IN_PROGRESS) {
+        msg = 'Sign-in is already in progress';
+      } else if (statusCodes && error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        msg = 'Play services not available or outdated';
+      }
+      Alert.alert('Google Sign-In Failed', msg);
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -216,10 +299,32 @@ const RegisterScreen = ({ navigation, route }) => {
               >AMO Market</SvgText>
             </Svg>
           </View>
-          <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 12, marginTop: 12 }}>Join AMO</CustomText>
-          <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted }]}>
+          <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 8, marginTop: 8 }}>Join AMO</CustomText>
+          <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted, marginBottom: 16 }]}>
             Create an account to start selling and buying premium products.
           </CustomText>
+
+          <TouchableOpacity 
+            style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }, { width: '100%', marginBottom: 16 }]}
+            onPress={handleGoogleSignInPress}
+            activeOpacity={0.8}
+            disabled={googleLoading}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#1e293b" />
+            ) : (
+              <>
+                <GoogleIcon />
+                <CustomText style={styles.googleButtonText}>Join with Google</CustomText>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={[styles.separator, { marginVertical: 12, width: '100%' }]}>
+            <View style={[styles.line, { backgroundColor: colors.border }]} />
+            <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
+            <View style={[styles.line, { backgroundColor: colors.border }]} />
+          </View>
 
           {/* Role Selection */}
           <View style={styles.roleContainer}>
@@ -300,21 +405,6 @@ const RegisterScreen = ({ navigation, route }) => {
             <CustomText style={[styles.dataAssurance, { color: colors.muted }]}>
               Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
             </CustomText>
-
-            <View style={styles.separator}>
-              <View style={[styles.line, { backgroundColor: colors.border }]} />
-              <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
-              <View style={[styles.line, { backgroundColor: colors.border }]} />
-            </View>
-
-             <TouchableOpacity 
-               style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }]}
-               onPress={() => setGoogleModalVisible(true)}
-               activeOpacity={0.8}
-             >
-               <GoogleIcon />
-               <CustomText style={styles.googleButtonText}>Join with Google</CustomText>
-             </TouchableOpacity>
            </View>
 
            <TouchableOpacity 
@@ -325,131 +415,9 @@ const RegisterScreen = ({ navigation, route }) => {
                Already have an account? <CustomText style={{ color: colors.primary }}>Login</CustomText>
              </CustomText>
            </TouchableOpacity>
-         </View>
-       </ScrollView>
-
-      {/* Google Account Chooser Bottom Sheet Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={googleModalVisible}
-        onRequestClose={() => {
-          if (!googleLoading) setGoogleModalVisible(false);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <GoogleIcon />
-              <CustomText variant="h2" style={{ marginTop: 12, textAlign: 'center' }}>Sign in with Google</CustomText>
-              <CustomText variant="caption" style={{ color: colors.muted, marginTop: 4, textAlign: 'center' }}>
-                to continue to AMO Market
-              </CustomText>
-            </View>
-
-            {googleLoading ? (
-              <View style={styles.modalLoading}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <CustomText style={{ marginTop: 16 }}>Connecting to Google...</CustomText>
-              </View>
-            ) : showCustomGoogleForm ? (
-              /* Custom Account Form */
-              <View style={styles.formContainer}>
-                <CustomInput
-                  label="Name"
-                  placeholder="e.g. John Doe"
-                  value={customGoogleName}
-                  onChangeText={setCustomGoogleName}
-                  colors={colors}
-                />
-                <View style={{ height: 12 }} />
-                <CustomInput
-                  label="Google Email"
-                  placeholder="e.g. user@gmail.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={customGoogleEmail}
-                  onChangeText={setCustomGoogleEmail}
-                  colors={colors}
-                />
-                <View style={{ height: 20 }} />
-                <CustomButton
-                  title="Continue"
-                  onPress={() => {
-                    if (!customGoogleEmail || !customGoogleName) {
-                      Alert.alert('Error', 'Please fill in all fields');
-                      return;
-                    }
-                    handleGoogleSignIn(customGoogleEmail, customGoogleName, null);
-                  }}
-                />
-                <TouchableOpacity
-                  style={{ marginTop: 12, alignSelf: 'center' }}
-                  onPress={() => setShowCustomGoogleForm(false)}
-                >
-                  <CustomText style={{ color: colors.primary, fontWeight: '600' }}>Back to accounts</CustomText>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              /* Account List */
-              <View style={styles.accountsList}>
-                {/* Pre-populated Google Account 1 */}
-                <TouchableOpacity
-                  style={[styles.accountItem, { borderColor: colors.border }]}
-                  onPress={() => handleGoogleSignIn('john.doe@gmail.com', 'John Doe', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150')}
-                >
-                  <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150' }}
-                    style={styles.accountAvatar}
-                  />
-                  <View style={styles.accountDetails}>
-                    <CustomText style={{ fontWeight: '600', color: colors.foreground }}>John Doe</CustomText>
-                    <CustomText style={{ color: colors.muted, fontSize: 12 }}>john.doe@gmail.com</CustomText>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Pre-populated Google Account 2 */}
-                <TouchableOpacity
-                  style={[styles.accountItem, { borderColor: colors.border, marginTop: 12 }]}
-                  onPress={() => handleGoogleSignIn('jane.smith@gmail.com', 'Jane Smith', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150')}
-                >
-                  <Image
-                    source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150' }}
-                    style={styles.accountAvatar}
-                  />
-                  <View style={styles.accountDetails}>
-                    <CustomText style={{ fontWeight: '600', color: colors.foreground }}>Jane Smith</CustomText>
-                    <CustomText style={{ color: colors.muted, fontSize: 12 }}>jane.smith@gmail.com</CustomText>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Add Custom Account */}
-                <TouchableOpacity
-                  style={[styles.accountItem, { borderColor: colors.border, marginTop: 12 }]}
-                  onPress={() => setShowCustomGoogleForm(true)}
-                >
-                  <View style={[styles.accountAvatar, { backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' }]}>
-                    <CustomText style={{ fontSize: 20, fontWeight: '300', color: colors.foreground }}>+</CustomText>
-                  </View>
-                  <View style={styles.accountDetails}>
-                    <CustomText style={{ fontWeight: '600', color: colors.primary }}>Use another account</CustomText>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {!googleLoading && (
-              <TouchableOpacity
-                style={[styles.cancelBtn, { marginTop: 24 }]}
-                onPress={() => setGoogleModalVisible(false)}
-              >
-                <CustomText style={{ color: '#ef4444', fontWeight: '700' }}>Cancel</CustomText>
-              </TouchableOpacity>
-            )}
           </View>
-        </View>
-      </Modal>
+        </ScrollView>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -462,15 +430,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 5,
   },
   backButton: {
     marginRight: 16,
-    padding: 8,
+    padding: 6,
     borderRadius: 12,
   },
   content: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -479,14 +450,14 @@ const styles = StyleSheet.create({
   },
   roleContainer: {
     width: '100%',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   roleLabel: {
     fontSize: 10,
     fontWeight: '800',
     textAlign: 'center',
     letterSpacing: 2,
-    marginBottom: 16,
+    marginBottom: 10,
   },
   roleGrid: {
     flexDirection: 'row',
@@ -496,27 +467,27 @@ const styles = StyleSheet.create({
   roleItem: {
     flex: 1,
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
     borderRadius: 16,
     borderWidth: 1,
   },
   roleItemText: {
-    marginTop: 8,
+    marginTop: 6,
     fontSize: 12,
     fontWeight: '700',
   },
   form: {
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   agentFields: {
-    marginTop: 20,
+    marginTop: 10,
   },
   agentInfoBox: {
-    padding: 16,
+    padding: 12,
     borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   agentInfoTitle: {
     fontSize: 14,
@@ -530,13 +501,13 @@ const styles = StyleSheet.create({
 
   subtitle: {
     textAlign: 'center',
-    marginBottom: 48,
+    marginBottom: 20,
   },
   button: {
     width: '100%',
   },
   link: {
-    marginTop: 24,
+    marginTop: 12,
   },
   linkText: {
     fontSize: 14,
@@ -544,14 +515,14 @@ const styles = StyleSheet.create({
   dataAssurance: {
     fontSize: 11,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 10,
     lineHeight: 16,
     paddingHorizontal: 10,
   },
   separator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: 12,
   },
   line: {
     flex: 1,
@@ -575,52 +546,6 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     fontSize: 15,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  modalLoading: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  formContainer: {
-    paddingVertical: 10,
-  },
-  accountsList: {
-    paddingVertical: 10,
-  },
-  accountItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  accountAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 16,
-  },
-  accountDetails: {
-    flex: 1,
-  },
-  cancelBtn: {
-    alignItems: 'center',
-    paddingVertical: 12,
   },
 });
 

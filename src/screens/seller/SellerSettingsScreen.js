@@ -59,7 +59,7 @@ const SellerSettingsScreen = () => {
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentsModal, setShowPaymentsModal] = useState(false);
-  const [acceptedPayments, setAcceptedPayments] = useState(['MTN_MOMO', 'AIRTEL_MONEY', 'CARD', 'CASH_ON_DELIVERY']);
+  const [acceptedPayments, setAcceptedPayments] = useState([]);
   const [savingPayments, setSavingPayments] = useState(false);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ const SellerSettingsScreen = () => {
         setLoadingPrivacy(false);
       });
       sellerService.getPaymentMethods(user.id)
-        .then(res => setAcceptedPayments(res.acceptedPayments?.length ? res.acceptedPayments : ['MTN_MOMO', 'AIRTEL_MONEY', 'CARD', 'CASH_ON_DELIVERY']))
+        .then(res => setAcceptedPayments(res.acceptedPayments?.length ? res.acceptedPayments : []))
         .catch(err => console.log('[SellerSettings] Payment methods error:', err));
     }
   }, [user?.id]);

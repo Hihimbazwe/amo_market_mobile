@@ -39,7 +39,9 @@
     "owner": "ihyacinthe",
     "plugins": [
       "expo-video",
-      "expo-contacts"
+      "expo-contacts",
+      "@react-native-google-signin/google-signin",
+      "expo-web-browser"
     ]
   }
 }

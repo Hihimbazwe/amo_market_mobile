@@ -363,12 +363,9 @@ const RootNavigator = () => {
                       }
                     }
                     if (route && route.name) {
-                      const ignoredRoutes = ['Login', 'Register', 'VerifyOTP', 'ForgotPassword', 'ResetPassword', 'Auth'];
-                      if (!ignoredRoutes.includes(route.name)) {
-                        setCurrentRoute(route.name);
-                        if (user) {
-                          setCurrentRouteObj({ name: route.name, params: route.params });
-                        }
+                      setCurrentRoute(route.name);
+                      if (user) {
+                        setCurrentRouteObj({ name: route.name, params: route.params });
                       }
                     }
                   } catch (err) {

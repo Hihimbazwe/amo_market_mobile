@@ -183,12 +183,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
       id: routeProduct?.sellerId || routeProduct?.seller?.id,
       userId: routeProduct?.seller?.userId || routeProduct?.sellerId,
       name: routeProduct?.seller?.locationName || routeProduct?.seller?.storeName || routeProduct?.seller?.user?.name || 'AMO Seller',
-      rating: routeProduct?.seller?.rating || 4.8,
-      reviewsCount: routeProduct?.seller?._count?.reviews || 12,
+      rating: routeProduct?.seller?.rating || 0,
+      reviewsCount: routeProduct?.seller?._count?.reviews || 0,
       isVerified: routeProduct?.seller?.kycVerified || false,
       image: routeProduct?.seller?.user?.image || null,
-      response: routeProduct?.seller?.responseTime || '2h',
-      sales: routeProduct?.seller?.salesCount || '1.2k+',
+      response: routeProduct?.seller?.responseTime || null,
+      sales: routeProduct?.seller?.salesCount || null,
       acceptedPayments: ownerAcceptedPayments,
     }
   };
@@ -545,14 +545,15 @@ const ProductDetailScreen = ({ route, navigation }) => {
             const reviewCount = reviews.length > 0 ? reviews.length : (routeProduct?._count?.reviews || 0);
             const avgRating = reviews.length > 0
               ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
-              : (routeProduct?.avgRating > 0 ? routeProduct.avgRating : 4.8);
+              : (routeProduct?.avgRating > 0 ? routeProduct.avgRating : 0);
+            if (avgRating === 0 && reviewCount === 0) return null;
             return (
               <View style={styles.ratingRow}>
                 <View style={styles.stars}>
                   {[...Array(5)].map((_, i) => <Star key={i} size={14} color="#FBBF24" fill={i < Math.round(avgRating) ? "#FBBF24" : "none"} />)}
                 </View>
                 <CustomText variant="caption" style={styles.ratingText}>
-                  {avgRating.toFixed(1)} ⭐ ({reviewCount} verified reviews)
+                  {avgRating.toFixed(1)} ⭐ ({reviewCount} verified review{reviewCount !== 1 ? 's' : ''})
                 </CustomText>
               </View>
             );
@@ -661,24 +662,27 @@ const ProductDetailScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          <View style={styles.statsGrid}>
-            {[
-              {
-                label: 'Rating',
-                value: (() => {
-                  const r = routeProduct?.seller?.rating || 0;
-                  return r > 0 ? r.toFixed(1) + ' ★' : 'New';
-                })()
-              },
-              { label: 'Sales', value: product.seller.sales },
-              { label: 'Response', value: product.seller.response }
-            ].map((stat, i) => (
-              <View key={i} style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <CustomText variant="h3" style={{ color: colors.primary }}>{stat.value}</CustomText>
-                <CustomText style={styles.statLabel}>{stat.label}</CustomText>
+          {(() => {
+            const sellerRating = routeProduct?.seller?.rating || 0;
+            const sellerSales = product.seller.sales ?? 0;
+            const sellerResponse = product.seller.response;
+            const stats = [
+              sellerRating > 0 ? { label: 'Rating', value: sellerRating.toFixed(1) + ' ★' } : null,
+              { label: 'Sales', value: sellerSales },
+              sellerResponse ? { label: 'Response', value: sellerResponse } : null,
+            ].filter(Boolean);
+            if (stats.length === 0) return null;
+            return (
+              <View style={styles.statsGrid}>
+                {stats.map((stat, i) => (
+                  <View key={i} style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <CustomText variant="h3" style={{ color: colors.primary }}>{stat.value}</CustomText>
+                    <CustomText style={styles.statLabel}>{stat.label}</CustomText>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            );
+          })()}
 
           {acceptedPaymentLabels.length > 0 && (
             <View style={[styles.paymentSection, { backgroundColor: 'rgba(74, 222, 128, 0.05)', borderColor: 'rgba(74, 222, 128, 0.2)' }]}>
