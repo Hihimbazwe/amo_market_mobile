@@ -21,6 +21,7 @@ import {
   MessageCircle,
   Truck,
   ShieldOff,
+  Star,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -37,6 +38,7 @@ import SellerAnalyticsScreen from '../screens/seller/SellerAnalyticsScreen';
 import SellerMembershipScreen from '../screens/seller/SellerMembershipScreen';
 import SellerKYCScreen from '../screens/seller/SellerKYCScreen';
 import SellerInventoryScreen from '../screens/seller/SellerInventoryScreen';
+import SellerReviewsScreen from '../screens/seller/SellerReviewsScreen';
 import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
@@ -62,6 +64,7 @@ const NAV_GROUPS = (t) => [
       { name: t('orders'), icon: ShoppingBag, screen: 'SellerOrders' },
       // { name: t('shipping'), icon: Truck, screen: 'SellerShipment' },
       { name: t('disputes'), icon: AlertCircle, screen: 'SellerDisputes' },
+      { name: 'Reviews', icon: Star, screen: 'SellerReviews' },
     ],
   },
   {
@@ -256,6 +259,7 @@ export default function SellerDashboardDrawer({ navigation }) {
         <Stack.Screen name="SellerMembership" component={SellerMembershipScreen} />
         <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
         <Stack.Screen name="SellerInventory" component={SellerInventoryScreen} />
+        <Stack.Screen name="SellerReviews" component={SellerReviewsScreen} />
         <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
         <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />
         <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />

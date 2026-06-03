@@ -42,7 +42,10 @@ import {
   ShieldAlert,
   AlertTriangle,
   X,
-  CheckCircle2
+  CheckCircle2,
+  ThumbsUp,
+  MessageSquare,
+  User,
 } from 'lucide-react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import CustomText from '../components/CustomText';
@@ -55,6 +58,7 @@ import { sellerService } from '../api/sellerService';
 import { productService } from '../api/productService';
 import { orderService } from '../api/orderService';
 import { useFocusEffect } from '@react-navigation/native';
+import { reviewService } from '../api/reviewService';
 
 const { width } = Dimensions.get('window');
 
@@ -106,12 +110,20 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [loadingSocial, setLoadingSocial] = useState(true);
+  const [helpfulVoted, setHelpfulVoted] = useState({});
+  const [helpfulCounts, setHelpfulCounts] = useState({});
 
   // Review form states
   const [eligibleOrderId, setEligibleOrderId] = useState(null);
   const [userRating, setUserRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+
+  // Seller reply states
+  const [sellerReplyTarget, setSellerReplyTarget] = useState(null); // { id, existingReply }
+  const [sellerReplyText, setSellerReplyText] = useState('');
+  const [sellerReplyLoading, setSellerReplyLoading] = useState(false);
 
   // Scam report modal states
   const [scamModalVisible, setScamModalVisible] = useState(false);
@@ -202,11 +214,23 @@ const ProductDetailScreen = ({ route, navigation }) => {
       setLoadingSocial(true);
       try {
         const [revs, comms] = await Promise.all([
-          productService.getReviews(product.id),
+          reviewService.getProductReviews(product.id, user?.id),
           productService.getComments(product.id)
         ]);
         setReviews(revs || []);
         setComments(comms || []);
+
+        // Initialize helpful counts
+        if (revs && Array.isArray(revs)) {
+          const counts = {};
+          const voted = {};
+          revs.forEach((r) => {
+            counts[r.id] = r.helpfulVotes || r._count?.ReviewHelpfulVote || 0;
+            if (r.helpfulVoted) voted[r.id] = true;
+          });
+          setHelpfulCounts((prev) => ({ ...counts, ...prev }));
+          setHelpfulVoted((prev) => ({ ...voted, ...prev }));
+        }
       } catch (err) {
         console.log('[DEBUG] Error loading social data:', err);
       } finally {
@@ -343,8 +367,9 @@ const ProductDetailScreen = ({ route, navigation }) => {
       setUserRating(0);
       setReviewComment('');
       setEligibleOrderId(null);
+      setShowReviewForm(false);
 
-      const revs = await productService.getReviews(product.id);
+      const revs = await reviewService.getProductReviews(product.id, user?.id);
       setReviews(revs || []);
       Alert.alert("Success", "Your review has been posted!");
     } catch (error) {
@@ -352,6 +377,27 @@ const ProductDetailScreen = ({ route, navigation }) => {
       Alert.alert("Error", "Failed to post review.");
     } finally {
       setSubmittingReview(false);
+    }
+  };
+
+  const handleSellerReply = async () => {
+    if (!sellerReplyText.trim()) {
+      Alert.alert('Reply Required', 'Please type your reply before submitting.');
+      return;
+    }
+    setSellerReplyLoading(true);
+    try {
+      await reviewService.replyToReview(user.id, sellerReplyTarget.id, sellerReplyText.trim());
+      // Refresh reviews to show updated reply
+      const revs = await reviewService.getProductReviews(product.id, user?.id);
+      setReviews(revs || []);
+      setSellerReplyTarget(null);
+      setSellerReplyText('');
+      Alert.alert('Reply Posted', 'Your reply has been posted successfully.');
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to post reply.');
+    } finally {
+      setSellerReplyLoading(false);
     }
   };
 
@@ -640,24 +686,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   )}
                 </TouchableOpacity>
 
-                {eligibleOrderId && (
-                  <TouchableOpacity
-                    style={[
-                      styles.visitShopBtn,
-                      {
-                        backgroundColor: 'rgba(239,68,68,0.06)',
-                        borderColor: '#ef444460',
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        gap: 4
-                      }
-                    ]}
-                    onPress={handleOpenScamReport}
-                  >
-                    <ShieldAlert size={14} color="#ef4444" />
-                    <CustomText style={{ color: '#ef4444', fontSize: 12, fontWeight: 'bold' }}>Report</CustomText>
-                  </TouchableOpacity>
-                )}
+                {/* Report button moved to Reviews section */}
               </View>
             </View>
           </View>
@@ -823,16 +852,63 @@ const ProductDetailScreen = ({ route, navigation }) => {
               )}
               {activeTab === 2 && (
                 <View>
-                  {eligibleOrderId && (
-                    <View style={[styles.reviewForm, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '20' }]}>
+                  {/* ── Reviews Section Header: Post Review + Report buttons ── */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <CustomText style={{ fontSize: 13, fontWeight: '700', color: colors.foreground }}>Customer Reviews</CustomText>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {eligibleOrderId && (
+                        <TouchableOpacity
+                          style={[{
+                            flexDirection: 'row', alignItems: 'center', gap: 5,
+                            paddingHorizontal: 12, paddingVertical: 7,
+                            borderRadius: 10, borderWidth: 1,
+                            backgroundColor: showReviewForm ? colors.primary + '18' : colors.primary,
+                            borderColor: showReviewForm ? colors.primary + '60' : colors.primary,
+                          }]}
+                          onPress={() => {
+                            if (!user) {
+                              Alert.alert('Login Required', 'Please login to leave a review.');
+                              navigation.navigate('Login');
+                              return;
+                            }
+                            setShowReviewForm(v => !v);
+                          }}
+                        >
+                          <Star size={13} color={showReviewForm ? colors.primary : '#fff'} fill={showReviewForm ? colors.primary : '#fff'} />
+                          <CustomText style={{ fontSize: 12, fontWeight: '700', color: showReviewForm ? colors.primary : '#fff' }}>
+                            {showReviewForm ? 'Cancel' : 'Post Review'}
+                          </CustomText>
+                        </TouchableOpacity>
+                      )}
+                      {eligibleOrderId && (
+                        <TouchableOpacity
+                          style={[{
+                            flexDirection: 'row', alignItems: 'center', gap: 5,
+                            paddingHorizontal: 10, paddingVertical: 7,
+                            borderRadius: 10, borderWidth: 1,
+                            backgroundColor: 'rgba(239,68,68,0.06)',
+                            borderColor: '#ef444440',
+                          }]}
+                          onPress={handleOpenScamReport}
+                        >
+                          <ShieldAlert size={13} color="#ef4444" />
+                          <CustomText style={{ fontSize: 12, fontWeight: '700', color: '#ef4444' }}>Report</CustomText>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* ── Inline Review Form (toggled) ── */}
+                  {eligibleOrderId && showReviewForm && (
+                    <View style={[styles.reviewForm, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '20', marginBottom: 20 }]}>
                       <CustomText variant="h3" style={{ marginBottom: 12 }}>Leave a Review</CustomText>
                       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
                         {[1, 2, 3, 4, 5].map((s) => (
                           <TouchableOpacity key={s} onPress={() => setUserRating(s)}>
                             <Star
                               size={28}
-                              color={s <= userRating ? "#FBBF24" : colors.muted}
-                              fill={s <= userRating ? "#FBBF24" : "none"}
+                              color={s <= userRating ? '#FBBF24' : colors.muted}
+                              fill={s <= userRating ? '#FBBF24' : 'none'}
                             />
                           </TouchableOpacity>
                         ))}
@@ -860,6 +936,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
                     </View>
                   )}
 
+                  {/* ── Review list ── */}
                   {loadingSocial ? <ActivityIndicator color={colors.primary} /> : reviews.length > 0 ? (
                     <View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}>
@@ -869,32 +946,135 @@ const ProductDetailScreen = ({ route, navigation }) => {
                         <View>
                           <View style={{ flexDirection: 'row', marginBottom: 6 }}>
                             {[...Array(5)].map((_, i) => (
-                              <Star key={i} size={16} color="#FBBF24" fill={i < Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) ? "#FBBF24" : "none"} />
+                              <Star key={i} size={16} color="#FBBF24" fill={i < Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) ? '#FBBF24' : 'none'} />
                             ))}
                           </View>
                           <CustomText variant="caption">{reviews.length} verified review{reviews.length !== 1 ? 's' : ''}</CustomText>
                         </View>
                       </View>
-                      {reviews.map((r, i) => (
-                        <View key={i} style={styles.reviewItem}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                            <View style={styles.stars}>
-                              {[...Array(5)].map((_, si) => <Star key={si} size={10} color="#FBBF24" fill={si < r.rating ? "#FBBF24" : "none"} />)}
+                      {reviews.map((r, i) => {
+                        const isVoted = helpfulVoted[r.id];
+                        const count = helpfulCounts[r.id] !== undefined ? helpfulCounts[r.id] : (r.helpfulVotes || 0);
+                        const buyerName = r.buyer?.name || 'Anonymous';
+                        // Seller can reply if the logged-in user's seller profile matches this product's seller
+                        const isSeller = user?.id && user?.role === 'SELLER' &&
+                          (routeProduct?.seller?.userId === user.id || routeProduct?.sellerId === user.id);
+
+                        return (
+                          <View key={i} style={[styles.reviewItem, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12 }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center' }}>
+                                {r.buyer?.image ? (
+                                  <Image source={{ uri: r.buyer.image }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                                ) : (
+                                  <User color={colors.primary} size={14} />
+                                )}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <CustomText style={{ color: colors.foreground, fontWeight: '700', fontSize: 13 }}>
+                                    {buyerName}
+                                  </CustomText>
+                                  <ShieldCheck color="#10B981" size={12} />
+                                </View>
+                                <CustomText style={{ color: colors.muted, fontSize: 10, marginTop: 1 }}>
+                                  {new Date(r.createdAt).toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </CustomText>
+                              </View>
+                              <View style={{ flexDirection: 'row', gap: 2 }}>
+                                {[...Array(5)].map((_, si) => <Star key={si} size={11} color={si < r.rating ? (r.rating >= 4 ? '#10B981' : r.rating === 3 ? '#F59E0B' : '#EF4444') : colors.muted} fill={si < r.rating ? (r.rating >= 4 ? '#10B981' : r.rating === 3 ? '#F59E0B' : '#EF4444') : 'none'} />)}
+                              </View>
                             </View>
-                            <CustomText variant="caption" style={{ marginLeft: 8 }}>{new Date(r.createdAt).toLocaleDateString()}</CustomText>
-                            <View style={styles.verifiedPurchaseBadge}>
-                              <CustomText style={styles.verifiedPurchaseText}>Verified Purchase</CustomText>
+
+                            {r.comment ? (
+                              <CustomText style={{ fontSize: 13, color: colors.foreground, lineHeight: 20, marginBottom: 10 }}>
+                                {r.comment}
+                              </CustomText>
+                            ) : null}
+
+                            {/* Seller reply thread */}
+                            {r.reply && (
+                              <View style={{ backgroundColor: colors.primary + '08', borderColor: colors.primary + '25', borderLeftWidth: 3, borderLeftColor: colors.primary, borderRadius: 12, padding: 12, marginBottom: 10 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                  <MessageSquare color={colors.primary} size={12} />
+                                  <CustomText style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>Seller Reply</CustomText>
+                                </View>
+                                <CustomText style={{ color: colors.foreground, fontSize: 12, lineHeight: 18 }}>
+                                  {r.reply}
+                                </CustomText>
+                              </View>
+                            )}
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                              {/* Helpful vote button (buyers) */}
+                              <TouchableOpacity
+                                style={{
+                                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                                  paddingHorizontal: 12, paddingVertical: 6,
+                                  borderRadius: 10, borderWidth: 1,
+                                  backgroundColor: isVoted ? colors.primary + '18' : colors.glass,
+                                  borderColor: isVoted ? colors.primary + '40' : colors.border,
+                                }}
+                                onPress={async () => {
+                                  if (!user?.id) {
+                                    Alert.alert('Login Required', 'You must be logged in to vote.');
+                                    return;
+                                  }
+                                  if (isVoted) {
+                                    Alert.alert('Already Voted', 'You have already marked this review as helpful.');
+                                    return;
+                                  }
+                                  setHelpfulVoted((prev) => ({ ...prev, [r.id]: true }));
+                                  setHelpfulCounts((prev) => ({ ...prev, [r.id]: count + 1 }));
+                                  try {
+                                    const res = await reviewService.markHelpful(user.id, r.id);
+                                    if (res?.alreadyVoted) {
+                                      setHelpfulVoted((prev) => ({ ...prev, [r.id]: true }));
+                                    }
+                                  } catch (err) {
+                                    setHelpfulVoted((prev) => ({ ...prev, [r.id]: false }));
+                                    setHelpfulCounts((prev) => ({ ...prev, [r.id]: count }));
+                                    Alert.alert('Error', err.message || 'Failed to vote');
+                                  }
+                                }}
+                              >
+                                <ThumbsUp size={12} color={isVoted ? colors.primary : colors.muted} fill={isVoted ? colors.primary : 'transparent'} />
+                                <CustomText style={{ fontSize: 11, fontWeight: '600', color: isVoted ? colors.primary : colors.muted }}>
+                                  {count > 0 ? `${count} Helpful` : 'Helpful'}
+                                </CustomText>
+                              </TouchableOpacity>
+
+                              {/* Seller reply button */}
+                              {isSeller && (
+                                <TouchableOpacity
+                                  style={{
+                                    flexDirection: 'row', alignItems: 'center', gap: 5,
+                                    paddingHorizontal: 12, paddingVertical: 6,
+                                    borderRadius: 10, borderWidth: 1,
+                                    backgroundColor: colors.primary + '10',
+                                    borderColor: colors.primary + '30',
+                                  }}
+                                  onPress={() => {
+                                    setSellerReplyTarget({ id: r.id, existingReply: r.reply || '' });
+                                    setSellerReplyText(r.reply || '');
+                                  }}
+                                >
+                                  <MessageSquare size={12} color={colors.primary} />
+                                  <CustomText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                                    {r.reply ? 'Edit Reply' : 'Reply'}
+                                  </CustomText>
+                                </TouchableOpacity>
+                              )}
                             </View>
                           </View>
-                          {r.comment ? <CustomText style={{ fontSize: 13, color: colors.muted }}>{r.comment}</CustomText> : null}
-                        </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   ) : (
-                    <View style={{ alignItems: 'center', py: 20 }}>
+                    <View style={{ alignItems: 'center', paddingVertical: 20 }}>
                       <Star size={32} color={colors.muted} style={{ opacity: 0.3, marginBottom: 8 }} />
                       <CustomText style={[styles.tabContent, { textAlign: 'center' }]}>
-                        No reviews yet. {eligibleOrderId ? "Be the first to review!" : "Complete a purchase of this product to leave a review."}
+                        No reviews yet. {eligibleOrderId ? 'Be the first to review!' : 'Complete a purchase of this product to leave a review.'}
                       </CustomText>
                     </View>
                   )}
@@ -906,6 +1086,72 @@ const ProductDetailScreen = ({ route, navigation }) => {
           <View style={{ height: 120 }} />
         </View>
       </ScrollView>
+
+      {/* ─── Seller Reply Modal ─── */}
+      <Modal
+        visible={!!sellerReplyTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setSellerReplyTarget(null); setSellerReplyText(''); }}
+      >
+        <View style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]}>
+          <View style={[styles.modalSheet, { borderRadius: 24, paddingBottom: 24, maxHeight: '80%' }]}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <MessageSquare size={18} color={colors.primary} />
+                <CustomText style={[styles.modalTitle, { color: colors.foreground }]}>
+                  {sellerReplyTarget?.existingReply ? 'Edit Reply' : 'Reply to Review'}
+                </CustomText>
+              </View>
+              <TouchableOpacity onPress={() => { setSellerReplyTarget(null); setSellerReplyText(''); }} style={styles.modalCloseBtn}>
+                <X size={20} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+            <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 12 }}>
+              Your reply is public and visible to all customers.
+            </CustomText>
+            <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+              <TextInput
+                style={[{
+                  borderRadius: 14, borderWidth: 1, padding: 14,
+                  fontSize: 14, minHeight: 120, lineHeight: 20,
+                  textAlignVertical: 'top',
+                  backgroundColor: colors.glass,
+                  color: colors.foreground,
+                  borderColor: colors.border,
+                }]}
+                placeholder="Write your professional reply..."
+                placeholderTextColor={colors.muted}
+                value={sellerReplyText}
+                onChangeText={setSellerReplyText}
+                multiline
+                textAlignVertical="top"
+              />
+            </ScrollView>
+            <TouchableOpacity
+              style={[{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                paddingVertical: 14, borderRadius: 14, marginTop: 16,
+                backgroundColor: colors.primary, opacity: sellerReplyLoading ? 0.7 : 1,
+              }]}
+              onPress={handleSellerReply}
+              disabled={sellerReplyLoading || !sellerReplyText.trim()}
+            >
+              {sellerReplyLoading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <>
+                  <MessageSquare size={16} color="white" />
+                  <CustomText style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>
+                    {sellerReplyTarget?.existingReply ? 'Update Reply' : 'Post Reply'}
+                  </CustomText>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* ─── Scam Report Modal ─── */}
       <Modal

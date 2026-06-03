@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { StatusBar } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -77,6 +78,11 @@ const RegisterScreen = ({ navigation, route }) => {
   // Initialize Native Google Sign-In configuration
   useEffect(() => {
     try {
+      if (Constants.appOwnership === 'expo') {
+        setUseNativeGoogle(false);
+        console.log('[DEBUG] Expo Go detected — using expo-auth-session for Google Sign-In');
+        return;
+      }
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');
       GoogleSignin.configure({
         webClientId: GOOGLE_WEB_CLIENT_ID,
