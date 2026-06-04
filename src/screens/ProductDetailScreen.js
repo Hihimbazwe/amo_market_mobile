@@ -14,7 +14,8 @@ import {
   Platform,
   Modal,
   TextInput,
-  Switch
+  Switch,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -1094,24 +1095,32 @@ const ProductDetailScreen = ({ route, navigation }) => {
         animationType="fade"
         onRequestClose={() => { setSellerReplyTarget(null); setSellerReplyText(''); }}
       >
-        <View style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]}>
-          <View style={[styles.modalSheet, { borderRadius: 24, paddingBottom: 24, maxHeight: '80%' }]}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleRow}>
-                <MessageSquare size={18} color={colors.primary} />
-                <CustomText style={[styles.modalTitle, { color: colors.foreground }]}>
-                  {sellerReplyTarget?.existingReply ? 'Edit Reply' : 'Reply to Review'}
-                </CustomText>
+        <KeyboardAvoidingView
+          style={[styles.modalOverlay, { justifyContent: 'center', padding: 20 }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+        >
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={[styles.modalSheet, { backgroundColor: colors.card, borderRadius: 24, paddingBottom: 24 }]}>
+              {/* Header */}
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleRow}>
+                  <MessageSquare size={18} color={colors.primary} />
+                  <CustomText style={[styles.modalTitle, { color: colors.foreground }]}>
+                    {sellerReplyTarget?.existingReply ? 'Edit Reply' : 'Reply to Review'}
+                  </CustomText>
+                </View>
+                <TouchableOpacity onPress={() => { setSellerReplyTarget(null); setSellerReplyText(''); }} style={styles.modalCloseBtn}>
+                  <X size={20} color={colors.muted} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => { setSellerReplyTarget(null); setSellerReplyText(''); }} style={styles.modalCloseBtn}>
-                <X size={20} color={colors.muted} />
-              </TouchableOpacity>
-            </View>
-            <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 12 }}>
-              Your reply is public and visible to all customers.
-            </CustomText>
-            <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
+              <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 12 }}>
+                Your reply is public and visible to all customers.
+              </CustomText>
               <TextInput
                 style={[{
                   borderRadius: 14, borderWidth: 1, padding: 14,
@@ -1120,6 +1129,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   backgroundColor: colors.glass,
                   color: colors.foreground,
                   borderColor: colors.border,
+                  marginBottom: 16,
                 }]}
                 placeholder="Write your professional reply..."
                 placeholderTextColor={colors.muted}
@@ -1127,30 +1137,31 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 onChangeText={setSellerReplyText}
                 multiline
                 textAlignVertical="top"
+                scrollEnabled
               />
-            </ScrollView>
-            <TouchableOpacity
-              style={[{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-                paddingVertical: 14, borderRadius: 14, marginTop: 16,
-                backgroundColor: colors.primary, opacity: sellerReplyLoading ? 0.7 : 1,
-              }]}
-              onPress={handleSellerReply}
-              disabled={sellerReplyLoading || !sellerReplyText.trim()}
-            >
-              {sellerReplyLoading ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <>
-                  <MessageSquare size={16} color="white" />
-                  <CustomText style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>
-                    {sellerReplyTarget?.existingReply ? 'Update Reply' : 'Post Reply'}
-                  </CustomText>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+              <TouchableOpacity
+                style={[{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  paddingVertical: 14, borderRadius: 14,
+                  backgroundColor: colors.primary, opacity: sellerReplyLoading ? 0.7 : 1,
+                }]}
+                onPress={handleSellerReply}
+                disabled={sellerReplyLoading || !sellerReplyText.trim()}
+              >
+                {sellerReplyLoading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <>
+                    <MessageSquare size={16} color="white" />
+                    <CustomText style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>
+                      {sellerReplyTarget?.existingReply ? 'Update Reply' : 'Post Reply'}
+                    </CustomText>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ─── Scam Report Modal ─── */}

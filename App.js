@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import './src/i18n';
 import React from 'react';
-import { View, StyleSheet, AppState, Platform } from 'react-native';
+import { View, StyleSheet, AppState, Platform, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -144,11 +144,12 @@ const AuthStack = () => (
 // --- COMPONENTS ---
 
 const LoadingScreen = () => {
-  const { colors } = useTheme();
   return (
-    <View style={[styles.placeholder, { backgroundColor: colors.background }]}>
-      <Loader2 color={colors.primary} size={48} style={{ marginBottom: 16 }} />
-      <CustomText variant="h2">AMO Market</CustomText>
+    <View style={{ flex: 1, backgroundColor: '#030712', justifyContent: 'center', alignItems: 'center' }}>
+      <Image
+        source={require('./assets/splash-icon.png')}
+        style={{ width: 120, height: 120, resizeMode: 'contain' }}
+      />
     </View>
   );
 };
