@@ -190,6 +190,8 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   );
 };
 
+export const BuyerDrawerComponent = CustomDrawer;
+
 export default function BuyerDashboard({ navigation }) {
   const { visible, setVisible } = useContext(BuyerDrawerContext);
 

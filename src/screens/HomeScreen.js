@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  ScrollView, 
-  StatusBar, 
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  StatusBar,
   Dimensions,
   ImageBackground,
   FlatList,
@@ -15,14 +15,14 @@ import {
 } from 'react-native';
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  Smartphone, 
-  Shirt, 
-  Home as HomeIcon, 
-  Dumbbell, 
-  BookOpen, 
-  Car, 
-  Tag, 
+import {
+  Smartphone,
+  Shirt,
+  Home as HomeIcon,
+  Dumbbell,
+  BookOpen,
+  Car,
+  Tag,
   Zap,
   ShieldCheck,
   Truck,
@@ -36,7 +36,8 @@ import {
   TrendingUp,
   Clock,
   ArrowUpRight,
-  Flame
+  Flame,
+  ArrowUp
 } from 'lucide-react-native';
 import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import CustomText from '../components/CustomText';
@@ -49,6 +50,9 @@ import { productService } from '../api/productService';
 import { useTheme } from '../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { BuyerDrawerContext as DrawerContext } from '../context/BuyerDrawerContext';
+import { BuyerDrawerComponent } from '../navigation/BuyerDashboardDrawer';
+import { useAuth } from '../context/AuthContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -82,6 +86,9 @@ const HomeScreen = ({ navigation }) => {
   const flatListRef = useRef(null);
   const mainScrollRef = useRef(null);
   const timerRef = useRef(null);
+  const { toggleDrawer, visible, setVisible } = React.useContext(DrawerContext) || {};
+  const { isAuthenticated } = useAuth();
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const heroProducts = useMemo(() => {
     if (!liveProducts || liveProducts.length === 0) return [null];
@@ -126,7 +133,7 @@ const HomeScreen = ({ navigation }) => {
   const fetchFeatured = async (showRefresher = false) => {
     if (showRefresher) setRefreshing(true);
     else setLoading(true);
-    
+
     try {
       const data = await productService.getProducts();
       setLiveProducts(data); // Show all products
@@ -159,6 +166,10 @@ const HomeScreen = ({ navigation }) => {
     mainScrollRef.current?.scrollTo({ y: 320, animated: true });
   };
 
+  const handleScrollToTop = () => {
+    mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const onRefresh = useCallback(() => {
     fetchFeatured(true);
   }, []);
@@ -170,18 +181,18 @@ const HomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
-      
+
       {/* Main Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity style={[styles.iconButton, { backgroundColor: colors.glass }]}>
+          <TouchableOpacity onPress={toggleDrawer} style={[styles.iconButton, { backgroundColor: colors.glass }]}>
             <Menu color={colors.foreground} size={24} />
           </TouchableOpacity>
-          
+
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image 
-              source={require('../../assets/logo.png')} 
-              style={{ width: 28, height: 28, resizeMode: 'contain', marginRight: 8 }} 
+            <Image
+              source={require('../../assets/logo.png')}
+              style={{ width: 28, height: 28, resizeMode: 'contain', marginRight: 8 }}
             />
             <Svg height="24" width="105">
               <Defs>
@@ -210,14 +221,22 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <ScrollView 
+      <ScrollView
         ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          if (e.nativeEvent.contentOffset.y > 300) {
+            if (!showScrollTop) setShowScrollTop(true);
+          } else {
+            if (showScrollTop) setShowScrollTop(false);
+          }
+        }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-  
+
         {/* Hero Section - Auto-sliding Carousel */}
         <View style={styles.heroContainer}>
           <FlatList
@@ -234,8 +253,8 @@ const HomeScreen = ({ navigation }) => {
             renderItem={({ item }) => (
               <View style={styles.heroSlide}>
                 <ImageBackground
-                  source={{ 
-                    uri: item?.media?.[0]?.url || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200' 
+                  source={{
+                    uri: item?.media?.[0]?.url || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200'
                   }}
                   style={styles.heroImage}
                   imageStyle={{ borderRadius: 24 }}
@@ -253,8 +272,8 @@ const HomeScreen = ({ navigation }) => {
                     <CustomText variant="subtitle" style={styles.heroSubtitle}>
                       {item?.price ? `Rwf ${item.price.toLocaleString()}` : t('heroSubtitle')}
                     </CustomText>
-                    <CustomButton 
-                      title={t('shopNow')} 
+                    <CustomButton
+                      title={t('shopNow')}
                       style={styles.heroButton}
                       onPress={() => {
                         if (item?.id) {
@@ -262,7 +281,7 @@ const HomeScreen = ({ navigation }) => {
                         } else {
                           scrollToProducts();
                         }
-                      }} 
+                      }}
                     />
                   </View>
                 </ImageBackground>
@@ -272,12 +291,12 @@ const HomeScreen = ({ navigation }) => {
           {/* Pagination Dots */}
           <View style={styles.heroPagination}>
             {heroProducts.map((_, i) => (
-              <View 
-                key={i} 
+              <View
+                key={i}
                 style={[
-                  styles.heroDot, 
+                  styles.heroDot,
                   { backgroundColor: activeHeroIndex === i ? colors.primary : 'rgba(255,255,255,0.5)' }
-                ]} 
+                ]}
               />
             ))}
           </View>
@@ -288,19 +307,19 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.sectionHeader}>
             <CustomText variant="h2">{t('popularCategories')}</CustomText>
           </View>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoriesScroll}
           >
-            <TouchableOpacity 
-              style={[styles.categoryPill, selectedCategory === 'All' && styles.activeCategoryPill]} 
+            <TouchableOpacity
+              style={[styles.categoryPill, selectedCategory === 'All' && styles.activeCategoryPill]}
               onPress={() => setSelectedCategory('All')}
             >
               <CustomText style={[styles.categoryPillText, selectedCategory === 'All' && styles.activeCategoryPillText]}>All</CustomText>
             </TouchableOpacity>
             {categories.map((cat, index) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={index}
                 style={[styles.categoryPill, selectedCategory === cat.label && styles.activeCategoryPill]}
                 onPress={() => setSelectedCategory(cat.label)}
@@ -315,8 +334,8 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         {/* Trust Bar */}
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={[styles.trustBar, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}
           contentContainerStyle={styles.trustBarContent}
@@ -366,16 +385,41 @@ const HomeScreen = ({ navigation }) => {
             <CustomText variant="subtitle" style={{ color: 'rgba(255,255,255,0.7)', marginTop: 8 }}>
               {t('boostVisibility')}
             </CustomText>
-            <CustomButton 
-              title={t('getStarted')} 
+            <CustomButton
+              title={t('getStarted')}
               variant="secondary"
               style={{ marginTop: 24, width: 160 }}
-              onPress={() => {}}
+              onPress={() => { }}
             />
           </GlassContainer>
         </View>
       </ScrollView>
 
+      {/* Scroll to Top Floating Button */}
+      {showScrollTop && (
+        <TouchableOpacity
+          onPress={handleScrollToTop}
+          activeOpacity={0.8}
+          style={[
+            styles.scrollTopButton,
+            {
+              backgroundColor: colors.primary,
+              bottom: isAuthenticated ? 12 : 148
+            }
+          ]}
+        >
+          <ArrowUp color="#ffffff" size={24} />
+        </TouchableOpacity>
+      )}
+
+      {/* Local Drawer Component so it renders over this screen */}
+      {visible && setVisible && (
+        <BuyerDrawerComponent
+          visible={visible}
+          onClose={() => setVisible(false)}
+          navigation={navigation}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -641,6 +685,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+  },
+  scrollTopButton: {
+    position: 'absolute',
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+    zIndex: 99,
   },
 });
 

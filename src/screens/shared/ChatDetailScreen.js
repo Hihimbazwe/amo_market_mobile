@@ -20,8 +20,9 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Contacts from 'expo-contacts';
+import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, MoreVertical, Image as ImageIcon, CornerUpLeft, ShoppingBag, ExternalLink, Tag, Paperclip, FileText, UserPlus, X, Phone, Video } from 'lucide-react-native';
+import { ArrowLeft, Send, MoreVertical, Image as ImageIcon, CornerUpLeft, ShoppingBag, ExternalLink, Tag, Paperclip, FileText, UserPlus, X, Phone, Video, MapPin } from 'lucide-react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
@@ -284,6 +285,30 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
                       </CustomText>
                     </View>
                   </View>
+                ) : attachment.type === 'location' ? (
+                  <TouchableOpacity
+                    style={styles.attachmentRow}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      const url = Platform.OS === 'ios'
+                        ? `maps:0,0?q=${attachment.latitude},${attachment.longitude}`
+                        : `geo:0,0?q=${attachment.latitude},${attachment.longitude}`;
+                      Linking.openURL(url).catch(() => Alert.alert('Could not open map'));
+                    }}
+                  >
+                    <View style={[styles.attachmentIcon, { backgroundColor: isMe ? 'rgba(255,255,255,0.14)' : colors.primary + '14' }]}>
+                      <MapPin size={20} color={isMe ? '#fff' : colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <CustomText style={[styles.attachmentTitle, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={1}>
+                        Location Shared
+                      </CustomText>
+                      <CustomText style={[styles.attachmentMeta, { color: isMe ? 'rgba(255,255,255,0.75)' : colors.muted }]} numberOfLines={1}>
+                        Tap to view on map
+                      </CustomText>
+                    </View>
+                    <ExternalLink size={14} color={isMe ? 'rgba(255,255,255,0.75)' : colors.muted} />
+                  </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
                     style={styles.attachmentRow}
@@ -1087,6 +1112,31 @@ export default function ChatDetailScreen() {
     setImageCaption('');
   };
 
+  const handleShareLocation = async () => {
+    setAttachmentVisible(false);
+    if (isSellerDeactivated) {
+      Alert.alert('Account Restricted', 'Your seller account is deactivated. You cannot send messages until your account is reactivated.');
+      return;
+    }
+    
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Permission to access location was denied.');
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({});
+      await sendAttachmentMessage({
+        type: 'location',
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+    } catch (e) {
+      Alert.alert('Location Error', 'Could not retrieve your current location.');
+    }
+  };
+
   const handleSend = async () => {
     // Deactivated sellers cannot send new messages
     if (isSellerDeactivated) {
@@ -1189,7 +1239,7 @@ export default function ChatDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.glassBorder }]}>
         <TouchableOpacity onPress={() => navigation.navigate('Messages', { screen: 'MessagesMain' })} style={styles.backBtn}>
@@ -1475,6 +1525,12 @@ export default function ChatDetailScreen() {
                   <ImageIcon color={colors.primary} size={20} />
                 </View>
                 <CustomText style={[styles.attachmentOptionText, { color: colors.foreground }]}>Image</CustomText>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.attachmentOption} onPress={handleShareLocation}>
+                <View style={[styles.attachmentOptionIcon, { backgroundColor: colors.primary + '16' }]}>
+                  <MapPin color={colors.primary} size={20} />
+                </View>
+                <CustomText style={[styles.attachmentOptionText, { color: colors.foreground }]}>Location</CustomText>
               </TouchableOpacity>
               <TouchableOpacity style={styles.attachmentOption} onPress={handlePickDocumentAttachment}>
                 <View style={[styles.attachmentOptionIcon, { backgroundColor: colors.primary + '16' }]}>
@@ -1806,7 +1862,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 4,
     gap: 10,
   },
   inputWrap: {

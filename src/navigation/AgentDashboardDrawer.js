@@ -198,6 +198,8 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   );
 };
 
+export const AgentDrawerComponent = CustomDrawer;
+
 export default function AgentDashboardDrawer({ navigation }) {
   const { visible, setVisible } = useContext(AgentDrawerContext);
 

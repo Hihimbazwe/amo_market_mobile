@@ -47,10 +47,13 @@ import {
   ThumbsUp,
   MessageSquare,
   User,
+  Pencil,
+  Trash2,
 } from 'lucide-react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import CustomText from '../components/CustomText';
 import CustomInput from '../components/CustomInput';
+import ProductCard from '../components/ProductCard';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useCart } from '../context/CartContext';
@@ -114,6 +117,10 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [helpfulVoted, setHelpfulVoted] = useState({});
   const [helpfulCounts, setHelpfulCounts] = useState({});
 
+  // Related products states
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [relatedLoading, setRelatedLoading] = useState(true);
+
   // Review form states
   const [eligibleOrderId, setEligibleOrderId] = useState(null);
   const [userRating, setUserRating] = useState(0);
@@ -125,6 +132,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [sellerReplyTarget, setSellerReplyTarget] = useState(null); // { id, existingReply }
   const [sellerReplyText, setSellerReplyText] = useState('');
   const [sellerReplyLoading, setSellerReplyLoading] = useState(false);
+
+  // Edit review states
+  const [editReviewTarget, setEditReviewTarget] = useState(null); // { id, rating, comment }
+  const [editReviewRating, setEditReviewRating] = useState(0);
+  const [editReviewComment, setEditReviewComment] = useState('');
+  const [editReviewLoading, setEditReviewLoading] = useState(false);
 
   // Scam report modal states
   const [scamModalVisible, setScamModalVisible] = useState(false);
@@ -253,6 +266,31 @@ const ProductDetailScreen = ({ route, navigation }) => {
         .catch(err => console.log('[DEBUG] Error checking review eligibility:', err));
     }
   }, [product.id, user?.id]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchRelated = async () => {
+      const category = routeProduct?.category;
+      if (!category) {
+        if (active) setRelatedLoading(false);
+        return;
+      }
+      try {
+        const data = await productService.getProducts({ category, limit: 10 });
+        if (active) {
+          const prods = data.products || data;
+          const filtered = (Array.isArray(prods) ? prods : []).filter(p => p.id !== product.id);
+          setRelatedProducts(filtered);
+        }
+      } catch (err) {
+        console.log('[DEBUG] Error fetching related products:', err);
+      } finally {
+        if (active) setRelatedLoading(false);
+      }
+    };
+    fetchRelated();
+    return () => { active = false; };
+  }, [routeProduct?.category, product.id]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -389,7 +427,6 @@ const ProductDetailScreen = ({ route, navigation }) => {
     setSellerReplyLoading(true);
     try {
       await reviewService.replyToReview(user.id, sellerReplyTarget.id, sellerReplyText.trim());
-      // Refresh reviews to show updated reply
       const revs = await reviewService.getProductReviews(product.id, user?.id);
       setReviews(revs || []);
       setSellerReplyTarget(null);
@@ -400,6 +437,52 @@ const ProductDetailScreen = ({ route, navigation }) => {
     } finally {
       setSellerReplyLoading(false);
     }
+  };
+
+  const handleEditReview = async () => {
+    if (!editReviewRating) {
+      Alert.alert('Rating Required', 'Please select a star rating.');
+      return;
+    }
+    setEditReviewLoading(true);
+    try {
+      await reviewService.editReview(user.id, editReviewTarget.id, {
+        rating: editReviewRating,
+        comment: editReviewComment,
+      });
+      const revs = await reviewService.getProductReviews(product.id, user?.id);
+      setReviews(revs || []);
+      setEditReviewTarget(null);
+      Alert.alert('Updated', 'Your review has been updated.');
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to update review.');
+    } finally {
+      setEditReviewLoading(false);
+    }
+  };
+
+  const handleDeleteReview = (reviewId) => {
+    Alert.alert(
+      'Delete Review',
+      'Are you sure you want to delete this review? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await reviewService.deleteReview(user.id, reviewId);
+              const revs = await reviewService.getProductReviews(product.id, user?.id);
+              setReviews(revs || []);
+              Alert.alert('Deleted', 'Your review has been removed.');
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Failed to delete review.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleAddToCart = async () => {
@@ -1021,19 +1104,23 @@ const ProductDetailScreen = ({ route, navigation }) => {
                                     Alert.alert('Login Required', 'You must be logged in to vote.');
                                     return;
                                   }
-                                  if (isVoted) {
-                                    Alert.alert('Already Voted', 'You have already marked this review as helpful.');
+                                  if (r.buyerId === user.id) {
+                                    Alert.alert('Not Allowed', 'You cannot vote on your own review.');
                                     return;
                                   }
-                                  setHelpfulVoted((prev) => ({ ...prev, [r.id]: true }));
-                                  setHelpfulCounts((prev) => ({ ...prev, [r.id]: count + 1 }));
+                                  // Optimistic toggle
+                                  const newVoted = !isVoted;
+                                  const newCount = newVoted ? count + 1 : Math.max(0, count - 1);
+                                  setHelpfulVoted((prev) => ({ ...prev, [r.id]: newVoted }));
+                                  setHelpfulCounts((prev) => ({ ...prev, [r.id]: newCount }));
                                   try {
                                     const res = await reviewService.markHelpful(user.id, r.id);
-                                    if (res?.alreadyVoted) {
-                                      setHelpfulVoted((prev) => ({ ...prev, [r.id]: true }));
-                                    }
+                                    // Sync with server response
+                                    setHelpfulVoted((prev) => ({ ...prev, [r.id]: res.voted }));
+                                    setHelpfulCounts((prev) => ({ ...prev, [r.id]: res.voted ? count + 1 : Math.max(0, count - 1) }));
                                   } catch (err) {
-                                    setHelpfulVoted((prev) => ({ ...prev, [r.id]: false }));
+                                    // Rollback on error
+                                    setHelpfulVoted((prev) => ({ ...prev, [r.id]: isVoted }));
                                     setHelpfulCounts((prev) => ({ ...prev, [r.id]: count }));
                                     Alert.alert('Error', err.message || 'Failed to vote');
                                   }
@@ -1045,27 +1132,60 @@ const ProductDetailScreen = ({ route, navigation }) => {
                                 </CustomText>
                               </TouchableOpacity>
 
-                              {/* Seller reply button */}
-                              {isSeller && (
-                                <TouchableOpacity
-                                  style={{
-                                    flexDirection: 'row', alignItems: 'center', gap: 5,
-                                    paddingHorizontal: 12, paddingVertical: 6,
-                                    borderRadius: 10, borderWidth: 1,
-                                    backgroundColor: colors.primary + '10',
-                                    borderColor: colors.primary + '30',
-                                  }}
-                                  onPress={() => {
-                                    setSellerReplyTarget({ id: r.id, existingReply: r.reply || '' });
-                                    setSellerReplyText(r.reply || '');
-                                  }}
-                                >
-                                  <MessageSquare size={12} color={colors.primary} />
-                                  <CustomText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
-                                    {r.reply ? 'Edit Reply' : 'Reply'}
-                                  </CustomText>
-                                </TouchableOpacity>
-                              )}
+                              {/* Right-side action buttons */}
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                {/* Edit / Delete — own review */}
+                                {user?.id && r.buyerId === user.id && (
+                                  <>
+                                    <TouchableOpacity
+                                      style={{
+                                        padding: 6, borderRadius: 8, borderWidth: 1,
+                                        backgroundColor: colors.glass,
+                                        borderColor: colors.border,
+                                      }}
+                                      onPress={() => {
+                                        setEditReviewTarget({ id: r.id });
+                                        setEditReviewRating(r.rating);
+                                        setEditReviewComment(r.comment || '');
+                                      }}
+                                    >
+                                      <Pencil size={12} color={colors.primary} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={{
+                                        padding: 6, borderRadius: 8, borderWidth: 1,
+                                        backgroundColor: '#EF444415',
+                                        borderColor: '#EF444430',
+                                      }}
+                                      onPress={() => handleDeleteReview(r.id)}
+                                    >
+                                      <Trash2 size={12} color="#EF4444" />
+                                    </TouchableOpacity>
+                                  </>
+                                )}
+
+                                {/* Seller reply button */}
+                                {isSeller && (
+                                  <TouchableOpacity
+                                    style={{
+                                      flexDirection: 'row', alignItems: 'center', gap: 5,
+                                      paddingHorizontal: 10, paddingVertical: 6,
+                                      borderRadius: 10, borderWidth: 1,
+                                      backgroundColor: colors.primary + '10',
+                                      borderColor: colors.primary + '30',
+                                    }}
+                                    onPress={() => {
+                                      setSellerReplyTarget({ id: r.id, existingReply: r.reply || '' });
+                                      setSellerReplyText(r.reply || '');
+                                    }}
+                                  >
+                                    <MessageSquare size={12} color={colors.primary} />
+                                    <CustomText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                                      {r.reply ? 'Edit Reply' : 'Reply'}
+                                    </CustomText>
+                                  </TouchableOpacity>
+                                )}
+                              </View>
                             </View>
                           </View>
                         );
@@ -1082,6 +1202,31 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 </View>
               )}
             </View>
+          </View>
+
+          {/* ─── Related Products Section ─── */}
+          <View style={{ marginTop: 32 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <CustomText style={{ fontSize: 18, fontWeight: '800' }}>You might also like</CustomText>
+            </View>
+            {relatedLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
+            ) : relatedProducts.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                {relatedProducts.map((p) => (
+                  <ProductCard 
+                    key={p.id}
+                    product={p} 
+                    onPress={() => navigation.push('ProductDetail', { product: p })} 
+                    style={{ width: 160, marginBottom: 0 }}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <CustomText style={{ color: colors.muted, fontStyle: 'italic', marginVertical: 10 }}>
+                No related products found.
+              </CustomText>
+            )}
           </View>
 
           <View style={{ height: 120 }} />
@@ -1163,6 +1308,95 @@ const ProductDetailScreen = ({ route, navigation }) => {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ─── Edit Review Modal ─── */}
+      <Modal
+        visible={editReviewTarget !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditReviewTarget(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={[styles.modalSheet, { backgroundColor: colors.card, borderRadius: 24, paddingBottom: 24 }]}>
+              {/* Header */}
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleRow}>
+                  <Pencil size={18} color={colors.primary} />
+                  <CustomText style={[styles.modalTitle, { color: colors.foreground }]}>
+                    Edit Review
+                  </CustomText>
+                </View>
+                <TouchableOpacity onPress={() => setEditReviewTarget(null)} style={styles.modalCloseBtn}>
+                  <X size={20} color={colors.muted} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Star Rating Selection */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 20, gap: 12 }}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <TouchableOpacity key={s} onPress={() => setEditReviewRating(s)}>
+                    <Star
+                      size={32}
+                      color={s <= editReviewRating ? '#FBBF24' : colors.muted}
+                      fill={s <= editReviewRating ? '#FBBF24' : 'none'}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Comment Input */}
+              <TextInput
+                style={[{
+                  borderRadius: 14, borderWidth: 1, padding: 14,
+                  fontSize: 14, minHeight: 120, lineHeight: 20,
+                  textAlignVertical: 'top',
+                  backgroundColor: colors.glass,
+                  color: colors.foreground,
+                  borderColor: colors.border,
+                  marginBottom: 16,
+                }]}
+                placeholder="What did you like or dislike?"
+                placeholderTextColor={colors.muted}
+                value={editReviewComment}
+                onChangeText={setEditReviewComment}
+                multiline
+                textAlignVertical="top"
+                scrollEnabled
+              />
+
+              <TouchableOpacity
+                style={[{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  paddingVertical: 14, borderRadius: 14,
+                  backgroundColor: colors.primary, opacity: editReviewLoading ? 0.7 : 1,
+                }]}
+                onPress={handleEditReview}
+                disabled={editReviewLoading}
+              >
+                {editReviewLoading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <>
+                    <Star size={16} color="white" />
+                    <CustomText style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>
+                      Update Review
+                    </CustomText>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
 
       {/* ─── Scam Report Modal ─── */}
       <Modal

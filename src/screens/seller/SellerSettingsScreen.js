@@ -184,6 +184,19 @@ const SellerSettingsScreen = () => {
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
+            <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('SellerFollowers')} activeOpacity={0.7}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
+                <User color={colors.muted} size={20} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <CustomText style={[styles.settingTitle, { color: colors.foreground }]}>{t('myFollowers') || 'My Followers'}</CustomText>
+                <CustomText style={[styles.settingSubtitle, { color: colors.muted }]}>{t('viewFollowers') || 'View list of users following your store'}</CustomText>
+              </View>
+              <ChevronRight color={colors.muted} size={18} />
+            </TouchableOpacity>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
             <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('SellerKYC')} activeOpacity={0.7}>
               <View style={[styles.settingIcon, { backgroundColor: colors.glass }]}>
                 <ShieldCheck color={colors.muted} size={20} />

@@ -22,7 +22,11 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#030712"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ]
     },
     "notification": {
       "icon": "./assets/icon.png",
@@ -33,10 +37,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "49b11845-df80-45c9-884b-44a4cbcd4258"
+        "projectId": "9cf51c39-18f5-4326-a7c1-a28002683822"
       }
     },
-    "owner": "ihyacinthe",
+    "owner": "hyacintheee",
     "plugins": [
       "expo-video",
       "expo-contacts",

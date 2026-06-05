@@ -49,7 +49,7 @@ export const reviewService = {
     }
   },
 
-  // POST /api/reviews/[id]/helpful — mark a review as helpful (buyer only)
+  // POST /api/reviews/[id]/helpful — toggle helpful vote (adds or removes)
   markHelpful: async (userId, reviewId) => {
     try {
       const response = await fetchWithTimeout(`${BASE_URL}/api/reviews/${reviewId}/helpful`, {
@@ -60,11 +60,10 @@ export const reviewService = {
       let data;
       try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid response: ${text.slice(0, 100)}`); }
       if (!response.ok) {
-        // 409 = already voted — not a fatal error
-        if (response.status === 409) return { alreadyVoted: true };
         throw new Error(data.error || `Failed to vote (${response.status})`);
       }
-      return { success: true };
+      // data.voted = true (added) or false (removed)
+      return { success: true, voted: data.voted };
     } catch (error) {
       console.error('markHelpful error:', error);
       throw error;
@@ -86,6 +85,25 @@ export const reviewService = {
       return data;
     } catch (error) {
       console.error('replyToReview error:', error);
+      throw error;
+    }
+  },
+
+  // PATCH /api/reviews/[id] — buyer edits their own review
+  editReview: async (userId, reviewId, { rating, comment }) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/reviews/${reviewId}`, {
+        method: 'PATCH',
+        headers: buildHeaders(userId),
+        body: JSON.stringify({ rating, comment }),
+      });
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid response: ${text.slice(0, 100)}`); }
+      if (!response.ok) throw new Error(data.error || `Failed to update review (${response.status})`);
+      return data;
+    } catch (error) {
+      console.error('editReview error:', error);
       throw error;
     }
   },

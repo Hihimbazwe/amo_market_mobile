@@ -197,6 +197,8 @@ const CustomDrawer = ({ visible, onClose, navigation, activeScreen, setActiveScr
 };
 
 // ─── Main Drawer Navigator ────────────────────────────────────────────────────
+export const CourierDrawerComponent = CustomDrawer;
+
 export default function CourierDashboardDrawer({ navigation }) {
   const { visible, setVisible } = useContext(CourierDrawerContext);
   const [activeScreen, setActiveScreen] = useState('CourierDashboard');

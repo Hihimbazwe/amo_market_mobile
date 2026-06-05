@@ -43,6 +43,7 @@ import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
 import SellerProductDetailScreen from '../screens/seller/SellerProductDetailScreen';
+import SellerFollowersScreen from '../screens/seller/SellerFollowersScreen';
 
 // Buyer features for navigation parity
 import ProductDetailScreen from '../screens/ProductDetailScreen';
@@ -242,7 +243,9 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
   );
 };
 
-export default function SellerDashboardDrawer({ navigation }) {
+export const SellerDrawerComponent = CustomDrawer;
+
+export default function SellerDashboard({ navigation }) {
   const { visible, setVisible } = useContext(SellerDrawerContext);
 
   return (
@@ -259,6 +262,7 @@ export default function SellerDashboardDrawer({ navigation }) {
         <Stack.Screen name="SellerMembership" component={SellerMembershipScreen} />
         <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
         <Stack.Screen name="SellerInventory" component={SellerInventoryScreen} />
+        <Stack.Screen name="SellerFollowers" component={SellerFollowersScreen} />
         <Stack.Screen name="SellerReviews" component={SellerReviewsScreen} />
         <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
         <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} />

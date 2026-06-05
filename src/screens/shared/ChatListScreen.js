@@ -27,11 +27,15 @@ import { useAuth } from '../../context/AuthContext';
 import { chatService } from '../../api/chatService';
 import PresenceDot from '../../components/PresenceDot';
 
-// Try to get whichever drawer context is available
 import { BuyerDrawerContext } from '../../context/BuyerDrawerContext';
 import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { CourierDrawerContext } from '../../context/CourierDrawerContext';
 import { AgentDrawerContext } from '../../context/AgentDrawerContext';
+
+import { BuyerDrawerComponent } from '../../navigation/BuyerDashboardDrawer';
+import { SellerDrawerComponent } from '../../navigation/SellerDashboardDrawer';
+import { CourierDrawerComponent } from '../../navigation/CourierDashboardDrawer';
+import { AgentDrawerComponent } from '../../navigation/AgentDashboardDrawer';
 
 
 function formatTime(date) {
@@ -267,15 +271,22 @@ export default function ChatListScreen() {
   const agentCtx = useContext(AgentDrawerContext);
 
   const toggleDrawer = () => {
+    try {
+      if (navigation?.toggleDrawer) {
+        navigation.toggleDrawer();
+        return;
+      }
+    } catch (e) {}
+    
     const role = user?.role?.toUpperCase();
     if (role === 'SELLER') {
-      sellerCtx?.toggleDrawer();
+      sellerCtx?.toggleDrawer?.();
     } else if (role === 'AGENT') {
-      agentCtx?.toggleDrawer();
+      agentCtx?.toggleDrawer?.();
     } else if (role === 'COURIER') {
-      courierCtx?.toggleDrawer();
+      courierCtx?.toggleDrawer?.();
     } else {
-      buyerCtx?.toggleDrawer();
+      buyerCtx?.toggleDrawer?.();
     }
   };
 
@@ -862,15 +873,15 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
                         ) : (
                           <CustomText style={[styles.statusAvatarText, { color: colors.primary }]}>{myStatus.sellerInitials}</CustomText>
                         )}
-                        <View style={[styles.addPlusBtnMini, { backgroundColor: colors.primary }]}>
+                        <View style={[styles.addPlusBtnMini, { backgroundColor: colors.primary, borderColor: colors.background }]}>
                           <Plus color="#fff" size={10} />
                         </View>
                       </View>
                     </View>
                   ) : (
                     // Seller NO status: Show dashed ring
-                    <View style={styles.addStatusCircle}>
-                      <View style={[styles.addPlusBtn, { backgroundColor: colors.primary }]}>
+                    <View style={[styles.addStatusCircle, { borderColor: colors.border || 'rgba(150,150,150,0.3)' }]}>
+                      <View style={[styles.addPlusBtn, { backgroundColor: colors.primary, borderColor: colors.background }]}>
                         <Plus color="#fff" size={16} />
                       </View>
                     </View>
@@ -1000,12 +1011,6 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
             onPress={handleLockedTabPress}
           >
             <CustomText style={[styles.pillText, { color: filterType === 'locked' ? '#fff' : colors.muted }]}>Locked</CustomText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.settingsPill, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-            onPress={openChatSettings}
-          >
-            <Settings color={colors.muted} size={17} />
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -1182,6 +1187,21 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Render local drawer so it overlays exactly on this screen */}
+      {user?.role?.toUpperCase() === 'SELLER' && sellerCtx?.visible && sellerCtx?.setVisible && (
+        <SellerDrawerComponent visible={sellerCtx.visible} onClose={() => sellerCtx.setVisible(false)} navigation={navigation} />
+      )}
+      {user?.role?.toUpperCase() === 'AGENT' && agentCtx?.visible && agentCtx?.setVisible && (
+        <AgentDrawerComponent visible={agentCtx.visible} onClose={() => agentCtx.setVisible(false)} navigation={navigation} />
+      )}
+      {user?.role?.toUpperCase() === 'COURIER' && courierCtx?.visible && courierCtx?.setVisible && (
+        <CourierDrawerComponent visible={courierCtx.visible} onClose={() => courierCtx.setVisible(false)} navigation={navigation} />
+      )}
+      {(!user?.role || user?.role?.toUpperCase() === 'BUYER' || user?.role?.toUpperCase() === 'USER') && buyerCtx?.visible && buyerCtx?.setVisible && (
+        <BuyerDrawerComponent visible={buyerCtx.visible} onClose={() => buyerCtx.setVisible(false)} navigation={navigation} />
+      )}
+
     </SafeAreaView>
   );
 }
