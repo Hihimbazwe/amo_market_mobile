@@ -1023,19 +1023,6 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   {/* ── Review list ── */}
                   {loadingSocial ? <ActivityIndicator color={colors.primary} /> : reviews.length > 0 ? (
                     <View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}>
-                        <CustomText style={{ fontSize: 40, fontWeight: '900', color: colors.text || '#fff' }}>
-                          {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
-                        </CustomText>
-                        <View>
-                          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} size={16} color="#FBBF24" fill={i < Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) ? '#FBBF24' : 'none'} />
-                            ))}
-                          </View>
-                          <CustomText variant="caption">{reviews.length} verified review{reviews.length !== 1 ? 's' : ''}</CustomText>
-                        </View>
-                      </View>
                       {reviews.map((r, i) => {
                         const isVoted = helpfulVoted[r.id];
                         const count = helpfulCounts[r.id] !== undefined ? helpfulCounts[r.id] : (r.helpfulVotes || 0);

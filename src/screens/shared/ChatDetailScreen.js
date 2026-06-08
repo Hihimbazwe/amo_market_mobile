@@ -253,7 +253,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
             style={[
               styles.bubble,
               isMe
-                ? [styles.bubbleMe, { backgroundColor: colors.primary, opacity: msg.isDeleted ? 0.7 : 1 }]
+                ? [styles.bubbleMe, { backgroundColor: '#1B6A60', opacity: msg.isDeleted ? 0.7 : 1 }]
                 : [styles.bubbleOther, { backgroundColor: colors.card, borderColor: colors.glassBorder, opacity: msg.isDeleted ? 0.7 : 1 }],
               msg.isDeleted && { paddingVertical: 4, minHeight: 26 },
               // Smart borders
@@ -261,7 +261,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
               isMe && isSameSenderAsPrev && { borderTopRightRadius: 4 },
               !isMe && isSameSenderAsNext && { borderBottomLeftRadius: 16 },
               !isMe && isSameSenderAsPrev && { borderTopLeftRadius: 4 },
-              (productInfo || attachment) && { padding: 0, overflow: 'hidden' }
+              (productInfo || attachment) && { paddingHorizontal: 2, paddingTop: 2, paddingBottom: 0, overflow: 'hidden' }
             ]}
           >
             {attachment && (
@@ -374,7 +374,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
               delayLongPress={250}
               style={
                 productInfo || attachment
-                  ? { paddingHorizontal: 12, paddingVertical: 10 }
+                  ? { paddingHorizontal: 6, paddingTop: 1, paddingBottom: 2 }
                   : undefined
               }
             >
@@ -407,9 +407,9 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
 
               {msg.replyTo && (
                 <View style={[styles.quotedBubble, { backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                  <View style={[styles.quotedBorder, { backgroundColor: colors.primary }]} />
+                  <View style={[styles.quotedBorder, { backgroundColor: isMe ? '#fff' : colors.primary }]} />
                   <View style={styles.quotedBody}>
-                    <CustomText style={[styles.quotedSender, { color: colors.primary }]} numberOfLines={1}>
+                    <CustomText style={[styles.quotedSender, { color: isMe ? '#fff' : colors.primary }]} numberOfLines={1}>
                       {msg.replyTo.senderName}
                     </CustomText>
                     <CustomText style={[styles.quotedText, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={2}>
@@ -1890,15 +1890,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   attachmentCard: {
-    borderWidth: 1,
+    borderWidth: 0,
     borderRadius: 14,
-    margin: 8,
+    margin: 0,
     overflow: 'hidden',
   },
   attachmentImage: {
     width: 220,
     height: 180,
-    borderRadius: 12,
+    borderRadius: 14,
   },
   attachmentRow: {
     minWidth: 220,
