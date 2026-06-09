@@ -106,7 +106,7 @@ const BuyerOverviewScreen = () => {
         <CustomText variant="h2">{t('dashboard')}</CustomText>
       </View>
       
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={true}>
         
         {/* Futuristic Search Bar */}
         <View style={[styles.searchContainer, { backgroundColor: colors.glass }]}>
@@ -244,7 +244,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   menuButton: { marginRight: 16, padding: 8, borderRadius: 12 },
-  content: { padding: 16 },
+  scrollView: { flex: 1 },
+  content: { padding: 16, paddingBottom: 32 },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 12, paddingHorizontal: 16, marginBottom: 24,

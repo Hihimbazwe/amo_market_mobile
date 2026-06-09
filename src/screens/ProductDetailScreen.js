@@ -937,8 +937,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
               {activeTab === 2 && (
                 <View>
                   {/* ── Reviews Section Header: Post Review + Report buttons ── */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <CustomText style={{ fontSize: 13, fontWeight: '700', color: colors.foreground }}>Customer Reviews</CustomText>
+                  <View style={{ marginBottom: 16 }}>
+                    <CustomText style={{ fontSize: 13, fontWeight: '700', color: colors.foreground, marginBottom: 12 }}>Customer Reviews</CustomText>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       {eligibleOrderId && (
                         <TouchableOpacity
@@ -1023,7 +1023,30 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   {/* ── Review list ── */}
                   {loadingSocial ? <ActivityIndicator color={colors.primary} /> : reviews.length > 0 ? (
                     <View>
-                      {reviews.map((r, i) => {
+                      {/* View All button */}
+                      {reviews.length > 4 && (
+                        <TouchableOpacity
+                          onPress={() => navigation.navigate('Reviews', { productId: product.id, productName: product.title })}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 12,
+                            paddingHorizontal: 20,
+                            backgroundColor: colors.primary + '10',
+                            borderRadius: 12,
+                            marginBottom: 16,
+                            borderWidth: 1,
+                            borderColor: colors.primary + '30',
+                          }}
+                        >
+                          <CustomText style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+                            View All {reviews.length} Reviews
+                          </CustomText>
+                        </TouchableOpacity>
+                      )}
+
+                      {reviews.slice(0, 4).map((r, i) => {
                         const isVoted = helpfulVoted[r.id];
                         const count = helpfulCounts[r.id] !== undefined ? helpfulCounts[r.id] : (r.helpfulVotes || 0);
                         const buyerName = r.buyer?.name || 'Anonymous';

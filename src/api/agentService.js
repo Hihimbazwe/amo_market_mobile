@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '@env';
 
-const API_URL = API_BASE_URL;
+const API_URL = API_BASE_URL || 'https://amomarket-cyan.vercel.app';
 
 
 // Common headers for all API calls — ngrok-skip-browser-warning bypasses

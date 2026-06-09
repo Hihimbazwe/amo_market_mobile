@@ -41,13 +41,17 @@ export const NotificationProvider = ({ children }) => {
 
   // Dynamically set notification handler based on user settings
   useEffect(() => {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: pushNotificationsEnabled,
-        shouldPlaySound: pushNotificationsEnabled,
-        shouldSetBadge: false,
-      }),
-    });
+    try {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: pushNotificationsEnabled,
+          shouldPlaySound: pushNotificationsEnabled,
+          shouldSetBadge: false,
+        }),
+      });
+    } catch (err) {
+      console.error('[PUSH] Error setting notification handler:', err);
+    }
   }, [pushNotificationsEnabled]);
 
   useEffect(() => {
@@ -78,7 +82,8 @@ export const NotificationProvider = ({ children }) => {
   const fetchUnread = async () => {
     if (!user?.id) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/mobile/chat/conversations/unread-count`, {
+      const apiUrl = API_BASE_URL || 'https://amomarket-cyan.vercel.app';
+      const res = await fetch(`${apiUrl}/api/mobile/chat/conversations/unread-count`, {
         headers: { 'x-user-id': user.id, 'ngrok-skip-browser-warning': 'true' }
       });
       const data = await res.json();
@@ -100,94 +105,113 @@ export const NotificationProvider = ({ children }) => {
   useEffect(() => {
     if (!user?.id || loadingSettings) return;
 
-    if (pushNotificationsEnabled) {
-      console.log('[PUSH] Attempting registration for user:', user.id);
-      registerForPushNotificationsAsync().then(token => {
-        if (token) {
-          console.log('[PUSH] Token acquired:', token);
-          setExpoPushToken(token);
-          // Send the token to the backend
-          fetch(`${API_BASE_URL}/api/mobile/push-token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'ngrok-skip-browser-warning': 'true',
-              'x-user-id': user.id,
-            },
-            body: JSON.stringify({ token }),
-          })
-          .then(res => res.json())
-          .then(data => console.log('[PUSH] Backend sync response:', data))
-          .catch(err => {
-            console.error('[PUSH] Failed to sync push token with backend', err);
-          });
+    const setupPushNotifications = async () => {
+      try {
+        if (pushNotificationsEnabled) {
+          console.log('[PUSH] Attempting registration for user:', user.id);
+          const token = await registerForPushNotificationsAsync();
+          if (token) {
+            console.log('[PUSH] Token acquired:', token);
+            setExpoPushToken(token);
+            // Send the token to the backend
+            try {
+              const res = await fetch(`${API_BASE_URL}/api/mobile/push-token`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'ngrok-skip-browser-warning': 'true',
+                  'x-user-id': user.id,
+                },
+                body: JSON.stringify({ token }),
+              });
+              const data = await res.json();
+              console.log('[PUSH] Backend sync response:', data);
+            } catch (err) {
+              console.error('[PUSH] Failed to sync push token with backend', err);
+            }
+          } else {
+            console.warn('[PUSH] No token returned from registration');
+          }
         } else {
-          console.warn('[PUSH] No token returned from registration');
+          // Tell backend to delete push token when notifications are disabled
+          console.log('[PUSH] Push notifications disabled. Telling server to unregister token...');
+          try {
+            const res = await fetch(`${API_BASE_URL}/api/mobile/push-token`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true',
+                'x-user-id': user.id,
+              },
+              body: JSON.stringify({ token: 'DISABLED', enabled: false }),
+            });
+            const data = await res.json();
+            console.log('[PUSH] Backend unregister response:', data);
+          } catch (err) {
+            console.error('[PUSH] Failed to unregister push token on backend', err);
+          }
         }
-      }).catch(err => {
-        console.error('[PUSH] Registration error:', err);
-      });
-    } else {
-      // Tell backend to delete push token when notifications are disabled
-      console.log('[PUSH] Push notifications disabled. Telling server to unregister token...');
-      fetch(`${API_BASE_URL}/api/mobile/push-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-          'x-user-id': user.id,
-        },
-        body: JSON.stringify({ token: 'DISABLED', enabled: false }),
-      })
-      .then(res => res.json())
-      .then(data => console.log('[PUSH] Backend unregister response:', data))
-      .catch(err => {
-        console.error('[PUSH] Failed to unregister push token on backend', err);
-      });
-    }
+      } catch (err) {
+        console.error('[PUSH] Error in setupPushNotifications:', err);
+      }
+    };
+
+    setupPushNotifications();
 
     // Handle notifications received while app is running foreground
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      setNotification(notification);
-      const newNotificationItem = {
-        id: notification.request.identifier || String(Date.now()),
-        title: notification.request.content.title || 'Notification',
-        message: notification.request.content.body || '',
-        data: notification.request.content.data || {},
-        createdAt: new Date().toISOString(),
-        read: false,
-      };
-      setNotificationsList(prev => {
-        if (prev.some(n => n.id === newNotificationItem.id)) return prev;
-        const updated = [newNotificationItem, ...prev];
-        AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e => console.warn(e));
-        return updated;
+    try {
+      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+        setNotification(notification);
+        const newNotificationItem = {
+          id: notification.request.identifier || String(Date.now()),
+          title: notification.request.content.title || 'Notification',
+          message: notification.request.content.body || '',
+          data: notification.request.content.data || {},
+          createdAt: new Date().toISOString(),
+          read: false,
+        };
+        setNotificationsList(prev => {
+          if (prev.some(n => n.id === newNotificationItem.id)) return prev;
+          const updated = [newNotificationItem, ...prev];
+          AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e => console.warn(e));
+          return updated;
+        });
       });
-    });
+    } catch (err) {
+      console.error('[PUSH] Error adding notification received listener:', err);
+    }
 
     // Handle user tapping the notification
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log(response);
-      const notification = response.notification;
-      const newNotificationItem = {
-        id: notification.request.identifier || String(Date.now()),
-        title: notification.request.content.title || 'Notification',
-        message: notification.request.content.body || '',
-        data: notification.request.content.data || {},
-        createdAt: new Date().toISOString(),
-        read: false,
-      };
-      setNotificationsList(prev => {
-        if (prev.some(n => n.id === newNotificationItem.id)) return prev;
-        const updated = [newNotificationItem, ...prev];
-        AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e => console.warn(e));
-        return updated;
+    try {
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+        console.log(response);
+        const notification = response.notification;
+        const newNotificationItem = {
+          id: notification.request.identifier || String(Date.now()),
+          title: notification.request.content.title || 'Notification',
+          message: notification.request.content.body || '',
+          data: notification.request.content.data || {},
+          createdAt: new Date().toISOString(),
+          read: false,
+        };
+        setNotificationsList(prev => {
+          if (prev.some(n => n.id === newNotificationItem.id)) return prev;
+          const updated = [newNotificationItem, ...prev];
+          AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e => console.warn(e));
+          return updated;
+        });
       });
-    });
+    } catch (err) {
+      console.error('[PUSH] Error adding notification response listener:', err);
+    }
 
     return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
+      try {
+        notificationListener.current?.remove();
+        responseListener.current?.remove();
+      } catch (err) {
+        console.error('[PUSH] Error removing listeners:', err);
+      }
     };
   }, [user?.id, pushNotificationsEnabled]);
 
@@ -232,12 +256,12 @@ export const NotificationProvider = ({ children }) => {
   };
 
   return (
-    <NotificationContext.Provider value={{ 
+    <NotificationContext.Provider value={{
       notifications: notificationsList,
-      unreadCount: notificationsList.filter(n => !n.read).length, 
+      unreadCount: notificationsList.filter(n => !n.read).length,
       unreadChatCount: unreadChatCount,
       refreshUnread: fetchUnread,
-      loading: false, 
+      loading: false,
       expoPushToken,
       pushNotificationsEnabled,
       togglePushNotifications,
@@ -256,49 +280,53 @@ export const useNotifications = () => useContext(NotificationContext);
 async function registerForPushNotificationsAsync() {
   let token;
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
+  try {
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
 
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      console.warn('Failed to get push token for push notification!');
-      return;
-    }
-    
-    // Use project ID explicitly or fallback to auto-detection
-    try {
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.warn('[PUSH] Failed to get push token for push notification!');
+        return null;
+      }
+
+      // Use project ID explicitly or fallback to auto-detection
+      try {
         const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
         if (!projectId) {
           console.warn('[PUSH] No EAS Project ID found. Push notifications will not work until you add a projectId to app.json.');
-          Alert.alert('Push Setup Required', 'Please add your EAS Project ID to app.json to enable notifications.');
-          return;
+          return null;
         }
         token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    } catch(e) {
+      } catch (e) {
         console.error('[PUSH] Error getting Expo Push Token:', e);
         // Fallback without projectId (deprecated but might work in some dev environments)
         try {
           token = (await Notifications.getExpoPushTokenAsync()).data;
-        } catch(fallbackErr) {
+        } catch (fallbackErr) {
           console.error('[PUSH] Fallback also failed:', fallbackErr);
-          throw new Error('Could not get push token. Ensure you have an EAS Project ID.');
+          return null;
         }
+      }
+    } else {
+      console.warn('[PUSH] Must use physical device for Push Notifications');
     }
-  } else {
-    console.warn('Must use physical device for Push Notifications');
+  } catch (error) {
+    console.error('[PUSH] Unexpected error in registerForPushNotificationsAsync:', error);
+    return null;
   }
 
-  return token;
+  return token || null;
 }

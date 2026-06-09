@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@env';
 
-const BASE_URL = `${API_BASE_URL}/api/locations`;
+const BASE_URL = (API_BASE_URL || 'https://amomarket-cyan.vercel.app') + '/api/locations';
 
 const fetchList = async (params) => {
   try {

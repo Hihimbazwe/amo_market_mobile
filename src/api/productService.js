@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@env';
 
-const BASE_URL = API_BASE_URL;
+const BASE_URL = API_BASE_URL || 'https://amomarket-cyan.vercel.app';
 
 const commonHeaders = {
   'Content-Type': 'application/json',
@@ -289,7 +289,17 @@ export const productService = {
         body: JSON.stringify(reviewData),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        if (text?.includes('<html') || text?.includes('<!DOCTYPE')) {
+          throw new Error('Server error: Invalid response format.');
+        }
+        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+      }
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to submit review');
       }

@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@env';
 
-const BASE_URL = API_BASE_URL;
+const BASE_URL = API_BASE_URL || 'https://amomarket-cyan.vercel.app';
 
 // Common headers for all API calls — ngrok-skip-browser-warning bypasses
 // ngrok's HTML interstitial page that breaks non-browser (mobile) fetch calls

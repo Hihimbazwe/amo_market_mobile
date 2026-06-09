@@ -40,12 +40,12 @@ function formatLastSeen(timestamp) {
   const now = new Date();
   const diffMs = now - date;
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
+
   const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
+
   if (diffDays === 0) {
     if (now.getDate() === date.getDate()) {
-       return `today at ${timeStr}`;
+      return `today at ${timeStr}`;
     }
     return `yesterday at ${timeStr}`;
   } else if (diffDays === 1) {
@@ -85,12 +85,12 @@ const formatDateSeparator = (date) => {
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  
+
   const isSameYear = d.getFullYear() === now.getFullYear();
-  return d.toLocaleDateString([], { 
-    month: 'short', 
-    day: 'numeric', 
-    year: isSameYear ? undefined : 'numeric' 
+  return d.toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    year: isSameYear ? undefined : 'numeric'
   });
 };
 
@@ -148,7 +148,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
       const priceLine = lines[1].replace('💰 Price: ', '').trim();
       const imageLine = lines[2].replace('🖼️ Image: ', '').trim();
       const idLine = lines[3].replace('🆔 ID: ', '').trim();
-      
+
       let restOfText = '';
       if (lines.length > 4) {
         restOfText = lines.slice(4).join('\n').trim();
@@ -221,7 +221,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
 
   const isSameSenderAsNext = msg.isSameSenderAsNext;
   const isSameSenderAsPrev = msg.isSameSenderAsPrev;
-  
+
   return (
     <Swipeable
       ref={swipeableRef}
@@ -235,7 +235,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
       overshootRight={false}
     >
       <View style={[
-        styles.bubbleRow, 
+        styles.bubbleRow,
         isMe ? styles.rowRight : styles.rowLeft,
         { marginTop: msg.showSeparator ? 12 : (isSameSenderAsPrev ? 2 : 10) }
       ]}>
@@ -253,7 +253,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
             style={[
               styles.bubble,
               isMe
-                ? [styles.bubbleMe, { backgroundColor: '#1B6A60', opacity: msg.isDeleted ? 0.7 : 1 }]
+                ? [styles.bubbleMe, { backgroundColor: '#1A365D', opacity: msg.isDeleted ? 0.7 : 1 }]
                 : [styles.bubbleOther, { backgroundColor: colors.card, borderColor: colors.glassBorder, opacity: msg.isDeleted ? 0.7 : 1 }],
               msg.isDeleted && { paddingVertical: 4, minHeight: 26 },
               // Smart borders
@@ -346,10 +346,10 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
                 }}
               >
                 {productInfo.image ? (
-                  <Image 
-                    source={{ uri: productInfo.image }} 
-                    style={{ width: 44, height: 44, borderRadius: 8, marginRight: 10 }} 
-                    resizeMode="cover" 
+                  <Image
+                    source={{ uri: productInfo.image }}
+                    style={{ width: 44, height: 44, borderRadius: 8, marginRight: 10 }}
+                    resizeMode="cover"
                   />
                 ) : (
                   <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.05)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
@@ -426,7 +426,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
                     {'   '}{formatMsgTime(msg.timestamp)}{!msg.isDeleted && isMe && ' ✓✓'}
                   </CustomText>
                 </CustomText>
-                
+
                 <View style={styles.timestampWrap}>
                   <CustomText style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
                     {formatMsgTime(msg.timestamp)}
@@ -603,7 +603,7 @@ export default function ChatDetailScreen() {
       navigation.navigate('ProductDetail', { product: routeProduct });
       return;
     }
-    
+
     try {
       const fullProduct = await productService.getProductById(productId, user?.id);
       if (fullProduct) {
@@ -668,7 +668,7 @@ export default function ChatDetailScreen() {
   // Listen for real-time WebSocket events
   useEffect(() => {
     if (!conversation?.id || !user?.id) return;
-    
+
     return addListener((event) => {
       if (isHidden) return; // Ignore all real-time events if availability is hidden
 
@@ -680,7 +680,7 @@ export default function ChatDetailScreen() {
           setTyping(false);
         }
       }
-      
+
       // Online/Offline status could also be handled here if server broadcasts USER_ONLINE
       if (event.type === 'USER_ONLINE' && event.userId === participantId) {
         setIsOnline(true);
@@ -724,8 +724,8 @@ export default function ChatDetailScreen() {
   const handleUnblockPrompt = () => {
     Alert.alert('Unblock User', `Do you want to unblock ${conversation?.participantName}?`, [
       { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Unblock', 
+      {
+        text: 'Unblock',
         onPress: async () => {
           const res = await chatService.blockUser(user?.id, participantId, 'unblock');
           if (res.success || res.error === undefined) {
@@ -740,13 +740,13 @@ export default function ChatDetailScreen() {
 
   const handleManageChat = async (action) => {
     setOptionsVisible(false);
-    
+
     if (action === 'clear') {
       Alert.alert('Clear Chat', 'Are you sure you want to clear all messages? This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear', 
-          style: 'destructive', 
+        {
+          text: 'Clear',
+          style: 'destructive',
           onPress: async () => {
             const res = await chatService.manageConversation(conversation.id, user?.id, 'clear');
             if (res.success) {
@@ -761,9 +761,9 @@ export default function ChatDetailScreen() {
     } else if (action === 'block') {
       Alert.alert('Block User', `Are you sure you want to block ${conversation?.participantName}? They won't be able to message you.`, [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Block', 
-          style: 'destructive', 
+        {
+          text: 'Block',
+          style: 'destructive',
           onPress: async () => {
             const res = await chatService.blockUser(user?.id, participantId, 'block');
             if (res.success || res.error === undefined) {
@@ -858,7 +858,7 @@ export default function ChatDetailScreen() {
       };
 
       initMessages();
-      
+
       const pollInterval = setInterval(async () => {
         if (!conversation?.id || !user?.id) return;
         const cid = (conversation.id.startsWith('new-') || conversation.id.startsWith('temp_')) ? null : conversation.id;
@@ -869,14 +869,14 @@ export default function ChatDetailScreen() {
             // Only update if lengths diff or last message diff to avoid over-rendering janks
             // Preserve temp messages (IDs starting with 'm-') during polling to prevent flickering
             setMessages(prev => {
-               const tempMessages = prev.filter(m => m.id && m.id.startsWith('m-'));
-               if (prev.length !== data.length || (data.length > 0 && prev[prev.length-1]?.id !== data[data.length-1]?.id)) {
-                 return [...data, ...tempMessages];
-               }
-               return prev;
+              const tempMessages = prev.filter(m => m.id && m.id.startsWith('m-'));
+              if (prev.length !== data.length || (data.length > 0 && prev[prev.length - 1]?.id !== data[data.length - 1]?.id)) {
+                return [...data, ...tempMessages];
+              }
+              return prev;
             });
           }
-          
+
           // Poll typing and online status
           const statusResult = await chatService.checkTyping(cid, user.id, participantId);
           console.log(`[DEBUG-CHAT-DETAIL] Polling status for ${participantId}:`, statusResult);
@@ -907,9 +907,9 @@ export default function ChatDetailScreen() {
       const isMe = msg.senderId === 'me';
       const options = [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete for me', 
-          style: 'destructive', 
+        {
+          text: 'Delete for me',
+          style: 'destructive',
           onPress: () => {
             chatService.deleteMessage(conversation.id, msg.id, user?.id, 'me').then(() => {
               setMessages(prev => prev.filter(m => m.id !== msg.id));
@@ -919,7 +919,7 @@ export default function ChatDetailScreen() {
       ];
 
       if (isMe && !msg.isDeleted) {
-        options.push({ 
+        options.push({
           text: 'Delete for everyone',
           style: 'destructive',
           onPress: () => {
@@ -1118,7 +1118,7 @@ export default function ChatDetailScreen() {
       Alert.alert('Account Restricted', 'Your seller account is deactivated. You cannot send messages until your account is reactivated.');
       return;
     }
-    
+
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -1184,30 +1184,30 @@ export default function ChatDetailScreen() {
         senderName: replyingTo.senderId === 'me' ? 'You' : (replyingTo.senderName || 'Other')
       } : null
     };
-    
+
     setMessages((prev) => [...prev, myMsg]);
-    
+
     let cid = conversation.id;
     if (cid.startsWith('new-') || cid.startsWith('temp_')) {
-       try {
-         const pId = cid.startsWith('new-') ? cid.replace('new-', '') : cid.replace('temp_', '');
-         cid = await chatService.createConversation(pId, user?.id);
-         navigation.setParams({ conversation: { ...conversation, id: cid, productContext: null } });
-       } catch (e) {
-         setMessages((prev) => prev.filter(m => m.id !== tempId));
-         Alert.alert('Error', 'Could not create conversation.');
-         return;
-       }
+      try {
+        const pId = cid.startsWith('new-') ? cid.replace('new-', '') : cid.replace('temp_', '');
+        cid = await chatService.createConversation(pId, user?.id);
+        navigation.setParams({ conversation: { ...conversation, id: cid, productContext: null } });
+      } catch (e) {
+        setMessages((prev) => prev.filter(m => m.id !== tempId));
+        Alert.alert('Error', 'Could not create conversation.');
+        return;
+      }
     }
 
     try {
       const statusItemId = route.params?.statusId || null;
       const realMsg = await chatService.sendMessage(cid, user.id, finalMsgText, statusItemId, rId);
-      
+
       // Stop typing immediately on send
       if (cid) chatService.stopTyping(cid, user.id);
 
-      setMessages((prev) => 
+      setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...realMsg, replyTo: myMsg.replyTo || realMsg.replyTo } : m))
       );
     } catch (e) {
@@ -1257,15 +1257,15 @@ export default function ChatDetailScreen() {
           )}
           {isOnline && !isHidden && (
             <View style={styles.onlineDotHeaderWrapper}>
-              <Animated.View 
+              <Animated.View
                 style={[
-                  styles.onlineDotPulse, 
-                  { 
-                    backgroundColor: '#22c55e', 
-                    transform: [{ scale: pulseScale }], 
-                    opacity: pulseOpacity 
+                  styles.onlineDotPulse,
+                  {
+                    backgroundColor: '#22c55e',
+                    transform: [{ scale: pulseScale }],
+                    opacity: pulseOpacity
                   }
-                ]} 
+                ]}
               />
               <PresenceDot size={12} borderSize={2} borderColor={colors.background} />
             </View>
@@ -1351,10 +1351,10 @@ export default function ChatDetailScreen() {
             const isSameSenderAsNext = nextDate === currentDate && nextMsg && nextMsg.senderId === item.senderId;
 
             const enhancedMsg = {
-               ...item,
-               showSeparator,
-               isSameSenderAsPrev,
-               isSameSenderAsNext
+              ...item,
+              showSeparator,
+              isSameSenderAsPrev,
+              isSameSenderAsNext
             };
 
             return (
@@ -1425,93 +1425,93 @@ export default function ChatDetailScreen() {
             </View>
           </View>
         ) : isBlockedByMe ? (
-          <TouchableOpacity 
-             style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder, justifyContent: 'center', paddingVertical: 18 }]}
-             onPress={handleUnblockPrompt}
-             activeOpacity={0.7}
+          <TouchableOpacity
+            style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder, justifyContent: 'center', paddingVertical: 18 }]}
+            onPress={handleUnblockPrompt}
+            activeOpacity={0.7}
           >
-             <CustomText style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>
-               You blocked this contact. Tap to unblock.
-             </CustomText>
+            <CustomText style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>
+              You blocked this contact. Tap to unblock.
+            </CustomText>
           </TouchableOpacity>
         ) : (
-        <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }]}>
-          {replyingTo && (
-            <View style={[styles.replyPreview, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
-              <View style={styles.replyPreviewBody}>
-                <CustomText style={[styles.replyPreviewSender, { color: colors.primary }]}>
-                  {replyingTo.senderId === 'me' ? 'You' : (replyingTo.senderName || 'Other')}
-                </CustomText>
-                <CustomText style={[styles.replyPreviewText, { color: colors.muted }]} numberOfLines={1}>
-                  {replyingTo.text}
-                </CustomText>
-              </View>
-              <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyClose}>
-                <View style={[styles.replyCloseCircle, { backgroundColor: colors.glassBorder }]}>
-                  <CustomText style={{ fontSize: 10, color: colors.muted }}>✕</CustomText>
+          <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }]}>
+            {replyingTo && (
+              <View style={[styles.replyPreview, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
+                <View style={styles.replyPreviewBody}>
+                  <CustomText style={[styles.replyPreviewSender, { color: colors.primary }]}>
+                    {replyingTo.senderId === 'me' ? 'You' : (replyingTo.senderName || 'Other')}
+                  </CustomText>
+                  <CustomText style={[styles.replyPreviewText, { color: colors.muted }]} numberOfLines={1}>
+                    {replyingTo.text}
+                  </CustomText>
                 </View>
-              </TouchableOpacity>
-            </View>
-          )}
-          <View style={styles.inputBar}>
-            <TouchableOpacity
-              onPress={() => setAttachmentVisible(true)}
-              style={[styles.attachBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-              activeOpacity={0.8}
-            >
-              <Paperclip color={colors.primary} size={20} />
-            </TouchableOpacity>
-            <View style={[styles.inputWrap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-              {editingMessageId && (
-                <CustomText style={{ fontSize: 10, color: colors.primary, marginBottom: 2, fontWeight: '700' }}>
-                  Editing Message
-                </CustomText>
-              )}
-              <TextInput
-                ref={inputRef}
-                value={input}
-                onChangeText={(txt) => {
-                  setInput(txt);
-                  
-                  // Live typing via WebSocket
-                  if (conversation?.id && !conversation.id.startsWith('new-') && user?.id) {
-                    sendTyping(conversation.id, conversation.participantId);
-                    
-                    // Clear existing timer
-                    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-                    
-                    // Set timeout to stop typing
-                    typingTimerRef.current = setTimeout(() => {
-                      sendStopTyping(conversation.id, conversation.participantId);
-                    }, 2000);
-                  }
-                }}
-                placeholder="Type a message..."
-                placeholderTextColor={colors.muted}
-                style={[styles.input, { color: colors.foreground }]}
-                multiline
-                maxLength={1000}
-                returnKeyType="default"
-              />
-            </View>
-            {editingMessageId && (
-              <TouchableOpacity onPress={() => { setEditingMessageId(null); setInput(''); }} style={{ marginRight: 6, marginBottom: 12 }}>
-                <CustomText style={{ color: colors.muted, fontSize: 13, fontWeight: '600' }}>Cancel</CustomText>
-              </TouchableOpacity>
+                <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyClose}>
+                  <View style={[styles.replyCloseCircle, { backgroundColor: colors.glassBorder }]}>
+                    <CustomText style={{ fontSize: 10, color: colors.muted }}>✕</CustomText>
+                  </View>
+                </TouchableOpacity>
+              </View>
             )}
-            <TouchableOpacity
-              onPress={handleSend}
-              disabled={!input.trim()}
-              style={[
-                styles.sendBtn,
-                { backgroundColor: input.trim() ? colors.primary : colors.glass },
-              ]}
-              activeOpacity={0.8}
-            >
-              <Send color={input.trim() ? '#fff' : colors.muted} size={20} />
-            </TouchableOpacity>
+            <View style={styles.inputBar}>
+              <TouchableOpacity
+                onPress={() => setAttachmentVisible(true)}
+                style={[styles.attachBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                activeOpacity={0.8}
+              >
+                <Paperclip color={colors.primary} size={20} />
+              </TouchableOpacity>
+              <View style={[styles.inputWrap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                {editingMessageId && (
+                  <CustomText style={{ fontSize: 10, color: colors.primary, marginBottom: 2, fontWeight: '700' }}>
+                    Editing Message
+                  </CustomText>
+                )}
+                <TextInput
+                  ref={inputRef}
+                  value={input}
+                  onChangeText={(txt) => {
+                    setInput(txt);
+
+                    // Live typing via WebSocket
+                    if (conversation?.id && !conversation.id.startsWith('new-') && user?.id) {
+                      sendTyping(conversation.id, conversation.participantId);
+
+                      // Clear existing timer
+                      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+
+                      // Set timeout to stop typing
+                      typingTimerRef.current = setTimeout(() => {
+                        sendStopTyping(conversation.id, conversation.participantId);
+                      }, 2000);
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  placeholderTextColor={colors.muted}
+                  style={[styles.input, { color: colors.foreground }]}
+                  multiline
+                  maxLength={1000}
+                  returnKeyType="default"
+                />
+              </View>
+              {editingMessageId && (
+                <TouchableOpacity onPress={() => { setEditingMessageId(null); setInput(''); }} style={{ marginRight: 6, marginBottom: 12 }}>
+                  <CustomText style={{ color: colors.muted, fontSize: 13, fontWeight: '600' }}>Cancel</CustomText>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={handleSend}
+                disabled={!input.trim()}
+                style={[
+                  styles.sendBtn,
+                  { backgroundColor: input.trim() ? colors.primary : colors.glass },
+                ]}
+                activeOpacity={0.8}
+              >
+                <Send color={input.trim() ? '#fff' : colors.muted} size={20} />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
         )}
       </KeyboardAvoidingView>
 
@@ -1631,72 +1631,72 @@ export default function ChatDetailScreen() {
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               style={{ width: '100%' }}
             >
-            <TouchableWithoutFeedback>
-              <View style={[styles.reportSheet, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+              <TouchableWithoutFeedback>
+                <View style={[styles.reportSheet, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
 
-                {/* Sheet handle */}
-                <View style={[styles.sheetHandle, { backgroundColor: colors.glassBorder }]} />
+                  {/* Sheet handle */}
+                  <View style={[styles.sheetHandle, { backgroundColor: colors.glassBorder }]} />
 
-                {/* Warning icon row */}
-                <View style={[styles.reportIconWrap, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)' }]}>
-                  <CustomText style={styles.reportIconEmoji}>🚩</CustomText>
-                </View>
+                  {/* Warning icon row */}
+                  <View style={[styles.reportIconWrap, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)' }]}>
+                    <CustomText style={styles.reportIconEmoji}>🚩</CustomText>
+                  </View>
 
-                <CustomText style={[styles.reportTitle, { color: colors.foreground }]}>
-                  Report User
-                </CustomText>
-                <CustomText style={[styles.reportSubtitle, { color: colors.muted }]}>
-                  Reporting{' '}
-                  <CustomText style={{ color: colors.primary, fontWeight: '700' }}>
-                    {conversation?.participantName || 'this user'}
+                  <CustomText style={[styles.reportTitle, { color: colors.foreground }]}>
+                    Report User
                   </CustomText>
-                  . Please describe the issue below.
-                </CustomText>
+                  <CustomText style={[styles.reportSubtitle, { color: colors.muted }]}>
+                    Reporting{' '}
+                    <CustomText style={{ color: colors.primary, fontWeight: '700' }}>
+                      {conversation?.participantName || 'this user'}
+                    </CustomText>
+                    . Please describe the issue below.
+                  </CustomText>
 
-                {/* Reason input */}
-                <TextInput
-                  value={reportReason}
-                  onChangeText={setReportReason}
-                  placeholder="e.g. Sending spam messages, inappropriate content..."
-                  placeholderTextColor={colors.muted}
-                  style={[
-                    styles.reportInput,
-                    { backgroundColor: colors.background, borderColor: colors.glassBorder, color: colors.foreground },
-                  ]}
-                  multiline
-                  maxLength={500}
-                  textAlignVertical="top"
-                />
-                <CustomText style={[styles.charCount, { color: colors.muted }]}>
-                  {reportReason.length}/500
-                </CustomText>
+                  {/* Reason input */}
+                  <TextInput
+                    value={reportReason}
+                    onChangeText={setReportReason}
+                    placeholder="e.g. Sending spam messages, inappropriate content..."
+                    placeholderTextColor={colors.muted}
+                    style={[
+                      styles.reportInput,
+                      { backgroundColor: colors.background, borderColor: colors.glassBorder, color: colors.foreground },
+                    ]}
+                    multiline
+                    maxLength={500}
+                    textAlignVertical="top"
+                  />
+                  <CustomText style={[styles.charCount, { color: colors.muted }]}>
+                    {reportReason.length}/500
+                  </CustomText>
 
-                {/* Actions */}
-                <View style={styles.reportActions}>
-                  <TouchableOpacity
-                    style={[styles.reportBtn, styles.cancelBtn, { borderColor: colors.glassBorder }]}
-                    onPress={() => { setReportVisible(false); setReportReason(''); }}
-                    activeOpacity={0.8}
-                  >
-                    <CustomText style={[styles.reportBtnText, { color: colors.muted }]}>Cancel</CustomText>
-                  </TouchableOpacity>
+                  {/* Actions */}
+                  <View style={styles.reportActions}>
+                    <TouchableOpacity
+                      style={[styles.reportBtn, styles.cancelBtn, { borderColor: colors.glassBorder }]}
+                      onPress={() => { setReportVisible(false); setReportReason(''); }}
+                      activeOpacity={0.8}
+                    >
+                      <CustomText style={[styles.reportBtnText, { color: colors.muted }]}>Cancel</CustomText>
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.reportBtn, styles.submitBtn, { backgroundColor: reportSubmitting ? 'rgba(239,68,68,0.5)' : '#EF4444' }]}
-                    onPress={handleReport}
-                    disabled={reportSubmitting}
-                    activeOpacity={0.8}
-                  >
-                    {reportSubmitting ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <CustomText style={[styles.reportBtnText, { color: '#fff' }]}>Submit Report</CustomText>
-                    )}
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.reportBtn, styles.submitBtn, { backgroundColor: reportSubmitting ? 'rgba(239,68,68,0.5)' : '#EF4444' }]}
+                      onPress={handleReport}
+                      disabled={reportSubmitting}
+                      activeOpacity={0.8}
+                    >
+                      {reportSubmitting ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <CustomText style={[styles.reportBtnText, { color: '#fff' }]}>Submit Report</CustomText>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
                 </View>
-
-              </View>
-            </TouchableWithoutFeedback>
+              </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
           </View>
         </TouchableWithoutFeedback>
@@ -1785,9 +1785,9 @@ const styles = StyleSheet.create({
   },
   miniAvatarText: { fontSize: 11, fontWeight: '900' },
 
-  bubble: { 
-    borderRadius: 16, 
-    paddingHorizontal: 10, 
+  bubble: {
+    borderRadius: 16,
+    paddingHorizontal: 10,
     paddingTop: 6,
     paddingBottom: 6,
   },
@@ -2087,7 +2087,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {},
   reportBtnText: { fontSize: 15, fontWeight: '700' },
-  
+
   // Options Menu
   modalOverlay: {
     flex: 1,

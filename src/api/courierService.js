@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@env';
 
-const BASE_URL = API_BASE_URL;
+const BASE_URL = API_BASE_URL || 'https://amomarket-cyan.vercel.app';
 
 const buildHeaders = (userId) => ({
   'Content-Type': 'application/json',

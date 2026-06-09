@@ -81,6 +81,7 @@ const Stack = createNativeStackNavigator();
 // --- STACKS ---
 
 import SellerStoreScreen from './src/screens/buyer/SellerStoreScreen';
+import ReviewsScreen from './src/screens/ReviewsScreen';
 
 const HomeStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -99,6 +100,7 @@ const HomeStack = () => (
     <Stack.Screen name="GlobalSearch" component={GlobalSearchScreen} />
     <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
     <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
+    <Stack.Screen name="Reviews" component={ReviewsScreen} />
   </Stack.Navigator>
 );
 
