@@ -24,49 +24,57 @@ export const PresenceProvider = ({ children }) => {
   const connect = (userId) => {
     if (socketRef.current) return;
 
-    // Convert http(s) to ws(s) and use specific path
-    const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + `/ws/presence?userId=${userId}`;
-    console.log('[PRESENCE] Connecting to:', wsUrl);
+    // Safety check — if API_BASE_URL is undefined, skip WebSocket
+    const baseUrl = API_BASE_URL || 'https://amomarket-cyan.vercel.app';
+    if (!baseUrl || typeof baseUrl !== 'string') {
+      console.warn('[PRESENCE] API_BASE_URL is not defined, skipping WebSocket connection');
+      return;
+    }
 
-    const ws = new WebSocket(wsUrl);
+    try {
+      const wsUrl = baseUrl.replace(/^http/, 'ws') + `/ws/presence?userId=${userId}`;
+      console.log('[PRESENCE] Connecting to:', wsUrl);
 
-    ws.onopen = () => {
-      console.log('[PRESENCE] Connected');
-      if (reconnectTimerRef.current) {
-        clearInterval(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-    };
+      const ws = new WebSocket(wsUrl);
 
-    ws.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        emit(data);
-      } catch (err) {}
-    };
+      ws.onopen = () => {
+        console.log('[PRESENCE] Connected');
+        if (reconnectTimerRef.current) {
+          clearInterval(reconnectTimerRef.current);
+          reconnectTimerRef.current = null;
+        }
+      };
 
-    ws.onerror = (e) => {
-      console.warn('[PRESENCE] Error:', e.message);
-    };
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          emit(data);
+        } catch (err) { }
+      };
 
-    ws.onclose = () => {
-      console.log('[PRESENCE] Disconnected');
-      socketRef.current = null;
-      // Reconnect attempt if app is active
-      if (AppState.currentState === 'active' && !reconnectTimerRef.current) {
-         reconnectTimerRef.current = setInterval(() => connect(userId), 5000);
-      }
-    };
+      ws.onerror = (e) => {
+        console.warn('[PRESENCE] Error:', e.message);
+      };
 
-    socketRef.current = ws;
+      ws.onclose = () => {
+        console.log('[PRESENCE] Disconnected');
+        socketRef.current = null;
+        if (AppState.currentState === 'active' && !reconnectTimerRef.current) {
+          reconnectTimerRef.current = setInterval(() => connect(userId), 5000);
+        }
+      };
+
+      socketRef.current = ws;
+    } catch (err) {
+      console.warn('[PRESENCE] Failed to connect WebSocket - continuing anyway:', err);
+    }
   };
 
   const disconnect = () => {
     if (socketRef.current) {
-      // Send explicit offline before close for speed
       try {
         socketRef.current.send(JSON.stringify({ type: 'OFFLINE' }));
-      } catch (e) {}
+      } catch (e) { }
       socketRef.current.close();
       socketRef.current = null;
     }
@@ -78,21 +86,29 @@ export const PresenceProvider = ({ children }) => {
 
   const sendTyping = (conversationId, recipientId) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({
-        type: 'TYPING',
-        conversationId,
-        recipientId
-      }));
+      try {
+        socketRef.current.send(JSON.stringify({
+          type: 'TYPING',
+          conversationId,
+          recipientId
+        }));
+      } catch (err) {
+        console.warn('[PRESENCE] Failed to send typing event:', err);
+      }
     }
   };
 
   const sendStopTyping = (conversationId, recipientId) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({
-        type: 'STOP_TYPING',
-        conversationId,
-        recipientId
-      }));
+      try {
+        socketRef.current.send(JSON.stringify({
+          type: 'STOP_TYPING',
+          conversationId,
+          recipientId
+        }));
+      } catch (err) {
+        console.warn('[PRESENCE] Failed to send stop typing event:', err);
+      }
     }
   };
 
@@ -100,18 +116,30 @@ export const PresenceProvider = ({ children }) => {
     if (user?.id) {
       connect(user.id);
 
-      // Fallback periodic HTTP ping for reliability
-      chatService.pingOnlineStatus(user.id);
+      try {
+        chatService.pingOnlineStatus(user.id);
+      } catch (err) {
+        console.warn('[PRESENCE] Failed to ping online status:', err);
+      }
+
       const pingInterval = setInterval(() => {
         if (AppState.currentState === 'active') {
-          chatService.pingOnlineStatus(user.id);
+          try {
+            chatService.pingOnlineStatus(user.id);
+          } catch (err) {
+            console.warn('[PRESENCE] Ping failed:', err);
+          }
         }
-      }, 20000); // 20s interval
+      }, 20000);
 
       const subscription = AppState.addEventListener('change', nextAppState => {
         if (nextAppState === 'active') {
           connect(user.id);
-          chatService.pingOnlineStatus(user.id);
+          try {
+            chatService.pingOnlineStatus(user.id);
+          } catch (err) {
+            console.warn('[PRESENCE] Ping failed on app active:', err);
+          }
         } else {
           disconnect();
         }
@@ -128,7 +156,7 @@ export const PresenceProvider = ({ children }) => {
   }, [user?.id]);
 
   return (
-    <PresenceContext.Provider value={{ 
+    <PresenceContext.Provider value={{
       isConnected: !!socketRef.current,
       sendTyping,
       sendStopTyping,
