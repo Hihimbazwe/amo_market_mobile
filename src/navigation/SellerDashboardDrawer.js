@@ -22,6 +22,7 @@ import {
   Truck,
   ShieldOff,
   Star,
+  Users,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -66,6 +67,7 @@ const NAV_GROUPS = (t) => [
       // { name: t('shipping'), icon: Truck, screen: 'SellerShipment' },
       { name: t('disputes'), icon: AlertCircle, screen: 'SellerDisputes' },
       { name: 'Reviews', icon: Star, screen: 'SellerReviews' },
+      { name: 'Followers', icon: Users, screen: 'SellerFollowers' },
     ],
   },
   {
@@ -207,21 +209,21 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
                     return true;
                   })
                   .map((item) => {
-                  const ItemIcon = item.icon;
-                  return (
-                    <TouchableOpacity
-                      key={item.name}
-                      style={styles.navItem}
-                      onPress={() => handleNavigate(item.screen)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.navIconBox, { backgroundColor: `${colors.primary}12` }]}>
-                        <ItemIcon color={colors.muted} size={17} />
-                      </View>
-                      <CustomText style={[styles.navItemText, { color: colors.foreground }]}>{item.name}</CustomText>
-                    </TouchableOpacity>
-                  );
-                })}
+                    const ItemIcon = item.icon;
+                    return (
+                      <TouchableOpacity
+                        key={item.name}
+                        style={styles.navItem}
+                        onPress={() => handleNavigate(item.screen)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.navIconBox, { backgroundColor: `${colors.primary}12` }]}>
+                          <ItemIcon color={colors.muted} size={17} />
+                        </View>
+                        <CustomText style={[styles.navItemText, { color: colors.foreground }]}>{item.name}</CustomText>
+                      </TouchableOpacity>
+                    );
+                  })}
               </View>
             ))}
           </ScrollView>

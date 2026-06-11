@@ -43,6 +43,52 @@ const decryptContent = (encryptedBase64, conversationId) => {
   }
 };
 
+export const CALL_LOG_PREFIX = '__AMO_CALL_LOG__:';
+
+export const buildCallLogMessage = (payload) => {
+  const safePayload = {
+    type: payload.type === 'video' ? 'video' : 'voice',
+    status: payload.status || 'completed',
+    direction: payload.direction || 'outgoing',
+    durationSeconds: Math.max(0, Math.round(payload.durationSeconds || 0)),
+    callId: payload.callId || null,
+    createdAt: payload.createdAt || new Date().toISOString(),
+  };
+  return `${CALL_LOG_PREFIX}${JSON.stringify(safePayload)}`;
+};
+
+export const parseCallLogMessage = (text) => {
+  if (!text || !text.startsWith(CALL_LOG_PREFIX)) return null;
+  try {
+    return JSON.parse(text.slice(CALL_LOG_PREFIX.length));
+  } catch {
+    return null;
+  }
+};
+
+export const formatCallDuration = (seconds) => {
+  const total = Math.max(0, Math.round(seconds || 0));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  if (mins <= 0) return `${secs}s`;
+  return `${mins}m ${String(secs).padStart(2, '0')}s`;
+};
+
+export const formatCallLogTitle = (callLog) => {
+  if (!callLog) return '';
+  const typeLabel = callLog.type === 'video' ? 'Video Call' : 'Voice Call';
+  const status = callLog.status;
+
+  if (status === 'missed') return `Missed ${typeLabel}`;
+  if (status === 'declined') return `Declined ${typeLabel}`;
+  if (status === 'canceled') return `Canceled ${typeLabel}`;
+  if (status === 'completed') {
+    const duration = callLog.durationSeconds > 0 ? ` - ${formatCallDuration(callLog.durationSeconds)}` : '';
+    return `Completed ${typeLabel}${duration}`;
+  }
+  return `${callLog.direction === 'incoming' ? 'Incoming' : 'Outgoing'} ${typeLabel}`;
+};
+
 export const chatService = {
   getConversations: async (userId, filter = 'all') => {
     try {
@@ -175,6 +221,14 @@ export const chatService = {
       console.error('[DEBUG-API] sendMessage COMPLETE ERROR:', e);
       throw e;
     }
+  },
+
+  sendCallLog: async (conversationId, userId, participantId, payload) => {
+    let cid = conversationId;
+    if (!cid || cid.startsWith('new-') || cid.startsWith('temp_')) {
+      cid = await chatService.createConversation(participantId, userId);
+    }
+    return chatService.sendMessage(cid, userId, buildCallLogMessage(payload));
   },
 
   deleteConversation: async (id, userId) => {

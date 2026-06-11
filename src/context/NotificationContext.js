@@ -6,6 +6,7 @@ import Constants from 'expo-constants';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { notifyIncomingCallFromPush } from '../utils/callNotificationBridge';
 
 // ─────────────────────────────────────────────────────────
 // In-app API polling was disabled for performance, but 
@@ -24,6 +25,25 @@ export const NotificationProvider = ({ children }) => {
   const [notificationsList, setNotificationsList] = useState([]);
   const notificationListener = useRef();
   const responseListener = useRef();
+
+  const handleCallNotification = (data) => {
+    console.log('[Notification] handleCallNotification data:', data);
+    if (!data || data.type !== 'INCOMING_CALL') return false;
+    try {
+      notifyIncomingCallFromPush({
+        callerId: data.callerId,
+        callerName: data.callerName,
+        targetId: data.targetId,
+        isVideo: data.isVideo === true || data.isVideo === 'true',
+        conversationId: data.conversationId,
+        callId: data.callId,
+      });
+      console.log('[Notification] notifyIncomingCallFromPush invoked for', data.callId);
+    } catch (err) {
+      console.warn('[Notification] Error notifying incoming call from push:', err);
+    }
+    return true;
+  };
 
   useEffect(() => {
     const loadStoredNotifications = async () => {
@@ -158,10 +178,18 @@ export const NotificationProvider = ({ children }) => {
 
     setupPushNotifications();
 
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        const data = response?.notification?.request?.content?.data || {};
+        handleCallNotification(data);
+      })
+      .catch((err) => console.warn('[PUSH] Failed to inspect last notification response:', err));
+
     // Handle notifications received while app is running foreground
     try {
       notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
         setNotification(notification);
+        handleCallNotification(notification.request.content.data || {});
         const newNotificationItem = {
           id: notification.request.identifier || String(Date.now()),
           title: notification.request.content.title || 'Notification',
@@ -186,6 +214,7 @@ export const NotificationProvider = ({ children }) => {
       responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
         console.log(response);
         const notification = response.notification;
+        handleCallNotification(notification.request.content.data || {});
         const newNotificationItem = {
           id: notification.request.identifier || String(Date.now()),
           title: notification.request.content.title || 'Notification',
@@ -287,6 +316,13 @@ async function registerForPushNotificationsAsync() {
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF231F7C',
+      });
+      await Notifications.setNotificationChannelAsync('incoming-calls', {
+        name: 'Incoming calls',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 900, 700, 900],
+        sound: 'default',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
     }
 

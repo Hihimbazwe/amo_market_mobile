@@ -23,6 +23,7 @@ import CustomText from '../components/CustomText';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { reviewService } from '../api/reviewService';
+import { getPublicDisplayName } from '../utils/displayName';
 
 const ReviewsScreen = ({ route, navigation }) => {
   const { productId, productName } = route.params || {};
@@ -42,7 +43,7 @@ const ReviewsScreen = ({ route, navigation }) => {
       setLoading(true);
       const revs = await reviewService.getProductReviews(productId, user?.id);
       setReviews(revs || []);
-      
+
       // Initialize helpful counts
       const initialCounts = {};
       const initialVoted = {};
@@ -133,7 +134,7 @@ const ReviewsScreen = ({ route, navigation }) => {
     return '#EF4444';
   };
 
-  const avgRating = reviews.length > 0 
+  const avgRating = reviews.length > 0
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : '0.0';
 
@@ -206,7 +207,7 @@ const ReviewsScreen = ({ route, navigation }) => {
             reviews.map((review, index) => {
               const isVoted = helpfulVoted[review.id];
               const count = helpfulCounts[review.id] || 0;
-              const buyerName = review.buyer?.name || 'Anonymous';
+              const buyerName = getPublicDisplayName({ username: review.buyer?.username, name: review.buyer?.name });
               const isOwnReview = user?.id && review.buyerId === user.id;
 
               return (

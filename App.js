@@ -407,18 +407,18 @@ export default function App() {
         <PresenceProvider>
           <LanguageProvider>
             <ThemeProvider>
-              <NotificationProvider>
-                <CartProvider>
-                  <WishlistProvider>
-                    <SafeAreaProvider>
-                      <CallProvider>
+              <CallProvider>
+                <NotificationProvider>
+                  <CartProvider>
+                    <WishlistProvider>
+                      <SafeAreaProvider>
                         <RootNavigator />
                         <CallScreen />
-                      </CallProvider>
-                    </SafeAreaProvider>
-                  </WishlistProvider>
-                </CartProvider>
-              </NotificationProvider>
+                      </SafeAreaProvider>
+                    </WishlistProvider>
+                  </CartProvider>
+                </NotificationProvider>
+              </CallProvider>
             </ThemeProvider>
           </LanguageProvider>
         </PresenceProvider>

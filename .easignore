@@ -1,0 +1,11 @@
+node_modules/
+.git/
+.expo/
+dist/
+android/build/
+android/.gradle/
+android/.cxx/
+android/app/build/
+ios/build/
+playwright-report/
+test-results/

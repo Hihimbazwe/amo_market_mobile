@@ -24,7 +24,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { chatService } from '../../api/chatService';
+import { chatService, parseCallLogMessage, formatCallLogTitle } from '../../api/chatService';
 import PresenceDot from '../../components/PresenceDot';
 
 import { BuyerDrawerContext } from '../../context/BuyerDrawerContext';
@@ -58,6 +58,16 @@ function formatTime(date) {
 function normalizeSearch(value) {
   return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
+
+const ATTACHMENT_PREFIX = '__AMO_ATTACHMENT__:';
+const parseAttachmentMessage = (text) => {
+  if (!text || !text.startsWith(ATTACHMENT_PREFIX)) return null;
+  try {
+    return JSON.parse(text.slice(ATTACHMENT_PREFIX.length));
+  } catch (e) {
+    return null;
+  }
+};
 
 function editDistance(a, b) {
   if (a === b) return 0;
@@ -139,72 +149,113 @@ const renderRightActions = (progress, dragX, item, onSwipeAction) => {
   );
 };
 
-const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => (
-  <Swipeable renderRightActions={(prog, drag) => renderRightActions(prog, drag, item, onSwipeAction)}>
-    <TouchableOpacity
-      style={[styles.convItem, { backgroundColor: colors.background }]}
-      onPress={() => onPress(item)}
-      activeOpacity={0.7}
-    >
-      {/* Avatar */}
-      <View style={styles.avatarWrap}>
-        <View style={[styles.avatar, { backgroundColor: item.participantColor + '15', borderColor: item.participantColor + '33', overflow: 'hidden' }]}>
-          {item.participantImage ? (
-            <Image source={{ uri: item.participantImage }} style={{ width: '100%', height: '100%' }} />
-          ) : (
-            <CustomText style={[styles.avatarText, { color: item.participantColor }]}>
-              {item.participantInitials}
-            </CustomText>
+const ConversationItem = ({ item, onPress, onSwipeAction, colors }) => {
+  const callLog = parseCallLogMessage(item.lastMessage);
+  const attachment = parseAttachmentMessage(item.lastMessage);
+
+  let previewText = item.lastMessage || '';
+  let previewEmoji = '';
+  let thumbUri = null;
+
+  if (callLog) {
+    previewText = formatCallLogTitle(callLog);
+    previewEmoji = callLog.type === 'video' ? '📹' : '📞';
+  } else if (attachment) {
+    if (attachment.type === 'image') {
+      previewEmoji = '📷';
+      previewText = attachment.caption || 'Photo';
+      thumbUri = attachment.thumbnail || attachment.uri || null;
+    } else if (attachment.type === 'video') {
+      previewEmoji = '🎥';
+      previewText = attachment.caption || 'Video';
+      thumbUri = attachment.thumbnail || null;
+    } else if (attachment.type === 'audio') {
+      previewEmoji = '🎤';
+      previewText = attachment.caption || 'Audio';
+    } else if (attachment.type === 'contact') {
+      previewEmoji = '👤';
+      previewText = attachment.name || 'Contact';
+    } else if (attachment.type === 'location') {
+      previewEmoji = '📍';
+      previewText = attachment.label || 'Location';
+    } else {
+      previewEmoji = '📎';
+      previewText = attachment.filename || attachment.caption || 'Attachment';
+    }
+  }
+
+  return (
+    <Swipeable renderRightActions={(prog, drag) => renderRightActions(prog, drag, item, onSwipeAction)}>
+      <TouchableOpacity
+        style={[styles.convItem, { backgroundColor: colors.background }]}
+        onPress={() => onPress(item)}
+        activeOpacity={0.7}
+      >
+        {/* Avatar */}
+        <View style={styles.avatarWrap}>
+          <View style={[styles.avatar, { backgroundColor: item.participantColor + '15', borderColor: item.participantColor + '33', overflow: 'hidden' }]}>
+            {item.participantImage ? (
+              <Image source={{ uri: item.participantImage }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <CustomText style={[styles.avatarText, { color: item.participantColor }]}>
+                {item.participantInitials}
+              </CustomText>
+            )}
+          </View>
+          {item.isOnline && (
+            <View style={styles.onlineDotWrapper}>
+              <PresenceDot size={12} borderSize={2} borderColor={colors.background} />
+            </View>
           )}
         </View>
-        {item.isOnline && (
-          <View style={styles.onlineDotWrapper}>
-            <PresenceDot size={12} borderSize={2} borderColor={colors.background} />
-          </View>
-        )}
-      </View>
 
         <View style={styles.convBody}>
-        <View style={styles.convRow}>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-              <CustomText style={[styles.convName, { color: colors.foreground, fontWeight: item.unreadCount > 0 ? '800' : '700' }]} numberOfLines={1}>
-                {item.participantName}
+          <View style={styles.convRow}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                <CustomText style={[styles.convName, { color: colors.foreground, fontWeight: item.unreadCount > 0 ? '800' : '700' }]} numberOfLines={1}>
+                  {item.participantName}
+                </CustomText>
+              </View>
+              {item.isLocked && <Lock color={colors.primary} size={13} style={{ marginTop: 2, opacity: 0.8 }} />}
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <CustomText style={[styles.convTime, {
+                color: item.unreadCount > 0 ? '#25D366' : colors.muted,
+                fontWeight: item.unreadCount > 0 ? '800' : '500',
+                fontSize: 12
+              }]}>
+                {formatTime(item.time)}
               </CustomText>
+              {item.unreadCount > 0 && <View style={[styles.unreadDot, { backgroundColor: '#25D366', width: 8, height: 8, marginTop: 4 }]} />}
             </View>
-            {item.isLocked && <Lock color={colors.primary} size={13} style={{ marginTop: 2, opacity: 0.8 }} />}
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <CustomText style={[styles.convTime, { 
-              color: item.unreadCount > 0 ? '#25D366' : colors.muted, 
-              fontWeight: item.unreadCount > 0 ? '800' : '500',
-              fontSize: 12
-            }]}>
-              {formatTime(item.time)}
-            </CustomText>
-            {item.unreadCount > 0 && <View style={[styles.unreadDot, { backgroundColor: '#25D366', width: 8, height: 8, marginTop: 4 }]} />}
+          <View style={styles.convRow}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+              {item.isPinned && <PinOff color={colors.primary} size={12} style={{ marginRight: 6 }} />}
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                {thumbUri && (
+                  <Image source={{ uri: thumbUri }} style={{ width: 36, height: 36, borderRadius: 6, marginRight: 8 }} resizeMode="cover" />
+                )}
+                <CustomText style={[styles.convLast, {
+                  color: item.unreadCount > 0 ? colors.foreground : colors.muted,
+                  fontWeight: item.unreadCount > 0 ? '700' : '400'
+                }]} numberOfLines={1}>
+                  {previewEmoji ? `${previewEmoji} ` : ''}{previewText}
+                </CustomText>
+              </View>
+            </View>
+            {item.unreadCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: '#25D366', minWidth: 20, height: 20, borderRadius: 10 }]}>
+                <CustomText style={[styles.badgeText, { fontSize: 10, fontWeight: '900' }]}>{item.unreadCount}</CustomText>
+              </View>
+            )}
           </View>
         </View>
-        <View style={styles.convRow}>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-            {item.isPinned && <PinOff color={colors.primary} size={12} style={{ marginRight: 6 }} />}
-            <CustomText style={[styles.convLast, { 
-              color: item.unreadCount > 0 ? colors.foreground : colors.muted, 
-              fontWeight: item.unreadCount > 0 ? '700' : '400' 
-            }]} numberOfLines={1}>
-              {item.lastMessage}
-            </CustomText>
-          </View>
-          {item.unreadCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: '#25D366', minWidth: 20, height: 20, borderRadius: 10 }]}>
-              <CustomText style={[styles.badgeText, { fontSize: 10, fontWeight: '900' }]}>{item.unreadCount}</CustomText>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  </Swipeable>
-);
+      </TouchableOpacity>
+    </Swipeable>
+  );
+};
 
 const SearchUserItem = ({ item, onPress, loading, colors }) => (
   <TouchableOpacity
@@ -276,8 +327,8 @@ export default function ChatListScreen() {
         navigation.toggleDrawer();
         return;
       }
-    } catch (e) {}
-    
+    } catch (e) { }
+
     const role = user?.role?.toUpperCase();
     if (role === 'SELLER') {
       sellerCtx?.toggleDrawer?.();
@@ -303,7 +354,7 @@ export default function ChatListScreen() {
       });
       setConversations(sorted);
       setStatuses(statusData);
-      
+
       // Update filtered synchronously to prevent flickering "No conversations" text
       let res = sorted;
       if (search) {
@@ -327,16 +378,16 @@ export default function ChatListScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
-      
+
       if (user?.id) {
         // Legacy ping removed - handled by PresenceProvider WebSocket
       }
-      
+
       // Periodically refresh statuses
       const interval = setInterval(() => {
         chatService.getStatuses(user?.id, true).then(setStatuses);
       }, 30000);
-      
+
       return () => {
         clearInterval(interval);
       };
@@ -345,7 +396,7 @@ export default function ChatListScreen() {
 
   useEffect(() => {
     let result = conversations;
-    
+
     // Hide deleted conversations always
     result = result.filter(c => !c.hasDeleted);
 
@@ -373,7 +424,7 @@ export default function ChatListScreen() {
         .filter(c => c._searchScore < 999)
         .sort((a, b) => a._searchScore - b._searchScore || new Date(b.time) - new Date(a.time));
     }
-    
+
     setFiltered(result);
   }, [search, filterType, conversations]);
 
@@ -582,18 +633,18 @@ export default function ChatListScreen() {
       }
 
       const { data } = await Contacts.getContactsAsync({
-  fields: [
-    Contacts.Fields.Name,
-    Contacts.Fields.PhoneNumbers,
-    Contacts.Fields.Emails,
-    Contacts.Fields.FirstName,
-    Contacts.Fields.LastName,
-  ],
-});
+        fields: [
+          Contacts.Fields.Name,
+          Contacts.Fields.PhoneNumbers,
+          Contacts.Fields.Emails,
+          Contacts.Fields.FirstName,
+          Contacts.Fields.LastName,
+        ],
+      });
 
-// 👇 Add these two lines right here
-console.log('📱 Total contacts from device:', data?.length);
-console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
+      // 👇 Add these two lines right here
+      console.log('📱 Total contacts from device:', data?.length);
+      console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
 
 
       if (!data || data.length === 0) {
@@ -651,7 +702,7 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
               return updated;
             });
           })
-          .catch(() => {}); // silent fail — picker already open
+          .catch(() => { }); // silent fail — picker already open
       }
     } catch (err) {
       console.warn('Failed to read contacts:', err);
@@ -725,7 +776,7 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
       // Replace only this one status in our list with full data for the viewer
       const updatedStatuses = [...statuses];
       updatedStatuses[index] = fullStatus;
-      
+
       navigation.navigate('StatusViewer', { statuses: updatedStatuses, initialIndex: index });
     } catch (e) {
       Alert.alert('Error', 'Failed to load status content');
@@ -944,28 +995,28 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
-  <TouchableOpacity onPress={toggleDrawer} style={styles.headerIconBtn}>
-    <Menu color={colors.foreground} size={24} />
-  </TouchableOpacity>
-  <View style={{ flex: 1, alignItems: 'center' }}>
-    <CustomText style={[styles.headerTitle, { color: colors.foreground }]}>Messages</CustomText>
-  </View>
- <TouchableOpacity
-    onPress={() => {
-      setInviteVisible(true);
-    }}
-    style={[styles.headerIconBtn, {
-      backgroundColor: '#e67e22',
-      borderRadius: 20,
-      width: 36,
-      height: 36,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }]}
-  >
-    <Plus color="#ffffff" size={20} />
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity onPress={toggleDrawer} style={styles.headerIconBtn}>
+          <Menu color={colors.foreground} size={24} />
+        </TouchableOpacity>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <CustomText style={[styles.headerTitle, { color: colors.foreground }]}>Messages</CustomText>
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            setInviteVisible(true);
+          }}
+          style={[styles.headerIconBtn, {
+            backgroundColor: '#e67e22',
+            borderRadius: 20,
+            width: 36,
+            height: 36,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }]}
+        >
+          <Plus color="#ffffff" size={20} />
+        </TouchableOpacity>
+      </View>
 
       {/* Search Bar & Filters */}
       <View style={styles.topFilterSection}>
@@ -981,33 +1032,33 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
         </View>
 
         {/* Pills */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.pillsScrollContent}
           style={styles.pillsRow}
         >
-          <TouchableOpacity 
-            style={[styles.filterPill, filterType === 'all' && { backgroundColor: colors.primary }]} 
+          <TouchableOpacity
+            style={[styles.filterPill, filterType === 'all' && { backgroundColor: colors.primary }]}
             onPress={() => setFilterType('all')}
           >
             <CustomText style={[styles.pillText, { color: filterType === 'all' ? '#fff' : colors.muted }]}>All</CustomText>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.filterPill, filterType === 'unread' && { backgroundColor: colors.primary }]} 
+          <TouchableOpacity
+            style={[styles.filterPill, filterType === 'unread' && { backgroundColor: colors.primary }]}
             onPress={() => setFilterType('unread')}
           >
             <CustomText style={[styles.pillText, { color: filterType === 'unread' ? '#fff' : colors.muted }]}>Unread</CustomText>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.filterPill, filterType === 'archived' && { backgroundColor: colors.primary }]} 
+          <TouchableOpacity
+            style={[styles.filterPill, filterType === 'archived' && { backgroundColor: colors.primary }]}
             onPress={() => setFilterType('archived')}
           >
             <CustomText style={[styles.pillText, { color: filterType === 'archived' ? '#fff' : colors.muted }]}>Archived</CustomText>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.filterPill, filterType === 'locked' && { backgroundColor: colors.primary }]} 
+          <TouchableOpacity
+            style={[styles.filterPill, filterType === 'locked' && { backgroundColor: colors.primary }]}
             onPress={handleLockedTabPress}
           >
             <CustomText style={[styles.pillText, { color: filterType === 'locked' ? '#fff' : colors.muted }]}>Locked</CustomText>
@@ -1052,8 +1103,8 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
       <Modal visible={inviteVisible} transparent animationType="fade" onRequestClose={() => setInviteVisible(false)}>
         <View style={styles.inviteOverlay}>
           <View style={[styles.inviteCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
-            <TouchableOpacity 
-              onPress={() => setInviteVisible(false)} 
+            <TouchableOpacity
+              onPress={() => setInviteVisible(false)}
               style={styles.inviteCloseBtn}
               disabled={inviteLoading}
             >
@@ -1064,7 +1115,7 @@ console.log('📱 Sample contact:', JSON.stringify(data?.[0], null, 2));
             <CustomText style={[styles.inviteText, { color: colors.muted }]}>
               Enter an email or phone number. If they already have an account, the chat opens immediately.
             </CustomText>
-            
+
             <TextInput
               value={inviteContact}
               onChangeText={setInviteContact}
@@ -1241,8 +1292,8 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 2,
   },
-  searchInput: { 
-    flex: 1, 
+  searchInput: {
+    flex: 1,
     fontSize: 16,
     marginLeft: 12,
   },
@@ -1373,7 +1424,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  pillsRow: { 
+  pillsRow: {
     marginVertical: 4,
   },
   pillsScrollContent: {
@@ -1381,15 +1432,15 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 8,
   },
-  filterPill: { 
-    paddingHorizontal: 18, 
-    paddingVertical: 8, 
+  filterPill: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  pillText: { 
-    fontSize: 14, 
-    fontWeight: '700' 
+  pillText: {
+    fontSize: 14,
+    fontWeight: '700'
   },
   convItem: {
     flexDirection: 'row',
@@ -1412,31 +1463,31 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
   },
-  convBody: { 
+  convBody: {
     flex: 1,
     height: 60,
     justifyContent: 'center',
   },
-  convRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  convRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  convName: { 
-    fontSize: 17, 
-    fontWeight: '700', 
-    flex: 1, 
+  convName: {
+    fontSize: 17,
+    fontWeight: '700',
+    flex: 1,
     marginRight: 8,
     marginBottom: 4,
   },
-  convTime: { 
-    fontSize: 12, 
+  convTime: {
+    fontSize: 12,
     fontWeight: '500',
     opacity: 0.8,
   },
-  convLast: { 
-    fontSize: 14, 
-    flex: 1, 
+  convLast: {
+    fontSize: 14,
+    flex: 1,
     marginRight: 8,
   },
   badge: {
@@ -1491,9 +1542,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statusAvatarText: { fontSize: 20, fontWeight: '900' },
-  statusName: { 
-    fontSize: 12, 
-    fontWeight: '600', 
+  statusName: {
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
     opacity: 0.9,
   },

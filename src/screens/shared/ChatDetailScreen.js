@@ -28,7 +28,7 @@ import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCall } from '../../contexts/CallContext';
-import { chatService } from '../../api/chatService';
+import { chatService, parseCallLogMessage, formatCallLogTitle } from '../../api/chatService';
 import { productService } from '../../api/productService';
 import { useNotifications } from '../../context/NotificationContext';
 import { usePresence } from '../../context/PresenceContext';
@@ -136,9 +136,17 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
   let productInfo = null;
   let cleanMessageText = msg.text;
   const attachment = parseAttachmentMessage(msg.text);
+  const callLog = parseCallLogMessage(msg.text);
+  const displayCallDirection = callLog
+    ? (isMe ? callLog.direction : (callLog.direction === 'outgoing' ? 'incoming' : 'outgoing'))
+    : null;
 
   if (attachment) {
     cleanMessageText = attachment.caption || '';
+  }
+
+  if (callLog) {
+    cleanMessageText = '';
   }
 
   if (isProductMsg) {
@@ -168,6 +176,8 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
       console.log('Failed to parse product msg', e);
     }
   }
+
+  const isShortText = !callLog && !attachment && !productInfo && !msg.replyTo && typeof cleanMessageText === 'string' && cleanMessageText.length > 0 && cleanMessageText.length <= 24 && !cleanMessageText.includes('\n');
 
   const handleLongPress = () => {
     if (onAction) {
@@ -332,6 +342,42 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
               </View>
             )}
 
+            {callLog && (
+              <View style={[
+                styles.callLogCard,
+                { backgroundColor: isMe ? 'rgba(0,0,0,0.12)' : colors.background, borderColor: isMe ? 'rgba(255,255,255,0.2)' : colors.glassBorder }
+              ]}>
+                <View style={[
+                  styles.callLogIcon,
+                  {
+                    backgroundColor: callLog.status === 'missed' || callLog.status === 'declined'
+                      ? 'rgba(239,68,68,0.16)'
+                      : 'rgba(34,197,94,0.16)'
+                  }
+                ]}>
+                  {callLog.type === 'video' ? (
+                    <Video
+                      size={18}
+                      color={callLog.status === 'missed' || callLog.status === 'declined' ? '#EF4444' : '#22C55E'}
+                    />
+                  ) : (
+                    <Phone
+                      size={18}
+                      color={callLog.status === 'missed' || callLog.status === 'declined' ? '#EF4444' : '#22C55E'}
+                    />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <CustomText style={[styles.callLogTitle, { color: isMe ? '#fff' : colors.foreground }]} numberOfLines={1}>
+                    {formatCallLogTitle(callLog)}
+                  </CustomText>
+                  <CustomText style={[styles.callLogMeta, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
+                    {displayCallDirection === 'incoming' ? 'Incoming' : 'Outgoing'} - {formatMsgTime(msg.timestamp)}
+                  </CustomText>
+                </View>
+              </View>
+            )}
+
             {productInfo && (
               <TouchableOpacity
                 onPress={() => onNavigateProduct && onNavigateProduct(productInfo.id)}
@@ -378,7 +424,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
                   : undefined
               }
             >
-              {msg.statusItem && (
+              {!callLog && msg.statusItem && (
                 <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
                   {(msg.statusItem.type === 'image' || msg.statusItem.type === 'video') ? (
                     <Image source={{ uri: msg.statusItem.content }} style={styles.statusReplyImage} />
@@ -396,7 +442,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
                 </View>
               )}
 
-              {!msg.statusItem && msg.statusItemId && (
+              {!callLog && !msg.statusItem && msg.statusItemId && (
                 <View style={[styles.statusReplyBadge, { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : 'rgba(230, 126, 34, 0.1)' }]}>
                   <ImageIcon size={10} color={isMe ? '#fff' : '#e67e22'} />
                   <CustomText style={[styles.statusReplyText, { color: isMe ? '#fff' : '#e67e22' }]}>
@@ -405,7 +451,7 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
                 </View>
               )}
 
-              {msg.replyTo && (
+              {!callLog && msg.replyTo && (
                 <View style={[styles.quotedBubble, { backgroundColor: isMe ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)' }]}>
                   <View style={[styles.quotedBorder, { backgroundColor: isMe ? '#fff' : colors.primary }]} />
                   <View style={styles.quotedBody}>
@@ -419,21 +465,35 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
                 </View>
               )}
 
+              {!callLog && (
               <View style={styles.bubbleTextWrapper}>
-                <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}>
-                  {cleanMessageText}
-                  <CustomText style={styles.invisibleSpacer}>
-                    {'   '}{formatMsgTime(msg.timestamp)}{!msg.isDeleted && isMe && ' ✓✓'}
+                {isShortText ? (
+                  <CustomText
+                    style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}
+                    numberOfLines={1}
+                  >
+                    {cleanMessageText}
+                    <CustomText style={[styles.bubbleTimeInline, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}> {formatMsgTime(msg.timestamp)}{!msg.isDeleted && isMe && ' ✓✓'}</CustomText>
                   </CustomText>
-                </CustomText>
+                ) : (
+                  <>
+                    <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}> 
+                      {cleanMessageText}
+                      <CustomText style={styles.invisibleSpacer}>
+                        {'   '}
+                      </CustomText>
+                    </CustomText>
 
-                <View style={styles.timestampWrap}>
-                  <CustomText style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
-                    {formatMsgTime(msg.timestamp)}
-                    {!msg.isDeleted && isMe && ' ✓✓'}
-                  </CustomText>
-                </View>
+                    <View style={styles.timestampWrap}>
+                      <CustomText style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}> 
+                        {formatMsgTime(msg.timestamp)}
+                        {!msg.isDeleted && isMe && ' ✓✓'}
+                      </CustomText>
+                    </View>
+                  </>
+                )}
               </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -943,6 +1003,34 @@ export default function ChatDetailScreen() {
     }
   };
 
+  const resolveConversationId = async () => {
+    if (!conversation?.id || !user?.id) return null;
+    let cid = conversation.id;
+    if (cid.startsWith('new-') || cid.startsWith('temp_')) {
+      const pId = cid.startsWith('new-') ? cid.replace('new-', '') : cid.replace('temp_', '');
+      cid = await chatService.createConversation(pId, user.id);
+      navigation.setParams({ conversation: { ...conversation, id: cid, productContext } });
+    }
+    return cid;
+  };
+
+  const handleStartCall = async (isVideo) => {
+    if (!participantId || !user?.id) return;
+    if (isBlockedByMe) {
+      Alert.alert('Blocked User', 'Unblock this user before starting a call.');
+      return;
+    }
+    try {
+      const cid = await resolveConversationId();
+      await startCall(participantId, conversation?.participantName || 'AmoMarket user', isVideo, {
+        conversationId: cid,
+      });
+    } catch (err) {
+      console.warn('Failed to start call:', err);
+      Alert.alert('Call Failed', err.message || 'Could not start the call.');
+    }
+  };
+
   const sendAttachmentMessage = async (payload) => {
     if (isSellerDeactivated) {
       Alert.alert('Account Restricted', 'Your seller account is deactivated. You cannot send messages until your account is reactivated.');
@@ -1284,10 +1372,10 @@ export default function ChatDetailScreen() {
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity style={[styles.headerAction, { marginRight: 4 }]} onPress={() => startCall(participantId, conversation?.participantName, false)} activeOpacity={0.7}>
+          <TouchableOpacity style={[styles.headerAction, { marginRight: 4 }]} onPress={() => handleStartCall(false)} activeOpacity={0.7}>
             <Phone color={colors.primary} size={20} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.headerAction, { marginRight: 4 }]} onPress={() => startCall(participantId, conversation?.participantName, true)} activeOpacity={0.7}>
+          <TouchableOpacity style={[styles.headerAction, { marginRight: 4 }]} onPress={() => handleStartCall(true)} activeOpacity={0.7}>
             <Video color={colors.primary} size={20} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)} activeOpacity={0.7}>
@@ -1796,6 +1884,7 @@ const styles = StyleSheet.create({
   bubbleTextWrapper: {
     position: 'relative',
     minWidth: 50,
+    paddingRight: 72,
   },
   bubbleText: { fontSize: 15, lineHeight: 21 },
   invisibleSpacer: {
@@ -1806,11 +1895,12 @@ const styles = StyleSheet.create({
   timestampWrap: {
     position: 'absolute',
     bottom: -2,
-    right: 0,
+    right: 6,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  bubbleTime: { fontSize: 10.5, fontWeight: '600' },
+  bubbleTime: { fontSize: 10.5, fontWeight: '600', paddingLeft: 6, flexShrink: 0, lineHeight: 12 },
+  bubbleTimeInline: { fontSize: 10.5, fontWeight: '600', marginLeft: 6, flexShrink: 0, lineHeight: 12 },
 
   // Typing
   typingRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 14, marginBottom: 8, marginTop: 4 },
@@ -1919,6 +2009,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   attachmentMeta: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  callLogCard: {
+    minWidth: 220,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  callLogIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  callLogTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  callLogMeta: {
     fontSize: 11,
     marginTop: 2,
   },

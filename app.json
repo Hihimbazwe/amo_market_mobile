@@ -37,10 +37,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "9cf51c39-18f5-4326-a7c1-a28002683822"
+        "projectId": "a9961d64-b0ee-4472-b5e2-546ad16ffddf"
       }
     },
-    "owner": "hyacintheee",
+    "owner": "ihimbazwe",
     "plugins": [
       "expo-video",
       "expo-contacts",

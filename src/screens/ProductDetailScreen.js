@@ -63,6 +63,7 @@ import { productService } from '../api/productService';
 import { orderService } from '../api/orderService';
 import { useFocusEffect } from '@react-navigation/native';
 import { reviewService } from '../api/reviewService';
+import { getPublicDisplayName } from '../utils/displayName';
 
 const { width } = Dimensions.get('window');
 
@@ -1049,7 +1050,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
                       {reviews.slice(0, 4).map((r, i) => {
                         const isVoted = helpfulVoted[r.id];
                         const count = helpfulCounts[r.id] !== undefined ? helpfulCounts[r.id] : (r.helpfulVotes || 0);
-                        const buyerName = r.buyer?.name || 'Anonymous';
+                        const buyerName = getPublicDisplayName({ username: r.buyer?.username, name: r.buyer?.name });
                         // Seller can reply if the logged-in user's seller profile matches this product's seller
                         const isSeller = user?.id && user?.role === 'SELLER' &&
                           (routeProduct?.seller?.userId === user.id || routeProduct?.sellerId === user.id);

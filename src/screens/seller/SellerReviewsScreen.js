@@ -38,6 +38,7 @@ import CustomText from '../../components/CustomText';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { reviewService } from '../../api/reviewService';
+import { getPublicDisplayName } from '../../utils/displayName';
 
 // ─── Star Row ────────────────────────────────────────────────────────────────
 const StarRow = ({ rating, size = 14, color = '#F59E0B' }) => (
@@ -190,6 +191,7 @@ const ReviewCard = ({ review, userId, colors, onReply, onHelpful, helpfulVoted }
     review.rating >= 4 ? '#10B981' : review.rating === 3 ? '#F59E0B' : '#EF4444';
 
   const productImg = review.product?.media?.[0]?.url;
+  const buyerName = getPublicDisplayName({ username: review.buyer?.username, name: review.buyer?.name });
 
   return (
     <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -221,7 +223,7 @@ const ReviewCard = ({ review, userId, colors, onReply, onHelpful, helpfulVoted }
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <CustomText style={{ color: colors.foreground, fontWeight: '700', fontSize: 13 }}>
-              {review.buyer?.name || 'Anonymous'}
+              {buyerName}
             </CustomText>
             {review.buyer?.verified && (
               <CheckCircle color="#10B981" size={12} fill="#10B981" />
