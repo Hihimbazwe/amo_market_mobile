@@ -1,8 +1,7 @@
 <resources>
-  <color name="ic_launcher_background">#030712</color>
-  <color name="splashscreen_background">#030712</color>
+  <color name="splashscreen_background">#ffffff</color>
   <color name="iconBackground">#030712</color>
   <color name="colorPrimary">#023c69</color>
-  <color name="colorPrimaryDark">#030712</color>
+  <color name="colorPrimaryDark">#ffffff</color>
   <color name="notification_icon_color">#e67e22</color>
 </resources>
