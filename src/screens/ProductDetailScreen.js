@@ -690,6 +690,21 @@ const ProductDetailScreen = ({ route, navigation }) => {
             );
           })()}
 
+          {/* Stock Status Badge */}
+          <View style={{ marginBottom: 12 }}>
+            {routeProduct?.stock === 0 ? (
+              <View style={{ backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)', borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={14} color="#EF4444" />
+                <CustomText style={{ color: '#EF4444', fontWeight: '600', fontSize: 12 }}>Out of Stock</CustomText>
+              </View>
+            ) : routeProduct?.stock && routeProduct.stock <= 5 ? (
+              <View style={{ backgroundColor: 'rgba(249,115,22,0.1)', borderColor: 'rgba(249,115,22,0.2)', borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={14} color="#F97316" />
+                <CustomText style={{ color: '#F97316', fontWeight: '600', fontSize: 12 }}>Only {routeProduct.stock} left in stock</CustomText>
+              </View>
+            ) : null}
+          </View>
+
           <View style={[styles.priceContainer, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
               {(() => {
@@ -781,38 +796,83 @@ const ProductDetailScreen = ({ route, navigation }) => {
             const sellerSales = product.seller.sales ?? 0;
             const sellerResponse = product.seller.response;
             const stats = [
-              sellerRating > 0 ? { label: 'Rating', value: sellerRating.toFixed(1) + ' ★' } : null,
-              { label: 'Sales', value: sellerSales },
-              sellerResponse ? { label: 'Response', value: sellerResponse } : null,
+              sellerRating > 0 ? { label: 'Rating', value: sellerRating.toFixed(1) + ' ★', icon: Star } : null,
+              { label: 'Sales', value: sellerSales, icon: ShoppingBag },
+              sellerResponse ? { label: 'Response', value: sellerResponse, icon: Clock } : null,
             ].filter(Boolean);
             if (stats.length === 0) return null;
             return (
               <View style={styles.statsGrid}>
-                {stats.map((stat, i) => (
-                  <View key={i} style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <CustomText variant="h3" style={{ color: colors.primary }}>{stat.value}</CustomText>
-                    <CustomText style={styles.statLabel}>{stat.label}</CustomText>
-                  </View>
-                ))}
+                {stats.map((stat, i) => {
+                  const IconComponent = stat.icon;
+                  return (
+                    <View key={i} style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <IconComponent size={16} color={colors.primary} style={{ marginBottom: 6 }} />
+                      <CustomText variant="h3" style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>{stat.value}</CustomText>
+                      <CustomText style={[styles.statLabel, { fontSize: 11 }]}>{stat.label}</CustomText>
+                    </View>
+                  );
+                })}
               </View>
             );
           })()}
 
           {acceptedPaymentLabels.length > 0 && (
-            <View style={[styles.paymentSection, { backgroundColor: 'rgba(74, 222, 128, 0.05)', borderColor: 'rgba(74, 222, 128, 0.2)' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <CreditCard size={16} color="#4ade80" />
-                <CustomText style={{ color: '#4ade80', fontWeight: 'bold', marginLeft: 8 }}>WE ACCEPT</CustomText>
+            <View style={[styles.paymentSection, { backgroundColor: colors.primary + '06', borderColor: colors.primary + '20' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <CreditCard size={16} color={colors.primary} />
+                <CustomText style={{ color: colors.primary, fontWeight: 'bold', marginLeft: 8, fontSize: 12 }}>PAYMENT METHODS</CustomText>
               </View>
               <View style={styles.paymentMethods}>
                 {acceptedPaymentLabels.map(m => (
-                  <View key={m} style={styles.paymentMethod}>
-                    <CustomText style={styles.paymentMethodText}>{m}</CustomText>
+                  <View key={m} style={[styles.paymentMethod, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+                    <CustomText style={[styles.paymentMethodText, { color: colors.foreground, fontSize: 11, fontWeight: '600' }]}>{m}</CustomText>
                   </View>
                 ))}
               </View>
+              <CustomText variant="caption" style={{ marginTop: 10, color: colors.muted, fontSize: 10 }}>
+                ✓ 100% Buyer Protection on all orders
+              </CustomText>
             </View>
           )}
+
+          {/* Delivery Information Section */}
+          <View style={[{ 
+            backgroundColor: colors.card, 
+            borderColor: colors.border, 
+            borderWidth: 1,
+            borderRadius: 14, 
+            padding: 16,
+            marginVertical: 12
+          }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <Truck size={16} color={colors.primary} />
+              <CustomText style={{ color: colors.foreground, fontWeight: 'bold', marginLeft: 8, fontSize: 13 }}>DELIVERY</CustomText>
+            </View>
+            <CustomText style={{ color: colors.foreground, fontSize: 12, marginBottom: 6, fontWeight: '600' }}>🚚 Get it in 1–2 days (Kigali)</CustomText>
+            <CustomText style={{ color: colors.muted, fontSize: 11, marginBottom: 8 }}>✔ Free delivery for orders over RWF 25,000</CustomText>
+            <View style={{ backgroundColor: colors.primary + '10', borderColor: colors.primary + '30', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+              <CustomText style={{ color: colors.primary, fontSize: 11, fontWeight: '600' }}>💳 No hidden fees - Price you see is price you pay</CustomText>
+            </View>
+          </View>
+
+          {/* Trust Badges Section */}
+          <View style={{ marginVertical: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {/* Best Price Badge */}
+              <View style={{ flex: 1, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 12, alignItems: 'center' }}>
+                <Heart size={16} color={colors.primary} style={{ marginBottom: 6 }} />
+                <CustomText style={{ fontSize: 9, fontWeight: '700', color: colors.muted, textAlign: 'center', marginBottom: 4, textTransform: 'uppercase' }}>Best Price</CustomText>
+                <CustomText style={{ fontSize: 10, fontWeight: '600', color: colors.foreground, textAlign: 'center' }}>Guaranteed in Rwanda</CustomText>
+              </View>
+              {/* Secure Pay Badge */}
+              <View style={{ flex: 1, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 12, alignItems: 'center' }}>
+                <ShieldCheck size={16} color={'#4ade80'} style={{ marginBottom: 6 }} />
+                <CustomText style={{ fontSize: 9, fontWeight: '700', color: colors.muted, textAlign: 'center', marginBottom: 4, textTransform: 'uppercase' }}>Secure Pay</CustomText>
+                <CustomText style={{ fontSize: 10, fontWeight: '600', color: colors.foreground, textAlign: 'center' }}>100% Buyer Protection</CustomText>
+              </View>
+            </View>
+          </View>
 
           {/* 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }} style={{ marginTop: 20 }}>
@@ -908,6 +968,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
               <CustomText style={[styles.cartBtnText, { color: colors.primary }]}>
                 {addingToCart ? "Adding..." : "Add to Cart"}
               </CustomText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.messageBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={handleChatWithSeller}
+            >
+              <MessageCircle color={colors.primary} size={20} />
             </TouchableOpacity>
           </View>
 
@@ -1835,6 +1901,14 @@ const styles = StyleSheet.create({
   cartBtnText: {
     marginLeft: 8,
     fontWeight: '700',
+  },
+  messageBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
   },
   variantsSection: {
     marginTop: 24,
