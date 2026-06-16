@@ -46,7 +46,6 @@
       "expo-contacts",
       "@react-native-google-signin/google-signin",
       "expo-web-browser",
-      "@sentry/react-native"
-    ]
+          ]
   }
 }

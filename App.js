@@ -26,6 +26,8 @@ import GlobalSearchScreen from './src/screens/GlobalSearchScreen';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { SecurityProvider, useAppSecurity } from './src/context/SecurityContext';
+import { API_BASE_URL } from '@env';
 import Constants from 'expo-constants';
 import { CartProvider, useCart } from './src/context/CartContext';
 import { WishlistProvider } from './src/context/WishlistContext';
@@ -52,6 +54,10 @@ import { AgentDrawerContext } from './src/context/AgentDrawerContext';
 
 import { CallProvider } from './src/contexts/CallContext';
 import CallScreen from './src/screens/shared/CallScreen';
+import AppLockOverlay from './src/screens/shared/AppLockOverlay';
+
+console.log('📡 [ENV] API_BASE_URL loaded as:', API_BASE_URL);
+
 // Network Performance Logger
 const originalFetch = global.fetch;
 global.fetch = async (...args) => {
@@ -400,28 +406,43 @@ const RootNavigator = () => {
   );
 };
 
+// Security wrapper component
+const SecurityWrapper = ({ children }) => {
+  const { appLocked } = useAppSecurity();
+  return (
+    <>
+      {children}
+      <AppLockOverlay visible={appLocked} />
+    </>
+  );
+};
+
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <PresenceProvider>
-          <LanguageProvider>
-            <ThemeProvider>
-              <CallProvider>
-                <NotificationProvider>
-                  <CartProvider>
-                    <WishlistProvider>
-                      <SafeAreaProvider>
-                        <RootNavigator />
-                        <CallScreen />
-                      </SafeAreaProvider>
-                    </WishlistProvider>
-                  </CartProvider>
-                </NotificationProvider>
-              </CallProvider>
-            </ThemeProvider>
-          </LanguageProvider>
-        </PresenceProvider>
+        <SecurityProvider>
+          <PresenceProvider>
+            <LanguageProvider>
+              <ThemeProvider>
+                <CallProvider>
+                  <NotificationProvider>
+                    <CartProvider>
+                      <WishlistProvider>
+                        <SafeAreaProvider>
+                          <SecurityWrapper>
+                            <RootNavigator />
+                          </SecurityWrapper>
+                          <CallScreen />
+                        </SafeAreaProvider>
+                      </WishlistProvider>
+                    </CartProvider>
+                  </NotificationProvider>
+                </CallProvider>
+              </ThemeProvider>
+            </LanguageProvider>
+          </PresenceProvider>
+        </SecurityProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

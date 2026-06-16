@@ -183,7 +183,7 @@ export const CallProvider = ({ children }) => {
       if (direction === 'incoming') {
         finishCall({ status: 'missed', direction: 'incoming', notifyRemote: true });
       } else {
-        finishCall({ status: 'canceled', direction: 'outgoing', notifyRemote: true });
+        finishCall({ status: 'missed', direction: 'outgoing', notifyRemote: true });
       }
     }, CALL_TIMEOUT_MS);
   };
@@ -495,7 +495,7 @@ export const CallProvider = ({ children }) => {
 
   const endCall = () => {
     const direction = activeCallRef.current?.direction || (incomingCallRef.current ? 'incoming' : 'outgoing');
-    const status = connectedAtRef.current ? 'completed' : (direction === 'incoming' ? 'declined' : 'canceled');
+    const status = connectedAtRef.current ? 'completed' : (direction === 'incoming' ? 'declined' : 'missed');
     finishCall({ status, direction, notifyRemote: true });
   };
 

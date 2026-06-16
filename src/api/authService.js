@@ -61,7 +61,7 @@ export const authService = {
         throw new Error(errorMsg);
       }
 
-      return data.user;
+      return data;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -89,7 +89,7 @@ export const authService = {
         throw new Error(data.error || 'Google login failed');
       }
 
-      return data.user;
+      return data;
     } catch (error) {
       console.error('Google login error:', error);
       throw error;

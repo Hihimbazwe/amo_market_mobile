@@ -5,6 +5,7 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -14,9 +15,11 @@ export const AuthProvider = ({ children }) => {
     const loadStorageData = async () => {
       try {
         const storedUser = await AsyncStorage.getItem('@auth_user');
+        const storedToken = await AsyncStorage.getItem('@auth_token');
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
           setUser(parsedUser);
+          setAuthToken(storedToken);
           setIsAuthenticated(true);
         }
       } catch (e) {
@@ -31,9 +34,17 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (userData) => {
     try {
-      setUser(userData);
+      const nextUser = userData?.user || userData;
+      const nextToken = userData?.token || null;
+      setUser(nextUser);
+      setAuthToken(nextToken);
       setIsAuthenticated(true);
-      await AsyncStorage.setItem('@auth_user', JSON.stringify(userData));
+      await AsyncStorage.setItem('@auth_user', JSON.stringify(nextUser));
+      if (nextToken) {
+        await AsyncStorage.setItem('@auth_token', nextToken);
+      } else {
+        await AsyncStorage.removeItem('@auth_token');
+      }
     } catch (e) {
       console.error('Failed to save auth state', e);
     }
@@ -57,8 +68,10 @@ export const AuthProvider = ({ children }) => {
   const logout = async (isManual = true) => {
     try {
       setUser(null);
+      setAuthToken(null);
       setIsAuthenticated(false);
       await AsyncStorage.removeItem('@auth_user');
+      await AsyncStorage.removeItem('@auth_token');
       if (isManual) {
         await AsyncStorage.removeItem('@auto_logout_redirect');
       }
@@ -73,7 +86,7 @@ export const AuthProvider = ({ children }) => {
   const canChat = !isSellerDeactivated && !user?.chatDisabled;
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout, updateUser, isSellerDeactivated, canSell, canChat }}>
+    <AuthContext.Provider value={{ user, authToken, isAuthenticated, loading, login, logout, updateUser, isSellerDeactivated, canSell, canChat }}>
       {children}
     </AuthContext.Provider>
   );

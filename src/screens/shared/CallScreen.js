@@ -58,13 +58,13 @@ const CallScreen = () => {
   };
 
   const statusLabel = (() => {
-    if (callState === 'RINGING') return incomingCallData ? 'Incoming call' : 'Ringing...';
+    if (callState === 'RINGING') return incomingCallData ? 'Incoming call...' : 'Ringing...';
     if (callState === 'CALLING') return 'Calling...';
-    if (callState === 'CONNECTED') return `Connected - ${formatDuration(elapsedSeconds)}`;
+    if (callState === 'CONNECTED') return formatDuration(elapsedSeconds);
     if (callState === 'DECLINED') return 'Call declined';
     if (callState === 'ENDED') {
       if (endedInfo?.status === 'missed') return 'Missed call';
-      if (endedInfo?.status === 'canceled') return 'Call canceled';
+      if (endedInfo?.status === 'canceled') return 'Missed call';
       return 'Call ended';
     }
     return '';

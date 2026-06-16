@@ -15,6 +15,8 @@ import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../context/NotificationContext';
 import AccountPrivacyModals from '../../components/AccountPrivacyModals';
 import DeactivationBanner from '../../components/DeactivationBanner';
+import AppSecuritySetupScreen from '../shared/AppSecuritySetupScreen';
+import { useAppSecurity } from '../../context/SecurityContext';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors }) => (
   <View style={styles.settingRow}>
@@ -47,11 +49,13 @@ const BuyerSettingsScreen = () => {
   const language = i18n.language;
   const navigation = useNavigation();
   const { pushNotificationsEnabled, togglePushNotifications } = useNotifications();
+  const { securitySettings, enableSecurity, disableSecurity } = useAppSecurity();
   const [hideAvailability, setHideAvailability] = useState(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAppSecurityModal, setShowAppSecurityModal] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -69,6 +73,16 @@ const BuyerSettingsScreen = () => {
     if (res.error) {
       Alert.alert(t('error'), `${t('failedToUpdatePrivacy')}: ${res.details || res.error}`);
       setHideAvailability(!newValue);
+    }
+  };
+
+  const handleAppSecuritySetup = async (settings) => {
+    const ok = await enableSecurity(settings.method, settings.pin, settings.pattern);
+    if (ok) {
+      setShowAppSecurityModal(false);
+      Alert.alert(t('success'), 'App lock updated successfully.');
+    } else {
+      Alert.alert(t('error'), 'Could not save app lock settings.');
     }
   };
 
@@ -163,6 +177,35 @@ const BuyerSettingsScreen = () => {
           <CustomText style={[styles.sectionLabel, { color: colors.muted }]}>{t('securityPrivacy')}</CustomText>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <SettingRow icon={Lock} title={t('password')} subtitle={t('secureAccount')} value={t('change')} type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <SettingRow
+              icon={Shield}
+              title="App Lock"
+              subtitle={securitySettings.enabled ? `Enabled (${securitySettings.method || 'active'})` : "PIN, pattern, or fingerprint"}
+              value={securitySettings.enabled}
+              onValueChange={async (newValue) => {
+                if (newValue) {
+                  setShowAppSecurityModal(true);
+                } else {
+                  Alert.alert(
+                    t('Disable App Lock') || 'Disable App Lock',
+                    t('disableConfirmMsg') || 'Are you sure you want to disable app lock security?',
+                    [
+                      { text: t('cancel') || 'Cancel', style: 'cancel' },
+                      {
+                        text: t('disable') || 'Disable',
+                        style: 'destructive',
+                        onPress: async () => {
+                          const ok = await disableSecurity();
+                          if (ok) Alert.alert(t('success'), 'App lock disabled.');
+                        }
+                      }
+                    ]
+                  );
+                }
+              }}
+              colors={colors}
+            />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             {loadingPrivacy ? (
               <View style={{ padding: 16, alignItems: 'center' }}><ActivityIndicator size="small" color={colors.primary} /></View>
@@ -326,6 +369,32 @@ const BuyerSettingsScreen = () => {
         setShowDeleteModal={setShowDeleteModal}
       />
 
+      <Modal
+        visible={showAppSecurityModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAppSecurityModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowAppSecurityModal(false)}
+        >
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+            <TouchableOpacity 
+              style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]} 
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <AppSecuritySetupScreen
+                onComplete={handleAppSecuritySetup}
+                onCancel={() => setShowAppSecurityModal(false)}
+              />
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -353,14 +422,15 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
   },
   modalContent: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    borderRadius: 32,
     padding: 24,
-    maxHeight: '80%',
+    maxHeight: '90%',
+    height: '80%',
     borderWidth: 1,
+    marginHorizontal: 20,
   },
   modalHeader: {
     flexDirection: 'row',
