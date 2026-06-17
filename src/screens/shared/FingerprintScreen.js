@@ -1,151 +1,112 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
-import { Fingerprint } from 'lucide-react-native';
+import { Fingerprint, Lock } from 'lucide-react-native';
 
-const FingerprintScreen = ({ onSuccess, isSetup = false, onSetupComplete }) => {
+const FingerprintScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCancel, onUsePasswordPress }) => {
   const { colors } = useTheme();
-  const [loading, setLoading] = useState(!isSetup);
   const [error, setError] = useState('');
-  const [supported, setSupported] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    checkBiometricSupport();
-    if (!isSetup) {
-      automaticallyAuthenticate();
-    }
-  }, []);
+  const authenticate = async () => {
+    if (loading) return false;
+    setLoading(true);
+    setError('');
 
-  const checkBiometricSupport = async () => {
     try {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
-      setSupported(compatible && enrolled);
-
-      if (!compatible) {
-        setError('Fingerprint not supported on this device');
-      } else if (!enrolled) {
-        setError('No fingerprint enrolled. Please enroll in device settings.');
+      if (!hasHardware || !enrolled) {
+        setError('Fingerprint is not available on this device.');
+        setLoading(false);
+        return false;
       }
-    } catch (err) {
-      setError('Error checking biometric support');
-    }
-  };
 
-  const automaticallyAuthenticate = async () => {
-    try {
-      setLoading(true);
       const result = await LocalAuthentication.authenticateAsync({
         disableDeviceFallback: false,
-        reason: 'Authenticate to unlock your app',
-      });
-
-      if (result.success) {
-        if (onSuccess) {
-          onSuccess();
-        }
-      } else {
-        setError('Authentication failed');
-      }
-    } catch (err) {
-      setError('Fingerprint authentication error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSetup = async () => {
-    try {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      if (!compatible) {
-        Alert.alert('Not Supported', 'Fingerprint authentication is not supported on this device.');
-        return;
-      }
-
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!enrolled) {
-        Alert.alert('No Fingerprint Enrolled', 'Please register at least one fingerprint in your device settings.');
-        return;
-      }
-
-      setLoading(true);
-      const result = await LocalAuthentication.authenticateAsync({
-        disableDeviceFallback: true,
-        reason: 'Scan your fingerprint to confirm and enable lock setup',
+        reason: isSetup ? 'Confirm fingerprint to enable app lock' : 'Authenticate to continue',
       });
 
       if (result.success) {
         if (isSetup && onSetupComplete) {
-          onSetupComplete(true);
+          onSetupComplete();
+        } else if (onSuccess) {
+          const success = await onSuccess();
+          if (success === false) {
+            setError('Verification failed. Try again.');
+            setLoading(false);
+            return false;
+          }
         }
-      } else {
-        Alert.alert('Verification Failed', 'Fingerprint authentication failed. Please try again.');
+        setLoading(false);
+        return true;
       }
-    } catch (err) {
-      console.warn('[FingerprintScreen] Setup error:', err);
-      Alert.alert('Error', 'An error occurred during fingerprint verification.');
-    } finally {
+
+      setError('Authentication failed. Try again.');
       setLoading(false);
+      return false;
+    } catch (err) {
+      setError('Fingerprint authentication failed.');
+      setLoading(false);
+      return false;
     }
   };
+
+  useEffect(() => {
+    if (!isSetup) {
+      authenticate();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSetup]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-        <View style={{ alignItems: 'center', marginBottom: 40 }}>
-          {loading ? (
-            <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 20 }} />
+        <View style={[styles.iconWrap, { backgroundColor: colors.primary + '18' }]}>
+          {isSetup ? (
+            <Fingerprint color={colors.primary} size={48} />
           ) : (
-            <Fingerprint size={60} color={colors.primary} style={{ marginBottom: 20 }} />
+            <Lock color={colors.primary} size={48} />
           )}
-
-          <CustomText variant="h2" style={{ textAlign: 'center', marginBottom: 8 }}>
-            {isSetup ? 'Enable Fingerprint' : 'Fingerprint Required'}
-          </CustomText>
-
-          <CustomText style={{ color: colors.muted, textAlign: 'center', fontSize: 13 }}>
-            {isSetup ? 'Use your fingerprint to unlock the app' : 'Place your finger on the sensor'}
-          </CustomText>
         </View>
 
-        {error ? (
-          <TouchableOpacity
-            style={{ backgroundColor: '#EF4444', padding: 12, borderRadius: 10, marginBottom: 20 }}
-          >
-            <CustomText style={{ color: '#fff', textAlign: 'center', fontSize: 12 }}>
-              {error}
-            </CustomText>
-          </TouchableOpacity>
-        ) : null}
+        <CustomText variant="h2" style={[styles.title, { color: colors.foreground }]}>
+          {isSetup ? 'Enable Fingerprint Lock' : 'Fingerprint Required'}
+        </CustomText>
+        <CustomText style={[styles.subtitle, { color: colors.muted }]}>
+          {isSetup
+            ? 'Confirm your fingerprint to save this lock method.'
+            : 'Use your fingerprint to verify and continue.'}
+        </CustomText>
 
-        {!isSetup && !loading && (
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary, marginBottom: 8 }]}
-            onPress={automaticallyAuthenticate}
-          >
-            <CustomText style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
-              Try Again
-            </CustomText>
-          </TouchableOpacity>
+        {!!error && (
+          <CustomText style={[styles.error, { color: '#ef4444' }]}>{error}</CustomText>
         )}
 
-        {isSetup && (
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary, marginBottom: 12 }]}
-            onPress={handleSetup}
-          >
-            <CustomText style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
-              Enable Fingerprint
-            </CustomText>
-          </TouchableOpacity>
-        )}
-
-        {!supported && (
-          <CustomText style={{ color: colors.muted, textAlign: 'center', fontSize: 12, marginTop: 16 }}>
-            Fingerprint is not available on your device. Please choose PIN or Pattern instead.
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.primary }]}
+          onPress={authenticate}
+          disabled={loading}
+        >
+          <CustomText style={styles.buttonText}>
+            {loading ? 'Waiting...' : isSetup ? 'Confirm Fingerprint' : 'Try Again'}
           </CustomText>
+        </TouchableOpacity>
+
+        {onCancel && (
+          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+            <CustomText style={{ color: colors.muted, fontWeight: '600' }}>Cancel</CustomText>
+          </TouchableOpacity>
+        )}
+
+        {!isSetup && onUsePasswordPress && (
+          <TouchableOpacity style={styles.usePasswordButton} onPress={onUsePasswordPress}>
+            <CustomText style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
+              Use password instead
+            </CustomText>
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -156,15 +117,53 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: 24,
   },
   content: {
-    width: '100%',
+    alignItems: 'center',
+  },
+  iconWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  title: {
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  error: {
+    textAlign: 'center',
+    marginBottom: 16,
+    fontSize: 13,
   },
   button: {
     paddingVertical: 14,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    minWidth: 220,
     alignItems: 'center',
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  cancelButton: {
+    marginTop: 16,
+    padding: 12,
+  },
+  usePasswordButton: {
+    marginTop: 16,
+    padding: 12,
   },
 });
 

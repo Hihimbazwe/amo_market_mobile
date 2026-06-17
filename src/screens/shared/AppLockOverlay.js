@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppSecurity } from '../../context/SecurityContext';
+import { useAuth } from '../../context/AuthContext';
+import { rootNavigationRef } from '../../context/NavigationRefContext';
 import PINEntryScreen from './PINEntryScreen';
 import PatternEntryScreen from './PatternEntryScreen';
 import FingerprintScreen from './FingerprintScreen';
@@ -9,6 +11,7 @@ import FingerprintScreen from './FingerprintScreen';
 const AppLockOverlay = ({ visible, onUnlock }) => {
   const { colors } = useTheme();
   const { securitySettings, verifyPin, verifyPattern, verifyFingerprint, unlockApp } = useAppSecurity();
+  const { logout } = useAuth();
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [locked, setLocked] = useState(true);
   // When user taps "Use Fingerprint" from PIN screen, switch to fingerprint view
@@ -51,6 +54,39 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
     return success;
   };
 
+  const handleUsePasswordInstead = useCallback(async () => {
+    unlockApp();
+    await logout(true);
+
+    const navigateToLogin = () => {
+      const nav = rootNavigationRef.current;
+      if (!nav?.reset) return false;
+
+      try {
+        nav.reset({
+          index: 0,
+          routes: [{ name: 'Auth', state: { index: 0, routes: [{ name: 'Login' }] } }],
+        });
+        return true;
+      } catch (err) {
+        try {
+          nav.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+          return true;
+        } catch {
+          console.warn('[AppLockOverlay] Failed to navigate to Login:', err?.message);
+          return false;
+        }
+      }
+    };
+
+    if (!navigateToLogin()) {
+      setTimeout(navigateToLogin, 100);
+    }
+  }, [unlockApp, logout]);
+
   useEffect(() => {
     if (visible) {
       setFailedAttempts(0);
@@ -75,6 +111,7 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
             {(securitySettings.method === 'fingerprint' || showFingerprint) && (
               <FingerprintScreen
                 onSuccess={handleFingerprintVerify}
+                onUsePasswordPress={handleUsePasswordInstead}
               />
             )}
 
@@ -84,6 +121,7 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
                 onSuccess={handlePINVerify}
                 method="pin"
                 onFingerprintPress={() => setShowFingerprint(true)}
+                onUsePasswordPress={handleUsePasswordInstead}
               />
             )}
 
@@ -91,6 +129,7 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
             {securitySettings.method === 'pattern' && !showFingerprint && (
               <PatternEntryScreen
                 onSuccess={handlePatternVerify}
+                onUsePasswordPress={handleUsePasswordInstead}
               />
             )}
           </>

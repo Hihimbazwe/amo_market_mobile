@@ -1,40 +1,58 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import CustomText from './CustomText';
-import CustomButton from './CustomButton';
-import { LogIn } from 'lucide-react-native';
+import { LogIn, Lock } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useAppSecurity } from '../context/SecurityContext';
 
 const { width } = Dimensions.get('window');
 
 const AuthOverlay = ({ currentRoute }) => {
   const navigation = useNavigation();
   const { isAuthenticated } = useAuth();
-  
-  // currentRoute is now passed from App.js to avoid navigation state errors
+  const { securitySettings, loadDeviceSecurityAndLock } = useAppSecurity();
+
+  const deviceSecurityEnabled = !!securitySettings?.enabled;
+  const securityMethod = securitySettings?.method;
 
   if (isAuthenticated) return null;
-  
-  // Don't show on login/register screens
+
   if (['Login', 'Register', 'VerifyOTP', 'ForgotPassword', 'ResetPassword'].includes(currentRoute)) {
     return null;
   }
+
+  const handlePress = async () => {
+    if (deviceSecurityEnabled && securityMethod) {
+      await loadDeviceSecurityAndLock();
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.glass}>
         <View style={styles.content}>
           <View style={styles.textContainer}>
-            <CustomText style={styles.title}>Sign in and enjoy more</CustomText>
-            <CustomText style={styles.subtitle}>Unlock exclusive deals and features</CustomText>
+            <CustomText style={styles.title}>
+              {deviceSecurityEnabled ? 'Unlock to continue' : 'Sign in and enjoy more'}
+            </CustomText>
+            <CustomText style={styles.subtitle}>
+              {deviceSecurityEnabled ? 'Use your security method to unlock' : 'Unlock exclusive deals and features'}
+            </CustomText>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.signInButton}
-            onPress={() => navigation.navigate('Auth', { screen: 'Login' })}
+            onPress={handlePress}
           >
-            <LogIn size={18} color="#ffffff" />
-            <CustomText style={styles.signInText}>Sign In</CustomText>
+            {deviceSecurityEnabled ? <Lock size={18} color="#ffffff" /> : <LogIn size={18} color="#ffffff" />}
+            <CustomText style={styles.signInText}>
+              {deviceSecurityEnabled ? 'Unlock' : 'Sign In'}
+            </CustomText>
           </TouchableOpacity>
         </View>
       </View>

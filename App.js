@@ -55,6 +55,7 @@ import { AgentDrawerContext } from './src/context/AgentDrawerContext';
 import { CallProvider } from './src/contexts/CallContext';
 import CallScreen from './src/screens/shared/CallScreen';
 import AppLockOverlay from './src/screens/shared/AppLockOverlay';
+import { NavigationRefContext, rootNavigationRef } from './src/context/NavigationRefContext';
 
 console.log('📡 [ENV] API_BASE_URL loaded as:', API_BASE_URL);
 
@@ -244,6 +245,7 @@ const RootNavigator = () => {
 
   const inactivityTimer = React.useRef(null);
   const backgroundTime = React.useRef(null);
+  const navigationRef = React.useRef(null);
   const [showWarning, setShowWarning] = React.useState(false);
   const [currentRoute, setCurrentRoute] = React.useState(null);
   const [currentRouteObj, setCurrentRouteObj] = React.useState(null);
@@ -357,7 +359,12 @@ const RootNavigator = () => {
         <SellerDrawerContext.Provider value={{ visible: sellerDrawerVisible, setVisible: setSellerDrawerVisible, toggleDrawer: () => setSellerDrawerVisible(v => !v) }}>
           <CourierDrawerContext.Provider value={{ visible: courierDrawerVisible, setVisible: setCourierDrawerVisible, toggleDrawer: () => setCourierDrawerVisible(v => !v) }}>
             <AgentDrawerContext.Provider value={{ visible: agentDrawerVisible, setVisible: setAgentDrawerVisible, toggleDrawer: () => setAgentDrawerVisible(v => !v) }}>
+              <NavigationRefContext.Provider value={navigationRef}>
               <NavigationContainer 
+                ref={(node) => {
+                  navigationRef.current = node;
+                  rootNavigationRef.current = node;
+                }}
                 linking={linking}
                 onStateChange={(state) => {
                   if (!state) return;
@@ -392,6 +399,7 @@ const RootNavigator = () => {
                 </Stack.Navigator>
                 <AuthOverlay currentRoute={currentRoute} />
               </NavigationContainer>
+              </NavigationRefContext.Provider>
             </AgentDrawerContext.Provider>
           </CourierDrawerContext.Provider>
         </SellerDrawerContext.Provider>

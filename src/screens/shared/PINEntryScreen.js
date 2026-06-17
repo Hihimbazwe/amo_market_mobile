@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { Lock, Fingerprint } from 'lucide-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
+import { NavigationRefContext } from '../../context/NavigationRefContext';
 
 const { width, height } = Dimensions.get('window');
 
-const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = false, onFingerprintPress }) => {
+const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = false, onFingerprintPress, onCancel, onUsePasswordPress }) => {
   const { colors } = useTheme();
+  const navigationRef = useContext(NavigationRefContext);
   const [pin, setPin] = useState('');
   const [firstPin, setFirstPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -266,6 +268,41 @@ const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = 
               </CustomText>
             </TouchableOpacity>
           )}
+
+          {/* Cancel button for verification mode */}
+          {!isSetup && onCancel && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={onCancel}
+            >
+              <CustomText style={[styles.cancelButtonText, { color: colors.muted }]}>
+                Cancel
+              </CustomText>
+            </TouchableOpacity>
+          )}
+
+          {/* Use password instead link */}
+          {!isSetup && (
+            <TouchableOpacity
+              style={styles.usePasswordButton}
+              onPress={() => {
+                if (onUsePasswordPress) {
+                  onUsePasswordPress();
+                  return;
+                }
+                if (navigationRef?.current) {
+                  navigationRef.current.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                  });
+                }
+              }}
+            >
+              <CustomText style={[styles.usePasswordButtonText, { color: colors.primary }]}>
+                Use password instead
+              </CustomText>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -372,6 +409,24 @@ const styles = StyleSheet.create({
   fingerprintText: {
     fontWeight: '600',
     fontSize: 15,
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  usePasswordButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  usePasswordButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

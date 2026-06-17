@@ -9,6 +9,7 @@ import CustomButton from '../components/CustomButton';
 import CustomInput from '../components/CustomInput';
 import { authService } from '../api/authService';
 import { useAuth } from '../context/AuthContext';
+import { useAppSecurity } from '../context/SecurityContext';
 import { useTheme } from '../context/ThemeContext';
 import { StatusBar } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -35,6 +36,7 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { notifyCredentialLogin } = useAppSecurity();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [useNativeGoogle, setUseNativeGoogle] = useState(false);
 
@@ -106,6 +108,7 @@ const LoginScreen = ({ navigation }) => {
     setGoogleLoading(true);
     try {
       const result = await authService.loginWithGoogle(gEmail, gName, gImage);
+      notifyCredentialLogin();
       await login(result);
 
       // Check if there is an auto-logout redirect to restore
@@ -236,6 +239,7 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
     try {
       const result = await authService.login(email, password);
+      notifyCredentialLogin();
       await login(result);
       
       // Check if there is an auto-logout redirect to restore

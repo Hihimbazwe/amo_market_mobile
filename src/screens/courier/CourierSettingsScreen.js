@@ -14,8 +14,7 @@ import { chatService } from '../../api/chatService';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../context/NotificationContext';
 import AccountPrivacyModals from '../../components/AccountPrivacyModals';
-import AppSecuritySetupScreen from '../shared/AppSecuritySetupScreen';
-import { useAppSecurity } from '../../context/SecurityContext';
+import AppLockSettings from '../../components/AppLockSettings';
 
 const SettingRow = ({ icon: Icon, title, subtitle, value, onValueChange, type = 'switch', onPress, colors, t }) => (
   <View style={styles.settingRow}>
@@ -46,12 +45,10 @@ export default function CourierSettingsScreen() {
   const navigation = useNavigation();
   const { t } = useTranslation(['dashboard', 'common']);
   const { pushNotificationsEnabled, togglePushNotifications } = useNotifications();
-  const { securitySettings, enableSecurity, disableSecurity } = useAppSecurity();
   const [hideAvailability, setHideAvailability] = useState(false);
   const [loadingPrivacy, setLoadingPrivacy] = useState(true);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showAppSecurityModal, setShowAppSecurityModal] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -69,16 +66,6 @@ export default function CourierSettingsScreen() {
     if (res.error) {
       Alert.alert(t('error'), `${t('failedToUpdatePrivacy')}: ${res.details || res.error}`);
       setHideAvailability(!newValue);
-    }
-  };
-
-  const handleAppSecuritySetup = async (settings) => {
-    const ok = await enableSecurity(settings.method, settings.pin, settings.pattern);
-    if (ok) {
-      setShowAppSecurityModal(false);
-      Alert.alert(t('success'), 'App lock updated successfully.');
-    } else {
-      Alert.alert(t('error'), 'Could not save app lock settings.');
     }
   };
 
@@ -159,35 +146,7 @@ export default function CourierSettingsScreen() {
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <SettingRow icon={Lock} title={t('password')} subtitle={t('updateSecurity')} type="link" onPress={() => setShowPasswordModal(true)} colors={colors} t={t} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow
-              icon={Shield}
-              title="App Lock"
-              subtitle={securitySettings.enabled ? `Enabled (${securitySettings.method || 'active'})` : "PIN, pattern, or fingerprint"}
-              value={securitySettings.enabled}
-              onValueChange={async (newValue) => {
-                if (newValue) {
-                  setShowAppSecurityModal(true);
-                } else {
-                  Alert.alert(
-                    t('Disable App Lock') || 'Disable App Lock',
-                    t('disableConfirmMsg') || 'Are you sure you want to disable app lock security?',
-                    [
-                      { text: t('cancel') || 'Cancel', style: 'cancel' },
-                      {
-                        text: t('disable') || 'Disable',
-                        style: 'destructive',
-                        onPress: async () => {
-                          const ok = await disableSecurity();
-                          if (ok) Alert.alert(t('success'), 'App lock disabled.');
-                        }
-                      }
-                    ]
-                  );
-                }
-              }}
-              colors={colors}
-              t={t}
-            />
+            <AppLockSettings t={t} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow 
               icon={Shield} 
@@ -295,32 +254,6 @@ export default function CourierSettingsScreen() {
         showDeleteModal={showDeleteModal}
         setShowDeleteModal={setShowDeleteModal}
       />
-
-      <Modal
-        visible={showAppSecurityModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAppSecurityModal(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setShowAppSecurityModal(false)}
-        >
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
-            <TouchableOpacity 
-              style={[styles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]} 
-              activeOpacity={1}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <AppSecuritySetupScreen
-                onComplete={handleAppSecuritySetup}
-                onCancel={() => setShowAppSecurityModal(false)}
-              />
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </TouchableOpacity>
-      </Modal>
     </SafeAreaView>
   );
 }

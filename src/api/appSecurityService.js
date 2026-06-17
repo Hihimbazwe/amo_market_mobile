@@ -100,8 +100,35 @@ export const appSecurityService = {
     }
   },
 
+  switchLockMethod: async (userId, method) => {
+    return appSecurityService.updateSecuritySettings(userId, { action: 'switch', method });
+  },
+
+  reEnableSecurity: async (userId, method) => {
+    return appSecurityService.updateSecuritySettings(userId, { action: 'reenable', method });
+  },
+
+  updateLockMethod: async (userId, method, pin = null, pattern = null) => {
+    return appSecurityService.updateSecuritySettings(userId, {
+      action: 'update',
+      method,
+      pin,
+      pattern,
+    });
+  },
+
+  addLockMethod: async (userId, method, pin = null, pattern = null, makeActive = true) => {
+    return appSecurityService.updateSecuritySettings(userId, {
+      action: 'add',
+      method,
+      pin,
+      pattern,
+      makeActive,
+    });
+  },
+
   // Enable app security
-  enableSecurity: async (userId, method, pin = null, pattern = null) => {
+  enableSecurity: async (userId, method, pin = null, pattern = null, configuredMethods = null) => {
     try {
       const res = await fetchWithTimeout(`${BASE_URL}/api/user/security-settings/enable`, {
         method: 'POST',
@@ -110,6 +137,7 @@ export const appSecurityService = {
           method, // 'pin', 'pattern', 'fingerprint'
           pin,
           pattern,
+          configuredMethods, // All configured methods
         }),
       });
       return await parseJson(res, 'Failed to enable security');

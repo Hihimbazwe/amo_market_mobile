@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useContext } from 'react';
 import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
 import { Lock } from 'lucide-react-native';
+import { NavigationRefContext } from '../../context/NavigationRefContext';
 
 const { width } = Dimensions.get('window');
 
@@ -11,8 +12,9 @@ const GRID_SIZE = 3;
 const DOT_RADIUS = 16;
 const BOARD_SIZE = Math.min(width - 72, 320);
 
-const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false }) => {
+const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCancel, onUsePasswordPress }) => {
   const { colors } = useTheme();
+  const navigationRef = useContext(NavigationRefContext);
   const [pattern, setPattern] = useState([]);
   const [confirmPattern, setConfirmPattern] = useState([]);
   const [step, setStep] = useState(isSetup ? 'enter' : 'verify');
@@ -144,6 +146,41 @@ const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false }) => 
       >
         <CustomText style={{ color: '#fff', fontWeight: '700' }}>Clear</CustomText>
       </TouchableOpacity>
+
+      {/* Cancel button for verification mode */}
+      {!isSetup && onCancel && (
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={onCancel}
+        >
+          <CustomText style={styles.cancelButtonText}>
+            Cancel
+          </CustomText>
+        </TouchableOpacity>
+      )}
+
+      {/* Use password instead link */}
+      {!isSetup && (
+        <TouchableOpacity
+          style={styles.usePasswordButton}
+          onPress={() => {
+            if (onUsePasswordPress) {
+              onUsePasswordPress();
+              return;
+            }
+            if (navigationRef?.current) {
+              navigationRef.current.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            }
+          }}
+        >
+          <CustomText style={[styles.usePasswordButtonText, { color: colors.primary }]}>
+            Use password instead
+          </CustomText>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -173,6 +210,25 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  usePasswordButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  usePasswordButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
