@@ -108,6 +108,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const { isInWishlist, toggleWishlist, loading: wishlistLoading } = useWishlist();
   const [addingToCart, setAddingToCart] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
   const [selectedVariants, setSelectedVariants] = useState({});
   const [reviews, setReviews] = useState([]);
@@ -297,7 +298,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
     React.useCallback(() => {
       if (user?.id && product?.seller?.id) {
         sellerService.getFollowStatus(user.id, product.seller.id)
-          .then(data => setIsFollowing(data.isFollowing))
+          .then(data => {
+            setIsFollowing(data.isFollowing);
+            if (data.followerCount !== undefined) {
+              setFollowerCount(data.followerCount);
+            }
+          })
           .catch(err => console.log('[DEBUG] Follow status error:', err));
       }
     }, [user?.id, product?.seller?.id])
@@ -312,8 +318,11 @@ const ProductDetailScreen = ({ route, navigation }) => {
     setFollowLoading(true);
     try {
       const action = isFollowing ? 'unfollow' : 'follow';
-      await sellerService.toggleFollow(user.id, product.seller.id, action);
+      const data = await sellerService.toggleFollow(user.id, product.seller.id, action);
       setIsFollowing(!isFollowing);
+      if (data.followerCount !== undefined) {
+        setFollowerCount(data.followerCount);
+      }
     } catch (error) {
       Alert.alert("Error", "Failed to update follow status.");
     } finally {

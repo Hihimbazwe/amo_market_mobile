@@ -606,10 +606,10 @@ export const sellerService = {
 
   toggleFollow: async (userId, sellerId, action) => {
     try {
-      const response = await fetch(`${BASE_URL}/api/mobile/user/follow`, {
+      const response = await fetch(`${BASE_URL}/api/seller/follow`, {
         method: 'POST',
         headers: buildHeaders(userId),
-        body: JSON.stringify({ sellerId, action })
+        body: JSON.stringify({ sellerId, action, userId })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to toggle follow');
@@ -622,7 +622,7 @@ export const sellerService = {
 
   getFollowStatus: async (userId, sellerId) => {
     try {
-      const response = await fetch(`${BASE_URL}/api/mobile/user/follow?sellerId=${encodeURIComponent(sellerId)}`, {
+      const response = await fetch(`${BASE_URL}/api/seller/follow?sellerId=${encodeURIComponent(sellerId)}&userId=${encodeURIComponent(userId)}`, {
         method: 'GET',
         headers: buildHeaders(userId),
       });
