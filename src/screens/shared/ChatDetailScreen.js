@@ -33,6 +33,7 @@ import { productService } from '../../api/productService';
 import { useNotifications } from '../../context/NotificationContext';
 import { usePresence } from '../../context/PresenceContext';
 import PresenceDot from '../../components/PresenceDot';
+import { KeyboardAvoidingView, Platform, } from 'react-native';
 
 function formatLastSeen(timestamp) {
   if (!timestamp) return '';
@@ -466,33 +467,33 @@ const Bubble = ({ msg, colors, onAction, onSwipeReply, onNavigateProduct }) => {
               )}
 
               {!callLog && (
-              <View style={styles.bubbleTextWrapper}>
-                {isShortText ? (
-                  <CustomText
-                    style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}
-                    numberOfLines={1}
-                  >
-                    {cleanMessageText}
-                    <CustomText style={[styles.bubbleTimeInline, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}> {formatMsgTime(msg.timestamp)}{!msg.isDeleted && isMe && ' ✓✓'}</CustomText>
-                  </CustomText>
-                ) : (
-                  <>
-                    <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}> 
+                <View style={styles.bubbleTextWrapper}>
+                  {isShortText ? (
+                    <CustomText
+                      style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}
+                      numberOfLines={1}
+                    >
                       {cleanMessageText}
-                      <CustomText style={styles.invisibleSpacer}>
-                        {'   '}
-                      </CustomText>
+                      <CustomText style={[styles.bubbleTimeInline, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}> {formatMsgTime(msg.timestamp)}{!msg.isDeleted && isMe && ' ✓✓'}</CustomText>
                     </CustomText>
-
-                    <View style={styles.timestampWrap}>
-                      <CustomText style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}> 
-                        {formatMsgTime(msg.timestamp)}
-                        {!msg.isDeleted && isMe && ' ✓✓'}
+                  ) : (
+                    <>
+                      <CustomText style={[styles.bubbleText, { color: msg.isDeleted ? (isMe ? 'rgba(255,255,255,0.8)' : colors.muted) : (isMe ? '#fff' : colors.foreground), fontStyle: msg.isDeleted ? 'italic' : 'normal' }]}>
+                        {cleanMessageText}
+                        <CustomText style={styles.invisibleSpacer}>
+                          {'   '}
+                        </CustomText>
                       </CustomText>
-                    </View>
-                  </>
-                )}
-              </View>
+
+                      <View style={styles.timestampWrap}>
+                        <CustomText style={[styles.bubbleTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
+                          {formatMsgTime(msg.timestamp)}
+                          {!msg.isDeleted && isMe && ' ✓✓'}
+                        </CustomText>
+                      </View>
+                    </>
+                  )}
+                </View>
               )}
             </TouchableOpacity>
           </View>
@@ -1491,117 +1492,123 @@ export default function ChatDetailScreen() {
       )}
 
       {/* Input Bar */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {isSellerDeactivated ? (
-          /* Deactivated seller — show a locked input bar */
-          <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: 'rgba(245,158,11,0.3)' }]}>
-            <View style={[styles.inputBar, {
-              backgroundColor: 'rgba(245,158,11,0.06)',
-              borderRadius: 12,
-              margin: 10,
-              borderWidth: 1,
-              borderColor: 'rgba(245,158,11,0.25)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 14,
-              flexDirection: 'row',
-              gap: 8,
-            }]}>
-              <CustomText style={{ color: '#F59E0B', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
-                🔒 Messaging restricted — account deactivated
+      <KeyboardAwareScrollView
+        enableOnAndroid={true}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          {isSellerDeactivated ? (
+            /* Deactivated seller — show a locked input bar */
+            <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: 'rgba(245,158,11,0.3)' }]}>
+              <View style={[styles.inputBar, {
+                backgroundColor: 'rgba(245,158,11,0.06)',
+                borderRadius: 12,
+                margin: 10,
+                borderWidth: 1,
+                borderColor: 'rgba(245,158,11,0.25)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 14,
+                flexDirection: 'row',
+                gap: 8,
+              }]}>
+                <CustomText style={{ color: '#F59E0B', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+                  🔒 Messaging restricted — account deactivated
+                </CustomText>
+              </View>
+            </View>
+          ) : isBlockedByMe ? (
+            <TouchableOpacity
+              style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder, justifyContent: 'center', paddingVertical: 18 }]}
+              onPress={handleUnblockPrompt}
+              activeOpacity={0.7}
+            >
+              <CustomText style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>
+                You blocked this contact. Tap to unblock.
               </CustomText>
-            </View>
-          </View>
-        ) : isBlockedByMe ? (
-          <TouchableOpacity
-            style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.glassBorder, justifyContent: 'center', paddingVertical: 18 }]}
-            onPress={handleUnblockPrompt}
-            activeOpacity={0.7}
-          >
-            <CustomText style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>
-              You blocked this contact. Tap to unblock.
-            </CustomText>
-          </TouchableOpacity>
-        ) : (
-          <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }]}>
-            {replyingTo && (
-              <View style={[styles.replyPreview, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
-                <View style={styles.replyPreviewBody}>
-                  <CustomText style={[styles.replyPreviewSender, { color: colors.primary }]}>
-                    {replyingTo.senderId === 'me' ? 'You' : (replyingTo.senderName || 'Other')}
-                  </CustomText>
-                  <CustomText style={[styles.replyPreviewText, { color: colors.muted }]} numberOfLines={1}>
-                    {replyingTo.text}
-                  </CustomText>
-                </View>
-                <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyClose}>
-                  <View style={[styles.replyCloseCircle, { backgroundColor: colors.glassBorder }]}>
-                    <CustomText style={{ fontSize: 10, color: colors.muted }}>✕</CustomText>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: colors.glassBorder }]}>
+              {replyingTo && (
+                <View style={[styles.replyPreview, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
+                  <View style={styles.replyPreviewBody}>
+                    <CustomText style={[styles.replyPreviewSender, { color: colors.primary }]}>
+                      {replyingTo.senderId === 'me' ? 'You' : (replyingTo.senderName || 'Other')}
+                    </CustomText>
+                    <CustomText style={[styles.replyPreviewText, { color: colors.muted }]} numberOfLines={1}>
+                      {replyingTo.text}
+                    </CustomText>
                   </View>
-                </TouchableOpacity>
-              </View>
-            )}
-            <View style={styles.inputBar}>
-              <TouchableOpacity
-                onPress={() => setAttachmentVisible(true)}
-                style={[styles.attachBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
-                activeOpacity={0.8}
-              >
-                <Paperclip color={colors.primary} size={20} />
-              </TouchableOpacity>
-              <View style={[styles.inputWrap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-                {editingMessageId && (
-                  <CustomText style={{ fontSize: 10, color: colors.primary, marginBottom: 2, fontWeight: '700' }}>
-                    Editing Message
-                  </CustomText>
-                )}
-                <TextInput
-                  ref={inputRef}
-                  value={input}
-                  onChangeText={(txt) => {
-                    setInput(txt);
-
-                    // Live typing via WebSocket
-                    if (conversation?.id && !conversation.id.startsWith('new-') && user?.id) {
-                      sendTyping(conversation.id, conversation.participantId);
-
-                      // Clear existing timer
-                      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-
-                      // Set timeout to stop typing
-                      typingTimerRef.current = setTimeout(() => {
-                        sendStopTyping(conversation.id, conversation.participantId);
-                      }, 2000);
-                    }
-                  }}
-                  placeholder="Type a message..."
-                  placeholderTextColor={colors.muted}
-                  style={[styles.input, { color: colors.foreground }]}
-                  multiline
-                  maxLength={1000}
-                  returnKeyType="default"
-                />
-              </View>
-              {editingMessageId && (
-                <TouchableOpacity onPress={() => { setEditingMessageId(null); setInput(''); }} style={{ marginRight: 6, marginBottom: 12 }}>
-                  <CustomText style={{ color: colors.muted, fontSize: 13, fontWeight: '600' }}>Cancel</CustomText>
-                </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyClose}>
+                    <View style={[styles.replyCloseCircle, { backgroundColor: colors.glassBorder }]}>
+                      <CustomText style={{ fontSize: 10, color: colors.muted }}>✕</CustomText>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               )}
-              <TouchableOpacity
-                onPress={handleSend}
-                disabled={!input.trim()}
-                style={[
-                  styles.sendBtn,
-                  { backgroundColor: input.trim() ? colors.primary : colors.glass },
-                ]}
-                activeOpacity={0.8}
-              >
-                <Send color={input.trim() ? '#fff' : colors.muted} size={20} />
-              </TouchableOpacity>
+              <View style={styles.inputBar}>
+                <TouchableOpacity
+                  onPress={() => setAttachmentVisible(true)}
+                  style={[styles.attachBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                  activeOpacity={0.8}
+                >
+                  <Paperclip color={colors.primary} size={20} />
+                </TouchableOpacity>
+                <View style={[styles.inputWrap, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+                  {editingMessageId && (
+                    <CustomText style={{ fontSize: 10, color: colors.primary, marginBottom: 2, fontWeight: '700' }}>
+                      Editing Message
+                    </CustomText>
+                  )}
+                  <TextInput
+                    ref={inputRef}
+                    value={input}
+                    onChangeText={(txt) => {
+                      setInput(txt);
+
+                      // Live typing via WebSocket
+                      if (conversation?.id && !conversation.id.startsWith('new-') && user?.id) {
+                        sendTyping(conversation.id, conversation.participantId);
+
+                        // Clear existing timer
+                        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+
+                        // Set timeout to stop typing
+                        typingTimerRef.current = setTimeout(() => {
+                          sendStopTyping(conversation.id, conversation.participantId);
+                        }, 2000);
+                      }
+                    }}
+                    placeholder="Type a message..."
+                    placeholderTextColor={colors.muted}
+                    style={[styles.input, { color: colors.foreground }]}
+                    multiline
+                    maxLength={1000}
+                    returnKeyType="default"
+                  />
+                </View>
+                {editingMessageId && (
+                  <TouchableOpacity onPress={() => { setEditingMessageId(null); setInput(''); }} style={{ marginRight: 6, marginBottom: 12 }}>
+                    <CustomText style={{ color: colors.muted, fontSize: 13, fontWeight: '600' }}>Cancel</CustomText>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={handleSend}
+                  disabled={!input.trim()}
+                  style={[
+                    styles.sendBtn,
+                    { backgroundColor: input.trim() ? colors.primary : colors.glass },
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <Send color={input.trim() ? '#fff' : colors.muted} size={20} />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        )}
-      </KeyboardAvoidingView>
+          )}
+        </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
 
       {/* ── Report Modal ── */}
       <Modal visible={attachmentVisible} transparent animationType="fade" onRequestClose={() => setAttachmentVisible(false)}>

@@ -14,10 +14,10 @@ import { StatusBar } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import Constants from 'expo-constants';
+import { GOOGLE_WEB_CLIENT_ID } from '@env';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const GOOGLE_WEB_CLIENT_ID = '775752591684-hiqe6hbaivkjjqbv6022av3cn0svgstv.apps.googleusercontent.com';
 
 const GoogleIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 48 48">

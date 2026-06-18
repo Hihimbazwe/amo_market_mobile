@@ -343,12 +343,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
   };
 
   const SCAM_REASONS = [
-    { value: 'FAKE_PRODUCT',        label: 'Fake / Counterfeit Product' },
-    { value: 'NEVER_DELIVERED',     label: 'Never Delivered' },
-    { value: 'WRONG_ITEM',          label: 'Wrong Item Sent' },
-    { value: 'SELLER_DISAPPEARED',  label: 'Seller Disappeared' },
-    { value: 'PRICE_FRAUD',         label: 'Price Fraud' },
-    { value: 'OTHER',               label: 'Other' },
+    { value: 'FAKE_PRODUCT', label: 'Fake / Counterfeit Product' },
+    { value: 'NEVER_DELIVERED', label: 'Never Delivered' },
+    { value: 'WRONG_ITEM', label: 'Wrong Item Sent' },
+    { value: 'SELLER_DISAPPEARED', label: 'Seller Disappeared' },
+    { value: 'PRICE_FRAUD', label: 'Price Fraud' },
+    { value: 'OTHER', label: 'Other' },
   ];
 
   const handleOpenScamReport = () => {
@@ -543,11 +543,11 @@ const ProductDetailScreen = ({ route, navigation }) => {
             id: product.id,
             title: product.title,
             price: product.price,
-            image: media[0]?.url || 
-                   routeProduct?.image || 
-                   routeProduct?.imageUrl || 
-                   (routeProduct?.images && routeProduct.images.length > 0 ? routeProduct.images[0] : null) || 
-                   'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80',
+            image: media[0]?.url ||
+              routeProduct?.image ||
+              routeProduct?.imageUrl ||
+              (routeProduct?.images && routeProduct.images.length > 0 ? routeProduct.images[0] : null) ||
+              'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80',
             sellerName: product.seller.name,
             routeProduct: routeProduct,
           },
@@ -750,7 +750,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
                 <MapPin size={12} color={colors.muted} />
                 <CustomText variant="caption" style={styles.locationText}>{product.location}</CustomText>
               </View>
-              
+
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                 <TouchableOpacity
                   style={[styles.visitShopBtn, { borderColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6 }]}
@@ -837,7 +837,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
           )}
 
           {/* Delivery Information Section */}
-          <View style={[{ 
+          {/* <View style={[{ 
             backgroundColor: colors.card, 
             borderColor: colors.border, 
             borderWidth: 1,
@@ -854,7 +854,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
             <View style={{ backgroundColor: colors.primary + '10', borderColor: colors.primary + '30', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
               <CustomText style={{ color: colors.primary, fontSize: 11, fontWeight: '600' }}>💳 No hidden fees - Price you see is price you pay</CustomText>
             </View>
-          </View>
+          </View> */}
 
           {/* Trust Badges Section */}
           <View style={{ marginVertical: 12 }}>
@@ -1291,10 +1291,10 @@ const ProductDetailScreen = ({ route, navigation }) => {
             ) : relatedProducts.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                 {relatedProducts.map((p) => (
-                  <ProductCard 
+                  <ProductCard
                     key={p.id}
-                    product={p} 
-                    onPress={() => navigation.push('ProductDetail', { product: p })} 
+                    product={p}
+                    onPress={() => navigation.push('ProductDetail', { product: p })}
                     style={{ width: 160, marginBottom: 0 }}
                   />
                 ))}
@@ -1529,8 +1529,10 @@ const ProductDetailScreen = ({ route, navigation }) => {
                       key={r.value}
                       style={[
                         styles.reasonPill,
-                        { borderColor: scamReason === r.value ? '#ef4444' : colors.border,
-                          backgroundColor: scamReason === r.value ? 'rgba(239,68,68,0.12)' : colors.background }
+                        {
+                          borderColor: scamReason === r.value ? '#ef4444' : colors.border,
+                          backgroundColor: scamReason === r.value ? 'rgba(239,68,68,0.12)' : colors.background
+                        }
                       ]}
                       onPress={() => setScamReason(r.value)}
                     >
@@ -1550,11 +1552,13 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   <TextInput
                     style={[
                       styles.scamTextInput,
-                      { color: colors.text || colors.foreground,
+                      {
+                        color: colors.text || colors.foreground,
                         backgroundColor: colors.background,
                         borderColor: colors.border,
                         flex: 1,
-                        marginBottom: 0 }
+                        marginBottom: 0
+                      }
                     ]}
                     placeholder="Describe the issue in detail (min 10 characters)…"
                     placeholderTextColor={colors.muted}

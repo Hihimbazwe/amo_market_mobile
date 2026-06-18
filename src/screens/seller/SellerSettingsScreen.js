@@ -256,8 +256,8 @@ const SellerSettingsScreen = () => {
             <SettingRow icon={Lock} title={t('password')} subtitle={t('secureAccount')} type="link" onPress={() => setShowPasswordModal(true)} colors={colors} />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <AppLockSettings t={t} />
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <SettingRow icon={Shield} title={t('twoFactorAuth')} subtitle={t('enhanceSecurity')} value={marketing} onValueChange={setMarketing} colors={colors} />
+            {/* <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <SettingRow icon={Shield} title={t('twoFactorAuth')} subtitle={t('enhanceSecurity')} value={marketing} onValueChange={setMarketing} colors={colors} /> */}
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow
               icon={Shield}
@@ -274,15 +274,15 @@ const SellerSettingsScreen = () => {
 
         {/* ACCOUNT PRIVACY */}
         <View style={styles.privacyRow}>
-          <TouchableOpacity 
-            style={[styles.deactivateBtn, isSellerDeactivated && { borderColor: colors.primary }]} 
+          <TouchableOpacity
+            style={[styles.deactivateBtn, isSellerDeactivated && { borderColor: colors.primary }]}
             onPress={() => setShowDeactivateModal(true)}
           >
-             <CustomText style={[styles.deactivateBtnText, isSellerDeactivated && { color: colors.primary }]}>
-               {'Disable Selling'}
-             </CustomText>
+            <CustomText style={[styles.deactivateBtnText, isSellerDeactivated && { color: colors.primary }]}>
+              {'Disable Selling'}
+            </CustomText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.deleteBtn} onPress={() => setShowDeleteModal(true)}>
             <CustomText style={styles.deleteText}>{t('deleteAccount') || 'Delete'}</CustomText>
           </TouchableOpacity>
@@ -352,7 +352,7 @@ const SellerSettingsScreen = () => {
         </View>
       </Modal>
 
-      <AccountPrivacyModals 
+      <AccountPrivacyModals
         showDeactivateModal={showDeactivateModal}
         setShowDeactivateModal={setShowDeactivateModal}
         showDeleteModal={showDeleteModal}
