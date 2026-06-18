@@ -18,7 +18,7 @@ if (Constants.appOwnership !== 'expo') {
 }
 
 import io from 'socket.io-client';
-import { API_BASE_URL } from '@env';
+import { API_BASE_URL, SIGNALING_URL } from '@env';
 import { useAuth } from '../context/AuthContext';
 import { Alert, Vibration } from 'react-native';
 import { chatService } from '../api/chatService';
@@ -53,21 +53,10 @@ export const CallProvider = ({ children }) => {
   const sentCallLogsRef = useRef(new Set());
   const callStateRef = useRef(null);
 
-  useEffect(() => {
-    activeCallRef.current = activeCallData;
-  }, [activeCallData]);
-
-  useEffect(() => {
-    incomingCallRef.current = incomingCallData;
-  }, [incomingCallData]);
-
-  useEffect(() => {
-    connectedAtRef.current = connectedAt;
-  }, [connectedAt]);
-
-  useEffect(() => {
-    callStateRef.current = callState;
-  }, [callState]);
+  useEffect(() => { activeCallRef.current = activeCallData; }, [activeCallData]);
+  useEffect(() => { incomingCallRef.current = incomingCallData; }, [incomingCallData]);
+  useEffect(() => { connectedAtRef.current = connectedAt; }, [connectedAt]);
+  useEffect(() => { callStateRef.current = callState; }, [callState]);
 
   const clearCallTimeout = () => {
     if (callTimeoutRef.current) {
@@ -77,17 +66,13 @@ export const CallProvider = ({ children }) => {
   };
 
   const startRingingFeedback = (pattern = [0, 900, 700]) => {
-    try {
-      Vibration.vibrate(pattern, true);
-    } catch (err) {
+    try { Vibration.vibrate(pattern, true); } catch (err) {
       console.warn('[CallContext] ringtone vibration error:', err);
     }
   };
 
   const stopRingingFeedback = () => {
-    try {
-      Vibration.cancel();
-    } catch (err) {
+    try { Vibration.cancel(); } catch (err) {
       console.warn('[CallContext] stop vibration error:', err);
     }
   };
@@ -103,13 +88,11 @@ export const CallProvider = ({ children }) => {
       console.warn('[CallContext] writeCallLog missing required data', { userId: user?.id, callData });
       return;
     }
-
     const callId = callData.callId || `${callData.callerId || 'unknown'}-${Date.now()}`;
     if (sentCallLogsRef.current.has(callId)) {
       console.log('[CallContext] Skipping duplicate call log for', callId);
       return;
     }
-
     try {
       const payload = {
         type: callData.isVideo ? 'video' : 'voice',
@@ -225,27 +208,16 @@ export const CallProvider = ({ children }) => {
   useEffect(() => {
     if (!user?.id) return;
 
-    // Safety: get a valid base URL with fallback
-    const baseUrl = API_BASE_URL || 'https://amomarket-cyan.vercel.app';
+    // Use dedicated SIGNALING_URL from env — no port manipulation needed.
+    // Falls back to API_BASE_URL only as a last resort (will likely fail on Vercel).
+    const signalingUrl = SIGNALING_URL || API_BASE_URL;
 
-    if (!baseUrl || typeof baseUrl !== 'string') {
-      console.warn('[CallContext] API_BASE_URL is not defined, skipping signaling connection');
+    if (!signalingUrl || typeof signalingUrl !== 'string') {
+      console.warn('[CallContext] No signaling URL available, skipping signaling connection');
       return;
     }
 
-    let signalingUrl = baseUrl;
-    try {
-      const urlObj = new URL(baseUrl);
-      urlObj.port = '3001';
-      signalingUrl = urlObj.toString();
-    } catch (e) {
-      try {
-        signalingUrl = baseUrl.replace(/:\d+$/, ':3001');
-      } catch (replaceErr) {
-        console.warn('[CallContext] Failed to parse signaling URL, using base URL:', replaceErr);
-        signalingUrl = baseUrl;
-      }
-    }
+    console.log('[CallContext] Connecting to signaling server at:', signalingUrl);
 
     try {
       socketRef.current = io(signalingUrl, {
@@ -253,17 +225,16 @@ export const CallProvider = ({ children }) => {
         reconnection: true,
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
-        timeout: 5000,
+        timeout: 10000,
       });
 
       socketRef.current.on('connect', () => {
-        console.log('[CallContext] Connected to signaling server', signalingUrl, socketRef.current.id);
-        // Attempt register with ack and retry if necessary
+        console.log('[CallContext] Connected to signaling server:', signalingUrl, socketRef.current.id);
         tryRegister();
       });
 
       socketRef.current.on('connect_error', (err) => {
-        console.warn('[CallContext] signaling connect_error', err);
+        console.warn('[CallContext] signaling connect_error:', err.message, '| URL:', signalingUrl);
       });
 
       socketRef.current.on('reconnect_attempt', (attempt) => {
@@ -271,20 +242,20 @@ export const CallProvider = ({ children }) => {
       });
 
       socketRef.current.on('reconnect_failed', () => {
-        console.error('[CallContext] reconnect_failed');
+        console.error('[CallContext] reconnect_failed — signaling server unreachable');
       });
 
       socketRef.current.on('registered', (data) => {
-        console.log('[CallContext] Received server registered event', data);
+        console.log('[CallContext] Registered with signaling server:', data);
       });
 
       socketRef.current.on('incoming_call', (data) => {
-        console.log('[CallContext] Incoming call from', data.callerId, 'data:', data);
+        console.log('[CallContext] Incoming call from', data.callerId, data);
         receiveIncomingCall(data);
       });
 
       socketRef.current.on('call_ringing', () => {
-        console.log('[CallContext] Remote is ringing - transitioning from CALLING to RINGING');
+        console.log('[CallContext] Remote is ringing');
         if (!connectedAtRef.current && callStateRef.current === 'CALLING') {
           setCallState('RINGING');
         }
@@ -354,7 +325,7 @@ export const CallProvider = ({ children }) => {
         }
       });
     } catch (err) {
-      console.warn('[CallContext] Failed to connect to signaling server - continuing anyway:', err);
+      console.warn('[CallContext] Failed to connect to signaling server:', err);
     }
 
     return () => {
@@ -372,8 +343,8 @@ export const CallProvider = ({ children }) => {
       const configuration = {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ],
       };
 
       pcRef.current = new RTCPeerConnection(configuration);
@@ -403,10 +374,9 @@ export const CallProvider = ({ children }) => {
     }
   };
 
-  // Attempt to register with server using ack; retry until success
   const tryRegister = (attempt = 0) => {
     if (!socketRef.current || !socketRef.current.connected) {
-      console.log('[CallContext] Socket not connected yet, will retry register in 1s');
+      console.log('[CallContext] Socket not connected yet, retrying register in 1s');
       setTimeout(() => tryRegister(attempt + 1), 1000);
       return;
     }
@@ -595,7 +565,7 @@ export const CallProvider = ({ children }) => {
       endCall,
       toggleMute,
       toggleVideo,
-      switchCamera
+      switchCamera,
     }}>
       {children}
     </CallContext.Provider>

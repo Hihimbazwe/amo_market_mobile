@@ -9,7 +9,8 @@
       "distribution": "internal",
       "env": {
         "API_BASE_URL": "https://amomarket-cyan.vercel.app",
-        "GOOGLE_WEB_CLIENT_ID": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+        "GOOGLE_WEB_CLIENT_ID": "628531278836-evaft7mi1n5cjghebvnc7v4hlicvusaj.apps.googleusercontent.com",
+        "SIGNALING_URL": "https://amosignaling-server-production.up.railway.app"
       }
     },
     "preview": {
@@ -19,7 +20,8 @@
       },
       "env": {
         "API_BASE_URL": "https://amomarket-cyan.vercel.app",
-        "GOOGLE_WEB_CLIENT_ID": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+        "GOOGLE_WEB_CLIENT_ID": "628531278836-evaft7mi1n5cjghebvnc7v4hlicvusaj.apps.googleusercontent.com",
+        "SIGNALING_URL": "https://amosignaling-server-production.up.railway.app"
       }
     },
     "production": {
@@ -30,6 +32,7 @@
       "env": {
         "API_BASE_URL": "https://amomarket-cyan.vercel.app",
         "GOOGLE_WEB_CLIENT_ID": "628531278836-evaft7mi1n5cjghebvnc7v4hlicvusaj.apps.googleusercontent.com",
+        "SIGNALING_URL": "https://amosignaling-server-production.up.railway.app",
         "SENTRY_AUTH_TOKEN": "$SENTRY_AUTH_TOKEN",
         "SENTRY_ORG": "your-org-slug",
         "SENTRY_PROJECT": "your-project-slug"
