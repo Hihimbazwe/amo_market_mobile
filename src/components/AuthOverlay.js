@@ -52,6 +52,7 @@ const AuthOverlay = ({ currentRoute }) => {
       const success = await loadDeviceSecurityAndLock();
       if (success) {
         // AppLockOverlay will show the appropriate lock screen
+        // After successful unlock, auth session will be restored and user will be logged in
         // No navigation needed - the overlay is already rendered
       } else {
         // Fallback to regular login if device security loading fails

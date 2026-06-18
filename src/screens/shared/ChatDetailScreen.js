@@ -6,7 +6,7 @@ import {
   FlatList,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
+  // Platform,
   ActivityIndicator,
   Modal,
   Alert,
@@ -14,6 +14,7 @@ import {
   Animated,
   Image,
   Linking,
+  KeyboardAwaeScrollView,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -33,7 +34,7 @@ import { productService } from '../../api/productService';
 import { useNotifications } from '../../context/NotificationContext';
 import { usePresence } from '../../context/PresenceContext';
 import PresenceDot from '../../components/PresenceDot';
-import { KeyboardAvoidingView, Platform, } from 'react-native';
+import { Platform, } from 'react-native';
 
 function formatLastSeen(timestamp) {
   if (!timestamp) return '';

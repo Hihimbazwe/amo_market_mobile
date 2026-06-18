@@ -113,10 +113,14 @@ export const SecurityProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const appStateRef = useRef(AppState.currentState);
   const lockTimeoutRef = useRef(null);
+  const inactivityTimerRef = useRef(null);
   const deviceLockUserIdRef = useRef(null);
   const skipLockAfterLoginRef = useRef(false);
   const isDeviceLockSessionRef = useRef(false);
   const loadSecuritySettingsRef = useRef(null);
+
+  // Configurable inactivity period in milliseconds (default: 30 seconds)
+  const INACTIVITY_LOCK_PERIOD = 30000;
 
   // Storage key for local credential hash (never sent over the wire after setup)
   const localCredKey = user?.id ? `@security_cred_${user.id}` : null;
@@ -216,18 +220,28 @@ export const SecurityProvider = ({ children }) => {
     if (skipLockAfterLoginRef.current) return;
 
     if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+      // App returning from background/inactive
+      if (inactivityTimerRef.current) {
+        // Clear the inactivity timer
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+        // If timer was still running, user returned quickly - don't lock
+        return;
+      }
+      // Timer expired, lock the app
       if (securitySettings.enabled && isAuthenticated) {
-        if (lockTimeoutRef.current) {
-          clearTimeout(lockTimeoutRef.current);
-          lockTimeoutRef.current = null;
-        }
         setAppLocked(true);
         setDeviceLocked(false);
       }
     } else if (nextAppState.match(/inactive|background/)) {
+      // App going to background/inactive
       if (securitySettings.enabled && isAuthenticated) {
-        setAppLocked(true);
-        setDeviceLocked(true);
+        // Start inactivity timer instead of locking immediately
+        inactivityTimerRef.current = setTimeout(() => {
+          setAppLocked(true);
+          setDeviceLocked(true);
+          inactivityTimerRef.current = null;
+        }, INACTIVITY_LOCK_PERIOD);
       }
     }
     appStateRef.current = nextAppState;
@@ -465,11 +479,10 @@ export const SecurityProvider = ({ children }) => {
 
   const unlockApp = useCallback(() => {
     setAppLocked(false);
-    if (!isAuthenticated) {
-      isDeviceLockSessionRef.current = false;
-    }
+    // Don't clear isDeviceLockSessionRef here - it should be cleared when user logs in normally
+    // This allows the auth restoration in AppLockOverlay to work properly
     setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
-  }, [isAuthenticated]);
+  }, []);
 
   const lockApp = useCallback(() => {
     if (securitySettings.enabled && isAuthenticated) {
