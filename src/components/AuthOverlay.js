@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomText from './CustomText';
 import { LogIn, Lock } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -12,9 +13,32 @@ const AuthOverlay = ({ currentRoute }) => {
   const navigation = useNavigation();
   const { isAuthenticated } = useAuth();
   const { securitySettings, loadDeviceSecurityAndLock } = useAppSecurity();
+  const [deviceSecurityEnabled, setDeviceSecurityEnabled] = useState(false);
+  const [securityMethod, setSecurityMethod] = useState(null);
 
-  const deviceSecurityEnabled = !!securitySettings?.enabled;
-  const securityMethod = securitySettings?.method;
+  // Load device-wide security settings when logged out
+  useEffect(() => {
+    const loadDeviceSecurity = async () => {
+      if (isAuthenticated) {
+        // Use securitySettings from context when authenticated
+        setDeviceSecurityEnabled(!!securitySettings?.enabled);
+        setSecurityMethod(securitySettings?.method);
+        return;
+      }
+
+      try {
+        const stored = await AsyncStorage.getItem('@device_security_enabled');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setDeviceSecurityEnabled(parsed.enabled);
+          setSecurityMethod(parsed.method);
+        }
+      } catch (err) {
+        console.warn('[AuthOverlay] Error loading device security settings:', err);
+      }
+    };
+    loadDeviceSecurity();
+  }, [isAuthenticated, securitySettings]);
 
   if (isAuthenticated) return null;
 
@@ -24,7 +48,18 @@ const AuthOverlay = ({ currentRoute }) => {
 
   const handlePress = async () => {
     if (deviceSecurityEnabled && securityMethod) {
-      await loadDeviceSecurityAndLock();
+      // Load device security settings and lock app
+      const success = await loadDeviceSecurityAndLock();
+      if (success) {
+        // AppLockOverlay will show the appropriate lock screen
+        // No navigation needed - the overlay is already rendered
+      } else {
+        // Fallback to regular login if device security loading fails
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
     } else {
       navigation.reset({
         index: 0,

@@ -47,7 +47,7 @@ const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = 
     } else if (isSetup && step === 'confirm' && confirmPin.length === PIN_LENGTH) {
       handleNext();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin, confirmPin, step]);
 
   const handleNumberPress = (num) => {
@@ -255,19 +255,7 @@ const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = 
             </View>
           )}
 
-          {/* Fingerprint button — only in unlock mode and only if device is enrolled */}
-          {!isSetup && fingerprintAvailable && (
-            <TouchableOpacity
-              style={[styles.fingerprintBtn, { borderColor: colors.primary + '55' }]}
-              onPress={handleFingerprintPress}
-              activeOpacity={0.8}
-            >
-              <Fingerprint size={22} color={colors.primary} />
-              <CustomText style={[styles.fingerprintText, { color: colors.primary }]}>
-                Use Fingerprint
-              </CustomText>
-            </TouchableOpacity>
-          )}
+
 
           {/* Cancel button for verification mode */}
           {!isSetup && onCancel && (

@@ -15,10 +15,10 @@ import { StatusBar } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import Constants from 'expo-constants';
+import { GOOGLE_WEB_CLIENT_ID } from '@env';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const GOOGLE_WEB_CLIENT_ID = '775752591684-hiqe6hbaivkjjqbv6022av3cn0svgstv.apps.googleusercontent.com';
 
 const GoogleIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 48 48">
@@ -41,7 +41,7 @@ const LoginScreen = ({ navigation }) => {
   const [useNativeGoogle, setUseNativeGoogle] = useState(false);
 
   // expo-auth-session Google OAuth (works in standard Expo Go)
-  // androidClientId & iosClientId reuse the web client ID for Expo Go proxy testing
+  // All three reuse the same Web Client ID — that's correct for Expo Go proxy testing.
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
     androidClientId: GOOGLE_WEB_CLIENT_ID,
@@ -121,19 +121,16 @@ const LoginScreen = ({ navigation }) => {
           if (redirectObj && redirectObj.name) {
             console.log('[SESSION_RESTORE] Restoring screen:', redirectObj.name);
 
-            // 1. Root Stacks / Screens outside tabs
             if (['Checkout', 'ProductDetail', 'OrderSuccess', 'Notifications', 'GlobalSearch', 'ChatDetail', 'StatusViewer'].includes(redirectObj.name)) {
               navigation.navigate(redirectObj.name, redirectObj.params);
               return;
             }
 
-            // 2. Base Tabs
             if (['Home', 'Cart', 'Messages', 'Me'].includes(redirectObj.name)) {
               navigation.navigate('MainApp', { screen: redirectObj.name, params: redirectObj.params });
               return;
             }
 
-            // 3. Nested inside Home Stack
             if (['HomeMain', 'SellerStore'].includes(redirectObj.name)) {
               navigation.navigate('MainApp', {
                 screen: 'Home',
@@ -142,7 +139,6 @@ const LoginScreen = ({ navigation }) => {
               return;
             }
 
-            // 4. Nested inside Messages Stack
             if (['MessagesMain'].includes(redirectObj.name)) {
               navigation.navigate('MainApp', {
                 screen: 'Messages',
@@ -151,7 +147,6 @@ const LoginScreen = ({ navigation }) => {
               return;
             }
 
-            // 5. Drawer screens inside 'Me'
             navigation.navigate('MainApp', {
               screen: 'Me',
               params: {
@@ -241,30 +236,26 @@ const LoginScreen = ({ navigation }) => {
       const result = await authService.login(email, password);
       notifyCredentialLogin();
       await login(result);
-      
-      // Check if there is an auto-logout redirect to restore
+
       const savedRedirect = await AsyncStorage.getItem('@auto_logout_redirect');
       if (savedRedirect) {
         try {
           const redirectObj = JSON.parse(savedRedirect);
           await AsyncStorage.removeItem('@auto_logout_redirect');
-          
+
           if (redirectObj && redirectObj.name) {
             console.log('[SESSION_RESTORE] Restoring screen:', redirectObj.name);
 
-            // 1. Root Stacks / Screens outside tabs
             if (['Checkout', 'ProductDetail', 'OrderSuccess', 'Notifications', 'GlobalSearch', 'ChatDetail', 'StatusViewer'].includes(redirectObj.name)) {
               navigation.navigate(redirectObj.name, redirectObj.params);
               return;
             }
 
-            // 2. Base Tabs
             if (['Home', 'Cart', 'Messages', 'Me'].includes(redirectObj.name)) {
               navigation.navigate('MainApp', { screen: redirectObj.name, params: redirectObj.params });
               return;
             }
 
-            // 3. Nested inside Home Stack
             if (['HomeMain', 'SellerStore'].includes(redirectObj.name)) {
               navigation.navigate('MainApp', {
                 screen: 'Home',
@@ -273,7 +264,6 @@ const LoginScreen = ({ navigation }) => {
               return;
             }
 
-            // 4. Nested inside Messages Stack
             if (['MessagesMain'].includes(redirectObj.name)) {
               navigation.navigate('MainApp', {
                 screen: 'Messages',
@@ -282,7 +272,6 @@ const LoginScreen = ({ navigation }) => {
               return;
             }
 
-            // 5. Drawer screens inside 'Me'
             navigation.navigate('MainApp', {
               screen: 'Me',
               params: {
@@ -297,9 +286,8 @@ const LoginScreen = ({ navigation }) => {
         }
       }
 
-      // Redirect based on role
       const role = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
-      
+
       if (['SELLER', 'COURIER', 'AGENT'].includes(role)) {
         navigation.navigate('MainApp', { screen: 'Me' });
       } else {
@@ -324,121 +312,119 @@ const LoginScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.reset({
-            index: 0,
-            routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
-          })} 
-          style={[styles.backButton, { backgroundColor: colors.glass }]}
-        >
-          <ArrowLeft color={colors.foreground} size={24} />
-        </TouchableOpacity>
-        <CustomText variant="h2" style={{ color: colors.foreground }}>Login</CustomText>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
-            <Image 
-              source={require('../../assets/logo.png')} 
-              style={{ width: 60, height: 60, resizeMode: 'contain', marginBottom: 8 }} 
-            />
-            <Svg height="40" width="200">
-              <Defs>
-                <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor="#A855F7" stopOpacity="1" />
-                  <Stop offset="1" stopColor="#3B82F6" stopOpacity="1" />
-                </LinearGradient>
-              </Defs>
-              <SvgText
-                fill="url(#grad)"
-                fontSize="22"
-                fontWeight="900"
-                x="100"
-                y="30"
-                textAnchor="middle"
-              >AMO Market</SvgText>
-            </Svg>
-          </View>
-          <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 8, marginTop: 8 }}>Welcome Back</CustomText>
-          <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted, marginBottom: 16 }]}>
-            Sign in to your AMO account to continue shopping.
-          </CustomText>
-
-          <TouchableOpacity 
-            style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }, { width: '100%', marginBottom: 16 }]}
-            onPress={handleGoogleSignInPress}
-            activeOpacity={0.8}
-            disabled={googleLoading}
+          <TouchableOpacity
+            onPress={() => navigation.reset({
+              index: 0,
+              routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+            })}
+            style={[styles.backButton, { backgroundColor: colors.glass }]}
           >
-            {googleLoading ? (
-              <ActivityIndicator color="#1e293b" />
-            ) : (
-              <>
-                <GoogleIcon />
-                <CustomText style={styles.googleButtonText}>Sign in with Google</CustomText>
-              </>
-            )}
+            <ArrowLeft color={colors.foreground} size={24} />
           </TouchableOpacity>
+          <CustomText variant="h2" style={{ color: colors.foreground }}>Login</CustomText>
+        </View>
 
-          <View style={[styles.separator, { marginVertical: 12, width: '100%' }]}>
-            <View style={[styles.line, { backgroundColor: colors.border }]} />
-            <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
-            <View style={[styles.line, { backgroundColor: colors.border }]} />
-          </View>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <Image
+                source={require('../../assets/logo.png')}
+                style={{ width: 60, height: 60, resizeMode: 'contain', marginBottom: 8 }}
+              />
+              <Svg height="40" width="200">
+                <Defs>
+                  <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0" stopColor="#A855F7" stopOpacity="1" />
+                    <Stop offset="1" stopColor="#3B82F6" stopOpacity="1" />
+                  </LinearGradient>
+                </Defs>
+                <SvgText
+                  fill="url(#grad)"
+                  fontSize="22"
+                  fontWeight="900"
+                  x="100"
+                  y="30"
+                  textAnchor="middle"
+                >AMO Market</SvgText>
+              </Svg>
+            </View>
+            <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 8, marginTop: 8 }}>Welcome Back</CustomText>
+            <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted, marginBottom: 16 }]}>
+              Sign in to your AMO account to continue shopping.
+            </CustomText>
 
-          <View style={styles.form}>
-            <CustomInput 
-              label="Email"
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-            />
-            <CustomInput 
-              label="Password"
-              placeholder="Your password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            
-            <TouchableOpacity 
-              style={styles.forgotPass}
-              onPress={() => navigation.navigate('ForgotPassword')}
+            <TouchableOpacity
+              style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }, { width: '100%', marginBottom: 16 }]}
+              onPress={handleGoogleSignInPress}
+              activeOpacity={0.8}
+              disabled={googleLoading}
             >
-              <CustomText style={styles.forgotPassText}>Forgot password?</CustomText>
+              {googleLoading ? (
+                <ActivityIndicator color="#1e293b" />
+              ) : (
+                <>
+                  <GoogleIcon />
+                  <CustomText style={styles.googleButtonText}>Sign in with Google</CustomText>
+                </>
+              )}
             </TouchableOpacity>
 
-            <CustomButton 
-              title="Sign In" 
-              loading={loading}
-              onPress={handleLogin} 
-              style={styles.button}
-            />
+            <View style={[styles.separator, { marginVertical: 12, width: '100%' }]}>
+              <View style={[styles.line, { backgroundColor: colors.border }]} />
+              <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
+              <View style={[styles.line, { backgroundColor: colors.border }]} />
+            </View>
 
-            <CustomText style={[styles.dataAssurance, { color: colors.muted }]}>
-              Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
-            </CustomText>
-           </View>
+            <View style={styles.form}>
+              <CustomInput
+                label="Email"
+                placeholder="you@example.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+              />
+              <CustomInput
+                label="Password"
+                placeholder="Your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
 
-           <TouchableOpacity 
-             onPress={() => navigation.navigate('Register')}
-             style={styles.link}
-           >
-             <CustomText style={[styles.linkText, { color: colors.muted }]}>
-               Don't have an account? <CustomText style={{ color: colors.primary }}>Register</CustomText>
-             </CustomText>
-           </TouchableOpacity>
-         </View>
-       </ScrollView>
+              <TouchableOpacity
+                style={styles.forgotPass}
+                onPress={() => navigation.navigate('ForgotPassword')}
+              >
+                <CustomText style={styles.forgotPassText}>Forgot password?</CustomText>
+              </TouchableOpacity>
 
+              <CustomButton
+                title="Sign In"
+                loading={loading}
+                onPress={handleLogin}
+                style={styles.button}
+              />
 
+              <CustomText style={[styles.dataAssurance, { color: colors.muted }]}>
+                Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
+              </CustomText>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Register')}
+              style={styles.link}
+            >
+              <CustomText style={[styles.linkText, { color: colors.muted }]}>
+                Don't have an account? <CustomText style={{ color: colors.primary }}>Register</CustomText>
+              </CustomText>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -483,7 +469,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-
   subtitle: {
     textAlign: 'center',
     marginBottom: 20,

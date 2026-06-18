@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppSecurity } from '../../context/SecurityContext';
 import { useAuth } from '../../context/AuthContext';
@@ -11,16 +12,31 @@ import FingerprintScreen from './FingerprintScreen';
 const AppLockOverlay = ({ visible, onUnlock }) => {
   const { colors } = useTheme();
   const { securitySettings, verifyPin, verifyPattern, verifyFingerprint, unlockApp } = useAppSecurity();
-  const { logout } = useAuth();
+  const { logout, login } = useAuth();
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [locked, setLocked] = useState(true);
   // When user taps "Use Fingerprint" from PIN screen, switch to fingerprint view
   const [showFingerprint, setShowFingerprint] = useState(false);
 
-  const handleUnlockSuccess = () => {
+  const handleUnlockSuccess = async () => {
     unlockApp();
     setLocked(false);
     setShowFingerprint(false);
+    
+    // Check if this is a device lock session and restore auth if needed
+    try {
+      const deviceSecurity = await AsyncStorage.getItem('@device_security_enabled');
+      if (deviceSecurity) {
+        const parsed = JSON.parse(deviceSecurity);
+        if (parsed.authToken && parsed.userData) {
+          // Restore auth session with stored token and user data
+          await login({ token: parsed.authToken, user: parsed.userData });
+        }
+      }
+    } catch (err) {
+      console.warn('[AppLockOverlay] Error restoring auth session:', err);
+    }
+    
     if (onUnlock) onUnlock();
   };
 

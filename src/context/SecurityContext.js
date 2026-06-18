@@ -63,13 +63,40 @@ const hasConfiguredMethod = (method, configuredMethods = {}) => {
   return !!configuredMethods[method];
 };
 
-const persistSecuritySettings = async (userId, settings, deviceSecurityKey) => {
+const persistSecuritySettings = async (userId, settings, deviceSecurityKey, authToken = null, userData = null) => {
   await AsyncStorage.setItem(`@security_settings_${userId}`, JSON.stringify(settings));
-  await AsyncStorage.setItem(deviceSecurityKey, JSON.stringify({
+  const deviceSecurityData = {
     enabled: settings.enabled,
     method: settings.method,
     userId,
-  }));
+  };
+  if (authToken) {
+    deviceSecurityData.authToken = authToken;
+  }
+  if (userData) {
+    deviceSecurityData.userData = userData;
+  }
+  await AsyncStorage.setItem(deviceSecurityKey, JSON.stringify(deviceSecurityData));
+};
+
+const getAuthToken = async () => {
+  try {
+    const token = await AsyncStorage.getItem('@auth_token');
+    return token;
+  } catch (err) {
+    console.warn('[SecurityContext] Error getting auth token:', err);
+    return null;
+  }
+};
+
+const restoreAuthSession = async (authToken) => {
+  try {
+    if (authToken) {
+      await AsyncStorage.setItem('@auth_token', authToken);
+    }
+  } catch (err) {
+    console.warn('[SecurityContext] Error restoring auth session:', err);
+  }
 };
 
 export const SecurityProvider = ({ children }) => {
@@ -133,7 +160,8 @@ export const SecurityProvider = ({ children }) => {
           configuredMethods: mergeConfiguredMethods(remoteSettings.configuredMethods, localConfiguredMethods),
         };
         setSecuritySettings(safeSettings);
-        await persistSecuritySettings(user.id, safeSettings, deviceSecurityKey);
+        const authToken = await getAuthToken();
+        await persistSecuritySettings(user.id, safeSettings, deviceSecurityKey, authToken, user);
         setAppLocked(skipLock ? false : !!safeSettings.enabled);
       } catch (remoteErr) {
         console.warn('[SecurityContext] Remote settings fetch failed, using local cache:', remoteErr?.message);
@@ -153,7 +181,8 @@ export const SecurityProvider = ({ children }) => {
   const applySyncedSettings = useCallback(async (synced) => {
     setSecuritySettings(synced);
     if (user?.id) {
-      await persistSecuritySettings(user.id, synced, deviceSecurityKey);
+      const authToken = await getAuthToken();
+      await persistSecuritySettings(user.id, synced, deviceSecurityKey, authToken, user);
     }
   }, [user?.id, deviceSecurityKey]);
 
@@ -472,6 +501,11 @@ export const SecurityProvider = ({ children }) => {
 
           deviceLockUserIdRef.current = userId;
           isDeviceLockSessionRef.current = true;
+
+          // Restore auth session if token is available
+          if (parsed.authToken) {
+            await restoreAuthSession(parsed.authToken);
+          }
 
           let configuredMethods = {};
           if (userId) {
