@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import Constants from 'expo-constants';
 
+
 let RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices;
 let isWebRTCSupported = false;
 
@@ -424,15 +425,50 @@ export const CallProvider = ({ children }) => {
 
       pcRef.current.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log(
-            '[CallContext] Local ICE candidate type:',
-            event.candidate.type,
-            '| protocol:', event.candidate.protocol,
-            '| address:', event.candidate.address || event.candidate.ip
-          );
+          // react-native-webrtc ICE candidate objects do not reliably expose the
+          // browser fields `.type/.protocol/.address`. The most portable field is
+          // the raw SDP candidate line at `.candidate`.
+          const rawCandidate = event.candidate.candidate;
+          console.log('[CallContext] Local ICE candidate raw:', rawCandidate);
+
+          // Best-effort parse of SDP candidate line to extract key markers.
+          // Example SDP candidate line:
+          // candidate:0 1 udp 2122260223 192.0.2.1 54400 typ host
+          // candidate:1 1 udp 2122260223 203.0.113.1 3478 typ srflx raddr 0.0.0.0 rport 0 generation 0
+          // candidate:2 1 udp 2122260223 198.51.100.1 5000 typ relay raddr 0.0.0.0 rport 0
+          try {
+            if (typeof rawCandidate === 'string') {
+              const parts = rawCandidate.trim().split(/\s+/);
+              // Indices are based on the SDP grammar.
+              // parts[0] = 'candidate:foundation'
+              // parts[1] = component
+              // parts[2] = transport
+              // parts[3] = priority
+              // parts[4] = connection-address
+              // parts[5] = port
+              // then a sequence of key/value markers incl. typ <host|srflx|relay>
+              const transport = parts[2];
+              const connAddr = parts[4];
+              const port = parts[5];
+              let typ = null;
+              const typIdx = parts.findIndex((p) => p === 'typ');
+              if (typIdx !== -1 && parts[typIdx + 1]) typ = parts[typIdx + 1];
+
+              console.log('[CallContext] Local ICE candidate derived:', {
+                transport,
+                connAddr,
+                port,
+                typ, // host | srflx | relay (TURN)
+              });
+            }
+          } catch (e) {
+            console.warn('[CallContext] ICE candidate parse error:', e);
+          }
+
           socketRef.current?.emit('ice_candidate', {
             targetId,
             callerId: user.id,
+            // Keep the candidate object as-is for compatibility with your signaling.
             candidate: event.candidate,
           });
         } else {
