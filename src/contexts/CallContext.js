@@ -312,16 +312,25 @@ export const CallProvider = ({ children }) => {
       // Callee receives offer → set remote description → drain ICE queue → send answer
       socketRef.current.on('webrtc_offer', async (data) => {
         try {
-          if (!pcRef.current) await setupPeerConnection(data.callerId || data.targetId);
+          console.log('[CallContext] Received webrtc_offer from', data.callerId);
+          if (!pcRef.current) await setupPeerConnection(data.callerId);
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
           remoteDescriptionSetRef.current = true;
+          console.log('[CallContext] Remote description (offer) set');
 
           // Drain any ICE candidates that arrived before the offer was processed
           await drainPendingIceCandidates();
 
           const answer = await pcRef.current.createAnswer();
           await pcRef.current.setLocalDescription(answer);
-          socketRef.current.emit('webrtc_answer', { targetId: data.callerId, sdp: answer });
+          // IMPORTANT: include our own id as callerId so the recipient
+          // (the original caller) knows who the answer is addressed back to.
+          socketRef.current.emit('webrtc_answer', {
+            targetId: data.callerId,
+            callerId: user.id,
+            sdp: answer,
+          });
+          console.log('[CallContext] Sent webrtc_answer to', data.callerId);
         } catch (err) {
           console.warn('[CallContext] Error handling webrtc_offer:', err);
         }
@@ -330,9 +339,11 @@ export const CallProvider = ({ children }) => {
       // Caller receives answer → set remote description → drain ICE queue
       socketRef.current.on('webrtc_answer', async (data) => {
         try {
+          console.log('[CallContext] Received webrtc_answer');
           if (pcRef.current) {
             await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
             remoteDescriptionSetRef.current = true;
+            console.log('[CallContext] Remote description (answer) set');
 
             // Drain any ICE candidates that arrived before the answer was processed
             await drainPendingIceCandidates();
@@ -377,6 +388,26 @@ export const CallProvider = ({ children }) => {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
+          // TURN servers — required when devices are behind CGNAT / symmetric
+          // NAT (very common on mobile data), since STUN alone can't punch
+          // through those. Free relay below is for testing only — swap in
+          // your own coturn deployment or a paid provider (Twilio, Xirsys,
+          // Metered.ca) before shipping to production.
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+          },
         ],
       };
 
@@ -393,14 +424,39 @@ export const CallProvider = ({ children }) => {
 
       pcRef.current.onicecandidate = (event) => {
         if (event.candidate) {
-          socketRef.current?.emit('ice_candidate', { targetId, candidate: event.candidate });
+          console.log(
+            '[CallContext] Local ICE candidate type:',
+            event.candidate.type,
+            '| protocol:', event.candidate.protocol,
+            '| address:', event.candidate.address || event.candidate.ip
+          );
+          socketRef.current?.emit('ice_candidate', {
+            targetId,
+            callerId: user.id,
+            candidate: event.candidate,
+          });
+        } else {
+          console.log('[CallContext] ICE gathering complete (null candidate)');
         }
       };
 
       pcRef.current.ontrack = (event) => {
+        console.log('[CallContext] ontrack fired, streams:', event.streams?.length);
         if (event.streams && event.streams[0]) {
           setRemoteStream(event.streams[0]);
         }
+      };
+
+      pcRef.current.oniceconnectionstatechange = () => {
+        console.log('[CallContext] ICE connection state:', pcRef.current?.iceConnectionState);
+      };
+
+      pcRef.current.onconnectionstatechange = () => {
+        console.log('[CallContext] Peer connection state:', pcRef.current?.connectionState);
+      };
+
+      pcRef.current.onsignalingstatechange = () => {
+        console.log('[CallContext] Signaling state:', pcRef.current?.signalingState);
       };
     } catch (err) {
       console.warn('[CallContext] setupPeerConnection error:', err);
@@ -538,7 +594,15 @@ export const CallProvider = ({ children }) => {
       if (!pcRef.current) return;
       const offer = await pcRef.current.createOffer();
       await pcRef.current.setLocalDescription(offer);
-      socketRef.current?.emit('webrtc_offer', { targetId, sdp: offer });
+      // IMPORTANT: include callerId (our own user id) so the callee can
+      // address the webrtc_answer back to us. Without this, data.callerId
+      // is undefined on the callee side and the answer never reaches us.
+      socketRef.current?.emit('webrtc_offer', {
+        targetId,
+        callerId: user.id,
+        sdp: offer,
+      });
+      console.log('[CallContext] Sent webrtc_offer to', targetId);
     } catch (err) {
       console.warn('[CallContext] createOffer error:', err);
     }
