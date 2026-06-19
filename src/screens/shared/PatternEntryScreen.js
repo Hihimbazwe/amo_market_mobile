@@ -3,7 +3,7 @@ import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
-import { Lock } from 'lucide-react-native';
+import { Lock, ArrowLeft } from 'lucide-react-native';
 import { NavigationRefContext } from '../../context/NavigationRefContext';
 
 const { width } = Dimensions.get('window');
@@ -85,6 +85,21 @@ const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCan
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Back button in top left corner */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => {
+          if (navigationRef?.current) {
+            navigationRef.current.reset({
+              index: 0,
+              routes: [{ name: 'Home' }],
+            });
+          }
+        }}
+      >
+        <ArrowLeft size={24} color={colors.primary} />
+      </TouchableOpacity>
+
       <View style={styles.header}>
         <Lock size={44} color={colors.primary} style={{ marginBottom: 12 }} />
         <CustomText variant="h2" style={{ textAlign: 'center', marginBottom: 4 }}>
@@ -189,12 +204,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    justifyContent: 'flex-start',
-    paddingTop: 20,
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 1,
+    padding: 8,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 32,
   },
   board: {
     width: BOARD_SIZE,
@@ -204,7 +226,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 8,
+    marginVertical: 24,
   },
   button: {
     paddingVertical: 14,

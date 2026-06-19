@@ -21,6 +21,7 @@ const AppLockSettings = ({ t }) => {
     updateMethod,
     reEnableSecurity,
     configureAndActivateMethod,
+    verifyCurrentCredential,
   } = useAppSecurity();
 
   const [fingerprintAvailable, setFingerprintAvailable] = useState(false);
@@ -28,6 +29,8 @@ const AppLockSettings = ({ t }) => {
   const [showMethodSelector, setShowMethodSelector] = useState(false);
   const [updateMode, setUpdateMode] = useState(false);
   const [showManageMethods, setShowManageMethods] = useState(false);
+  const [verifyingCurrentCredential, setVerifyingCurrentCredential] = useState(false);
+  const [currentCredentialVerified, setCurrentCredentialVerified] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -75,7 +78,7 @@ const AppLockSettings = ({ t }) => {
     }
   }, [disableSecurity]);
 
-  // Update Lock card — PIN/Pattern open setup-in-update-mode directly. Fingerprint explains device management.
+  // Update Lock card — PIN/Pattern require current credential verification first. Fingerprint explains device management.
   const handleUpdateMethod = useCallback(() => {
     if (!currentMethod) return;
 
@@ -87,6 +90,9 @@ const AppLockSettings = ({ t }) => {
       return;
     }
 
+    // Start with verification mode for PIN/Pattern
+    setVerifyingCurrentCredential(true);
+    setCurrentCredentialVerified(false);
     setSetupMethod(currentMethod);
     setUpdateMode(true);
   }, [currentMethod]);
@@ -156,6 +162,23 @@ const AppLockSettings = ({ t }) => {
 
   const handlePINSetupComplete = useCallback(async (enteredPin) => {
     let ok = false;
+    
+    // If verifying current credential, verify it first
+    if (verifyingCurrentCredential && !currentCredentialVerified) {
+      const verified = await verifyCurrentCredential('pin', enteredPin);
+      if (verified) {
+        setCurrentCredentialVerified(true);
+        setVerifyingCurrentCredential(false);
+        // Now allow user to enter new PIN
+        Alert.alert('Verified', 'Current PIN verified. Please enter your new PIN.');
+        return;
+      } else {
+        Alert.alert('Incorrect PIN', 'The PIN you entered is incorrect. Please try again.');
+        return;
+      }
+    }
+    
+    // If current credential is verified, proceed with update
     if (updateMode) {
       ok = await updateMethod('pin', enteredPin);
     } else if (isEnabled) {
@@ -165,15 +188,34 @@ const AppLockSettings = ({ t }) => {
     }
     setSetupMethod(null);
     setUpdateMode(false);
+    setVerifyingCurrentCredential(false);
+    setCurrentCredentialVerified(false);
     if (ok) {
       Alert.alert(t?.('success') || 'Success', updateMode ? 'PIN updated successfully.' : 'PIN lock saved.');
     } else {
       Alert.alert(t?.('error') || 'Error', 'Could not save PIN lock settings.');
     }
-  }, [enableSecurity, updateMethod, configureAndActivateMethod, updateMode, isEnabled, t]);
+  }, [enableSecurity, updateMethod, configureAndActivateMethod, updateMode, isEnabled, t, verifyingCurrentCredential, currentCredentialVerified, verifyCurrentCredential]);
 
   const handlePatternSetupComplete = useCallback(async (enteredPattern) => {
     let ok = false;
+    
+    // If verifying current credential, verify it first
+    if (verifyingCurrentCredential && !currentCredentialVerified) {
+      const verified = await verifyCurrentCredential('pattern', enteredPattern);
+      if (verified) {
+        setCurrentCredentialVerified(true);
+        setVerifyingCurrentCredential(false);
+        // Now allow user to enter new pattern
+        Alert.alert('Verified', 'Current pattern verified. Please enter your new pattern.');
+        return;
+      } else {
+        Alert.alert('Incorrect Pattern', 'The pattern you entered is incorrect. Please try again.');
+        return;
+      }
+    }
+    
+    // If current credential is verified, proceed with update
     if (updateMode) {
       ok = await updateMethod('pattern', enteredPattern);
     } else if (isEnabled) {
@@ -183,12 +225,14 @@ const AppLockSettings = ({ t }) => {
     }
     setSetupMethod(null);
     setUpdateMode(false);
+    setVerifyingCurrentCredential(false);
+    setCurrentCredentialVerified(false);
     if (ok) {
       Alert.alert(t?.('success') || 'Success', updateMode ? 'Pattern updated successfully.' : 'Pattern lock saved.');
     } else {
       Alert.alert(t?.('error') || 'Error', 'Could not save pattern lock settings.');
     }
-  }, [enableSecurity, updateMethod, configureAndActivateMethod, updateMode, isEnabled, t]);
+  }, [enableSecurity, updateMethod, configureAndActivateMethod, updateMode, isEnabled, t, verifyingCurrentCredential, currentCredentialVerified, verifyCurrentCredential]);
 
   const handleFingerprintSetupComplete = useCallback(async () => {
     let ok = false;

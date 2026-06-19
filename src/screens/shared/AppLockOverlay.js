@@ -19,8 +19,12 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
   const [showFingerprint, setShowFingerprint] = useState(false);
 
   const handleUnlockSuccess = async () => {
-    // Check if this is a device lock session and restore auth if needed BEFORE unlocking
-    let authRestored = false;
+    unlockApp();
+    setLocked(false);
+    setShowFingerprint(false);
+    
+    // Check if this is a device lock session and restore auth if needed AFTER unlocking
+    // This prevents double unlock prompts
     try {
       const deviceSecurity = await AsyncStorage.getItem('@device_security_enabled');
       if (deviceSecurity) {
@@ -28,22 +32,11 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
         if (parsed.authToken && parsed.userData) {
           // Restore auth session with stored token and user data
           await login({ token: parsed.authToken, user: parsed.userData });
-          authRestored = true;
           console.log('[AppLockOverlay] Auth session restored successfully');
         }
       }
     } catch (err) {
       console.warn('[AppLockOverlay] Error restoring auth session:', err);
-    }
-    
-    unlockApp();
-    setLocked(false);
-    setShowFingerprint(false);
-    
-    // If auth was restored, notify the security context to skip any additional locks
-    if (authRestored) {
-      // The AuthContext will update isAuthenticated, which will hide AuthOverlay
-      // No additional action needed
     }
     
     if (onUnlock) onUnlock();

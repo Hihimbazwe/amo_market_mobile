@@ -136,8 +136,9 @@ export const SecurityProvider = ({ children }) => {
 
       // First hydrate from local storage so UI doesn't flash
       const stored = await AsyncStorage.getItem(`@security_settings_${user.id}`);
+      let parsed = null;
       if (stored) {
-        const parsed = JSON.parse(stored);
+        parsed = JSON.parse(stored);
         const safe = {
           enabled: !!parsed.enabled,
           method: parsed.method || null,
@@ -154,7 +155,7 @@ export const SecurityProvider = ({ children }) => {
         }
       }
 
-      // Then sync from remote
+      // Then sync from remote - but prioritize local method if it exists
       try {
         const remoteSettings = await appSecurityService.getSecuritySettings(user.id);
         const safeSettings = {
@@ -163,6 +164,12 @@ export const SecurityProvider = ({ children }) => {
           failedAttempts: remoteSettings.failedAttempts || 0,
           configuredMethods: mergeConfiguredMethods(remoteSettings.configuredMethods, localConfiguredMethods),
         };
+        
+        // If local storage has a method and remote doesn't, keep local method
+        if (parsed && parsed.method && !remoteSettings.method) {
+          safeSettings.method = parsed.method;
+        }
+        
         setSecuritySettings(safeSettings);
         const authToken = await getAuthToken();
         await persistSecuritySettings(user.id, safeSettings, deviceSecurityKey, authToken, user);
@@ -652,6 +659,23 @@ export const SecurityProvider = ({ children }) => {
     }
   }, [user?.id, securitySettings, applySyncedSettings]);
 
+  // Verify current credential before allowing method update
+  const verifyCurrentCredential = useCallback(async (method, credential) => {
+    if (!user?.id) return false;
+
+    try {
+      if (method === 'pin') {
+        return await verifyPin(credential);
+      } else if (method === 'pattern') {
+        return await verifyPattern(credential);
+      }
+      return false;
+    } catch (err) {
+      console.warn('[SecurityContext] Error verifying current credential:', err);
+      return false;
+    }
+  }, [user?.id, verifyPin, verifyPattern]);
+
   // Configure a new lock method while app lock is enabled
   const configureAndActivateMethod = useCallback(async (method, pin = null, pattern = null) => {
     if (!user?.id) return false;
@@ -724,6 +748,7 @@ export const SecurityProvider = ({ children }) => {
     reEnableSecurity,
     configureAndActivateMethod,
     notifyCredentialLogin,
+    verifyCurrentCredential,
   };
 
   return <SecurityContext.Provider value={value}>{children}</SecurityContext.Provider>;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
-import { Lock, Fingerprint } from 'lucide-react-native';
+import { Lock, Fingerprint, ArrowLeft } from 'lucide-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { NavigationRefContext } from '../../context/NavigationRefContext';
 
@@ -213,6 +213,21 @@ const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = 
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Back button in top left corner */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => {
+          if (navigationRef?.current) {
+            navigationRef.current.reset({
+              index: 0,
+              routes: [{ name: 'Home' }],
+            });
+          }
+        }}
+      >
+        <ArrowLeft size={24} color={colors.primary} />
+      </TouchableOpacity>
+
       <ScrollView
         contentContainerStyle={[styles.scrollContainer, isSetup && { paddingVertical: 12 }]}
         showsVerticalScrollIndicator={false}
@@ -301,11 +316,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 1,
+    padding: 8,
+  },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 32,
+    paddingTop: 80,
   },
   content: {
     width: '100%',
