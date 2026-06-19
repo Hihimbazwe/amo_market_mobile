@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NavigationRefContext } from './NavigationRefContext';
 
 const AuthContext = createContext();
 
@@ -8,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const navigationRef = useContext(NavigationRefContext);
 
 
   useEffect(() => {
@@ -74,6 +76,13 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.removeItem('@auth_token');
       if (isManual) {
         await AsyncStorage.removeItem('@auto_logout_redirect');
+      }
+      // Navigate to home screen after logout
+      if (navigationRef?.current) {
+        navigationRef.current.reset({
+          index: 0,
+          routes: [{ name: 'MainApp' }],
+        });
       }
     } catch (e) {
       console.error('Failed to clear auth state', e);

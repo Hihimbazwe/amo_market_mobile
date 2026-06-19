@@ -6,7 +6,7 @@ import {
   FlatList,
   TextInput,
   KeyboardAvoidingView,
-  // Platform,
+  Platform,
   ActivityIndicator,
   Modal,
   Alert,
@@ -14,7 +14,6 @@ import {
   Animated,
   Image,
   Linking,
-  KeyboardAwaeScrollView,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -34,7 +33,6 @@ import { productService } from '../../api/productService';
 import { useNotifications } from '../../context/NotificationContext';
 import { usePresence } from '../../context/PresenceContext';
 import PresenceDot from '../../components/PresenceDot';
-import { Platform, } from 'react-native';
 
 function formatLastSeen(timestamp) {
   if (!timestamp) return '';
@@ -1493,11 +1491,7 @@ export default function ChatDetailScreen() {
       )}
 
       {/* Input Bar */}
-      <KeyboardAwareScrollView
-        enableOnAndroid={true}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ flexGrow: 1 }}
-      >
+      <View>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           {isSellerDeactivated ? (
             /* Deactivated seller — show a locked input bar */
@@ -1609,7 +1603,7 @@ export default function ChatDetailScreen() {
             </View>
           )}
         </KeyboardAvoidingView>
-      </KeyboardAwareScrollView>
+      </View>
 
       {/* ── Report Modal ── */}
       <Modal visible={attachmentVisible} transparent animationType="fade" onRequestClose={() => setAttachmentVisible(false)}>

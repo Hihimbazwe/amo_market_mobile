@@ -642,7 +642,8 @@ const lockStyles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     width: '92%',
-    maxHeight: '88%',
+    maxHeight: '95%',
+    height: '90%',
     overflow: 'hidden',
   },
   selectorModalContent: {

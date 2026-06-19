@@ -53,6 +53,10 @@ export const CallProvider = ({ children }) => {
   const sentCallLogsRef = useRef(new Set());
   const callStateRef = useRef(null);
 
+  // ICE candidate queue — holds candidates that arrive before remote description is set
+  const pendingIceCandidatesRef = useRef([]);
+  const remoteDescriptionSetRef = useRef(false);
+
   useEffect(() => { activeCallRef.current = activeCallData; }, [activeCallData]);
   useEffect(() => { incomingCallRef.current = incomingCallData; }, [incomingCallData]);
   useEffect(() => { connectedAtRef.current = connectedAt; }, [connectedAt]);
@@ -205,11 +209,23 @@ export const CallProvider = ({ children }) => {
     return unsubscribe;
   }, [user?.id]);
 
+  // Helper to drain queued ICE candidates once remote description is set
+  const drainPendingIceCandidates = async () => {
+    if (!pcRef.current || pendingIceCandidatesRef.current.length === 0) return;
+    console.log(`[CallContext] Draining ${pendingIceCandidatesRef.current.length} queued ICE candidates`);
+    for (const candidate of pendingIceCandidatesRef.current) {
+      try {
+        await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.warn('[CallContext] Error adding queued ICE candidate:', e);
+      }
+    }
+    pendingIceCandidatesRef.current = [];
+  };
+
   useEffect(() => {
     if (!user?.id) return;
 
-    // Use dedicated SIGNALING_URL from env — no port manipulation needed.
-    // Falls back to API_BASE_URL only as a last resort (will likely fail on Vercel).
     const signalingUrl = SIGNALING_URL || API_BASE_URL;
 
     if (!signalingUrl || typeof signalingUrl !== 'string') {
@@ -293,10 +309,16 @@ export const CallProvider = ({ children }) => {
         });
       });
 
+      // Callee receives offer → set remote description → drain ICE queue → send answer
       socketRef.current.on('webrtc_offer', async (data) => {
         try {
           if (!pcRef.current) await setupPeerConnection(data.callerId || data.targetId);
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          remoteDescriptionSetRef.current = true;
+
+          // Drain any ICE candidates that arrived before the offer was processed
+          await drainPendingIceCandidates();
+
           const answer = await pcRef.current.createAnswer();
           await pcRef.current.setLocalDescription(answer);
           socketRef.current.emit('webrtc_answer', { targetId: data.callerId, sdp: answer });
@@ -305,20 +327,31 @@ export const CallProvider = ({ children }) => {
         }
       });
 
+      // Caller receives answer → set remote description → drain ICE queue
       socketRef.current.on('webrtc_answer', async (data) => {
         try {
           if (pcRef.current) {
             await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            remoteDescriptionSetRef.current = true;
+
+            // Drain any ICE candidates that arrived before the answer was processed
+            await drainPendingIceCandidates();
           }
         } catch (err) {
           console.warn('[CallContext] Error handling webrtc_answer:', err);
         }
       });
 
+      // Queue ICE candidates if remote description isn't set yet
       socketRef.current.on('ice_candidate', async (data) => {
         try {
-          if (pcRef.current) {
+          if (pcRef.current && remoteDescriptionSetRef.current) {
+            // Remote description ready — add immediately
             await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+          } else {
+            // Not ready yet — queue for later
+            console.log('[CallContext] Queuing ICE candidate (remote description not set yet)');
+            pendingIceCandidatesRef.current.push(data.candidate);
           }
         } catch (e) {
           console.warn('[CallContext] Error adding ICE candidate:', e);
@@ -470,6 +503,10 @@ export const CallProvider = ({ children }) => {
   };
 
   const cleanupCall = () => {
+    // Reset ICE candidate queue and remote description flag
+    pendingIceCandidatesRef.current = [];
+    remoteDescriptionSetRef.current = false;
+
     try {
       if (pcRef.current) {
         pcRef.current.close();

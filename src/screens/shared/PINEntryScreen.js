@@ -215,17 +215,13 @@ const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = 
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Back button in top left corner */}
       <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => {
-          if (navigationRef?.current) {
-            navigationRef.current.reset({
-              index: 0,
-              routes: [{ name: 'Home' }],
-            });
-          }
-        }}
+        onPress={() => navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+        })}
+        style={[styles.backButton, { backgroundColor: colors.glass }]}
       >
-        <ArrowLeft size={24} color={colors.primary} />
+        <ArrowLeft color={colors.foreground} size={24} />
       </TouchableOpacity>
 
       <ScrollView

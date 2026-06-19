@@ -18,7 +18,6 @@ import { GOOGLE_WEB_CLIENT_ID } from '@env';
 
 WebBrowser.maybeCompleteAuthSession();
 
-
 const GoogleIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 48 48">
     <Path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
@@ -37,8 +36,11 @@ const RegisterScreen = ({ navigation, route }) => {
   const [useNativeGoogle, setUseNativeGoogle] = useState(false);
 
   // expo-auth-session Google OAuth (works in standard Expo Go)
+  // All three reuse the same Web Client ID — correct for Expo Go proxy testing
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
+    androidClientId: GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_WEB_CLIENT_ID,
     scopes: ['profile', 'email'],
   });
 
@@ -102,7 +104,6 @@ const RegisterScreen = ({ navigation, route }) => {
       const result = await authService.loginWithGoogle(gEmail, gName, gImage);
       await login(result);
 
-      // Check if there is an auto-logout redirect to restore
       const savedRedirect = await AsyncStorage.getItem('@auto_logout_redirect');
       if (savedRedirect) {
         try {
@@ -142,7 +143,6 @@ const RegisterScreen = ({ navigation, route }) => {
       } else {
         navigation.navigate('MainApp', { screen: 'Home' });
       }
-
     } catch (error) {
       Alert.alert('Google Sign-In Failed', error.message || 'Something went wrong');
     } finally {
@@ -160,6 +160,7 @@ const RegisterScreen = ({ navigation, route }) => {
         Alert.alert('Google Sign-In Failed', e.message || 'Something went wrong');
         setGoogleLoading(false);
       }
+      // loading state cleared inside handleExpoGoogleToken or response useEffect
       return;
     }
 
@@ -182,7 +183,7 @@ const RegisterScreen = ({ navigation, route }) => {
       try {
         const signinPkg = require('@react-native-google-signin/google-signin');
         statusCodes = signinPkg.statusCodes;
-      } catch (err) {}
+      } catch (err) { }
 
       let msg = error.message || 'Something went wrong';
       if (statusCodes && error.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -229,9 +230,9 @@ const RegisterScreen = ({ navigation, route }) => {
         password,
         role,
         ...(route.params?.inviteToken && { inviteToken: route.params.inviteToken }),
-        ...(role === 'AGENT' && { province, district, sector, cell, village, phone, coverageArea })
+        ...(role === 'AGENT' && { province, district, sector, cell, village, phone, coverageArea }),
       };
-      
+
       const result = await authService.register(userData);
       if (result.inviteConversation) {
         await AsyncStorage.setItem('@auto_logout_redirect', JSON.stringify({
@@ -254,8 +255,8 @@ const RegisterScreen = ({ navigation, route }) => {
               isHidden: false,
               isLocked: false,
               isBlockedByMe: false,
-            }
-          }
+            },
+          },
         }));
       }
       Alert.alert('Success', 'Account created! Please check your email for verification.');
@@ -270,160 +271,162 @@ const RegisterScreen = ({ navigation, route }) => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.glass }]}>
-          <ArrowLeft color={colors.foreground} size={24} />
-        </TouchableOpacity>
-        <CustomText variant="h2" style={{ color: colors.foreground }}>Register</CustomText>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
-            <Image 
-              source={require('../../assets/logo.png')} 
-              style={{ width: 60, height: 60, resizeMode: 'contain', marginBottom: 8 }} 
-            />
-            <Svg height="40" width="200">
-              <Defs>
-                <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor="#A855F7" stopOpacity="1" />
-                  <Stop offset="1" stopColor="#3B82F6" stopOpacity="1" />
-                </LinearGradient>
-              </Defs>
-              <SvgText
-                fill="url(#grad)"
-                fontSize="22"
-                fontWeight="900"
-                x="100"
-                y="30"
-                textAnchor="middle"
-              >AMO Market</SvgText>
-            </Svg>
-          </View>
-          <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 8, marginTop: 8 }}>Join AMO</CustomText>
-          <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted, marginBottom: 16 }]}>
-            Create an account to start selling and buying premium products.
-          </CustomText>
-
-          <TouchableOpacity 
-            style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }, { width: '100%', marginBottom: 16 }]}
-            onPress={handleGoogleSignInPress}
-            activeOpacity={0.8}
-            disabled={googleLoading}
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={[styles.backButton, { backgroundColor: colors.glass }]}
           >
-            {googleLoading ? (
-              <ActivityIndicator color="#1e293b" />
-            ) : (
-              <>
-                <GoogleIcon />
-                <CustomText style={styles.googleButtonText}>Join with Google</CustomText>
-              </>
-            )}
+            <ArrowLeft color={colors.foreground} size={24} />
           </TouchableOpacity>
+          <CustomText variant="h2" style={{ color: colors.foreground }}>Register</CustomText>
+        </View>
 
-          <View style={[styles.separator, { marginVertical: 12, width: '100%' }]}>
-            <View style={[styles.line, { backgroundColor: colors.border }]} />
-            <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
-            <View style={[styles.line, { backgroundColor: colors.border }]} />
-          </View>
-
-          {/* Role Selection */}
-          <View style={styles.roleContainer}>
-            <CustomText style={[styles.roleLabel, { color: colors.muted }]}>I WANT TO</CustomText>
-            <View style={styles.roleGrid}>
-              {[
-                { id: 'BUYER', icon: ShoppingBag, label: 'Buy' },
-                { id: 'SELLER', icon: Store, label: 'Sell' },
-                // { id: 'AGENT', icon: UserCheck, label: 'Agent' },
-              ].map((item) => (
-                <TouchableOpacity 
-                  key={item.id}
-                  onPress={() => setRole(item.id)}
-                  style={[
-                    styles.roleItem,
-                    { backgroundColor: colors.glass, borderColor: colors.border },
-                    role === item.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }
-                  ]}
-                >
-                  <item.icon size={24} color={role === item.id ? colors.primary : colors.muted} />
-                  <CustomText style={[
-                     styles.roleItemText,
-                     { color: colors.muted },
-                     role === item.id && { color: colors.primary }
-                  ]}>
-                    {item.label}
-                  </CustomText>
-                </TouchableOpacity>
-              ))}
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <Image
+                source={require('../../assets/logo.png')}
+                style={{ width: 60, height: 60, resizeMode: 'contain', marginBottom: 8 }}
+              />
+              <Svg height="40" width="200">
+                <Defs>
+                  <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0" stopColor="#A855F7" stopOpacity="1" />
+                    <Stop offset="1" stopColor="#3B82F6" stopOpacity="1" />
+                  </LinearGradient>
+                </Defs>
+                <SvgText
+                  fill="url(#grad)"
+                  fontSize="22"
+                  fontWeight="900"
+                  x="100"
+                  y="30"
+                  textAnchor="middle"
+                >AMO Market</SvgText>
+              </Svg>
             </View>
-          </View>
 
-          <View style={styles.form}>
-            <CustomInput 
-              label="Full Name"
-              placeholder="John Doe"
-              value={name}
-              onChangeText={setName}
-            />
-            <CustomInput 
-              label="Email"
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-            />
-            <CustomInput 
-              label="Password"
-              placeholder="Min. 8 characters"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-
-            {role === 'AGENT' && (
-              <View style={styles.agentFields}>
-                <View style={[styles.agentInfoBox, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '20' }]}>
-                  <CustomText style={[styles.agentInfoTitle, { color: colors.primary }]}>Agent Location Details</CustomText>
-                  <CustomText style={[styles.agentInfoText, { color: colors.muted }]}>Agents handle local deliveries. Please select your exact location.</CustomText>
-                </View>
-                <CustomInput label="Province" placeholder="Enter Province" value={province} onChangeText={setProvince} />
-                <CustomInput label="District" placeholder="Enter District" value={district} onChangeText={setDistrict} />
-                <CustomInput label="Sector" placeholder="Enter Sector" value={sector} onChangeText={setSector} />
-                <CustomInput label="Cell" placeholder="Enter Cell" value={cell} onChangeText={setCell} />
-                <CustomInput label="Village" placeholder="Enter Village" value={village} onChangeText={setVillage} />
-                <CustomInput label="Phone Number" placeholder="+250 7XX XXX XXX" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-                <CustomInput label="Coverage Area" placeholder="e.g. Kimironko, Remera" value={coverageArea} onChangeText={setCoverageArea} />
-              </View>
-            )}
-
-            <CustomButton 
-              title={`Create ${role.charAt(0) + role.slice(1).toLowerCase()} Account`}
-              loading={loading}
-              onPress={handleRegister} 
-              style={styles.button}
-            />
-
-            <CustomText style={[styles.dataAssurance, { color: colors.muted }]}>
-              Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
+            <CustomText variant="h2" style={{ color: colors.foreground, marginBottom: 8, marginTop: 8 }}>Join AMO</CustomText>
+            <CustomText variant="subtitle" style={[styles.subtitle, { color: colors.muted, marginBottom: 16 }]}>
+              Create an account to start selling and buying premium products.
             </CustomText>
-           </View>
 
-           <TouchableOpacity 
-             onPress={() => navigation.navigate('Login')}
-             style={styles.link}
-           >
-             <CustomText style={[styles.linkText, { color: colors.muted }]}>
-               Already have an account? <CustomText style={{ color: colors.primary }}>Login</CustomText>
-             </CustomText>
-           </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.googleButton, !isDarkMode && { borderWidth: 1, borderColor: colors.border }, { width: '100%', marginBottom: 16 }]}
+              onPress={handleGoogleSignInPress}
+              activeOpacity={0.8}
+              disabled={googleLoading}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color="#1e293b" />
+              ) : (
+                <>
+                  <GoogleIcon />
+                  <CustomText style={styles.googleButtonText}>Join with Google</CustomText>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <View style={[styles.separator, { marginVertical: 12, width: '100%' }]}>
+              <View style={[styles.line, { backgroundColor: colors.border }]} />
+              <CustomText style={[styles.separatorText, { color: colors.muted }]}>OR</CustomText>
+              <View style={[styles.line, { backgroundColor: colors.border }]} />
+            </View>
+
+            {/* Role Selection */}
+            <View style={styles.roleContainer}>
+              <CustomText style={[styles.roleLabel, { color: colors.muted }]}>I WANT TO</CustomText>
+              <View style={styles.roleGrid}>
+                {[
+                  { id: 'BUYER', icon: ShoppingBag, label: 'Buy' },
+                  { id: 'SELLER', icon: Store, label: 'Sell' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    onPress={() => setRole(item.id)}
+                    style={[
+                      styles.roleItem,
+                      { backgroundColor: colors.glass, borderColor: colors.border },
+                      role === item.id && { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
+                    ]}
+                  >
+                    <item.icon size={24} color={role === item.id ? colors.primary : colors.muted} />
+                    <CustomText style={[
+                      styles.roleItemText,
+                      { color: colors.muted },
+                      role === item.id && { color: colors.primary },
+                    ]}>
+                      {item.label}
+                    </CustomText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.form}>
+              <CustomInput
+                label="Full Name"
+                placeholder="John Doe"
+                value={name}
+                onChangeText={setName}
+              />
+              <CustomInput
+                label="Email"
+                placeholder="you@example.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+              />
+              <CustomInput
+                label="Password"
+                placeholder="Min. 8 characters"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+
+              {role === 'AGENT' && (
+                <View style={styles.agentFields}>
+                  <View style={[styles.agentInfoBox, { backgroundColor: colors.primary + '05', borderColor: colors.primary + '20' }]}>
+                    <CustomText style={[styles.agentInfoTitle, { color: colors.primary }]}>Agent Location Details</CustomText>
+                    <CustomText style={[styles.agentInfoText, { color: colors.muted }]}>Agents handle local deliveries. Please select your exact location.</CustomText>
+                  </View>
+                  <CustomInput label="Province" placeholder="Enter Province" value={province} onChangeText={setProvince} />
+                  <CustomInput label="District" placeholder="Enter District" value={district} onChangeText={setDistrict} />
+                  <CustomInput label="Sector" placeholder="Enter Sector" value={sector} onChangeText={setSector} />
+                  <CustomInput label="Cell" placeholder="Enter Cell" value={cell} onChangeText={setCell} />
+                  <CustomInput label="Village" placeholder="Enter Village" value={village} onChangeText={setVillage} />
+                  <CustomInput label="Phone Number" placeholder="+250 7XX XXX XXX" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+                  <CustomInput label="Coverage Area" placeholder="e.g. Kimironko, Remera" value={coverageArea} onChangeText={setCoverageArea} />
+                </View>
+              )}
+
+              <CustomButton
+                title={`Create ${role.charAt(0) + role.slice(1).toLowerCase()} Account`}
+                loading={loading}
+                onPress={handleRegister}
+                style={styles.button}
+              />
+
+              <CustomText style={[styles.dataAssurance, { color: colors.muted }]}>
+                Your personal data is securely encrypted and protected in compliance with Rwanda Data Protection and Privacy Laws
+              </CustomText>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
+              style={styles.link}
+            >
+              <CustomText style={[styles.linkText, { color: colors.muted }]}>
+                Already have an account? <CustomText style={{ color: colors.primary }}>Login</CustomText>
+              </CustomText>
+            </TouchableOpacity>
           </View>
         </ScrollView>
-
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -504,7 +507,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-
   subtitle: {
     textAlign: 'center',
     marginBottom: 20,
