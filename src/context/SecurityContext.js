@@ -100,7 +100,7 @@ const restoreAuthSession = async (authToken) => {
 };
 
 export const SecurityProvider = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, authToken } = useAuth();
   const [securitySettings, setSecuritySettings] = useState({
     enabled: false,
     method: null, // 'pin', 'pattern', 'fingerprint' - currently active method
@@ -128,11 +128,15 @@ export const SecurityProvider = ({ children }) => {
   const deviceSecurityKey = '@device_security_enabled';
 
   // Load security settings from storage
-  const loadSecuritySettings = useCallback(async ({ skipLock = false } = {}) => {
+  const loadSecuritySettings = useCallback(async ({ skipLock = false, token = null, userData = null } = {}) => {
     try {
       if (!user?.id) return;
       deviceLockUserIdRef.current = user.id;
       const localConfiguredMethods = await loadLocalConfiguredMethods(user.id);
+
+      // Check if user has a locally-pending disable (remote sync may have failed previously)
+      const localDisabledFlag = await AsyncStorage.getItem(`@security_local_disabled_${user.id}`);
+      const hasLocalDisablePending = localDisabledFlag === 'true';
 
       // First hydrate from local storage so UI doesn't flash
       const stored = await AsyncStorage.getItem(`@security_settings_${user.id}`);
@@ -140,8 +144,8 @@ export const SecurityProvider = ({ children }) => {
       if (stored) {
         parsed = JSON.parse(stored);
         const safe = {
-          enabled: !!parsed.enabled,
-          method: parsed.method || null,
+          enabled: hasLocalDisablePending ? false : !!parsed.enabled,
+          method: hasLocalDisablePending ? null : (parsed.method || null),
           failedAttempts: parsed.failedAttempts || 0,
           configuredMethods: mergeConfiguredMethods(parsed.configuredMethods, localConfiguredMethods),
         };
@@ -158,6 +162,28 @@ export const SecurityProvider = ({ children }) => {
       // Then sync from remote - but prioritize local method if it exists
       try {
         const remoteSettings = await appSecurityService.getSecuritySettings(user.id);
+        // If we have a local disable pending, attempt to push it to remote now
+        if (hasLocalDisablePending) {
+          try {
+            await appSecurityService.disableSecurity(user.id);
+            await AsyncStorage.removeItem(`@security_local_disabled_${user.id}`);
+          } catch (syncErr) {
+            console.warn('[SecurityContext] Could not sync pending disable to remote:', syncErr?.message);
+          }
+          // Regardless of remote sync result, honour the local disable
+          const disabledSettings = {
+            enabled: false,
+            method: null,
+            failedAttempts: 0,
+            configuredMethods: mergeConfiguredMethods(remoteSettings.configuredMethods, localConfiguredMethods),
+          };
+          setSecuritySettings(disabledSettings);
+          const activeToken = token || authToken || await getAuthToken();
+          const activeUser = userData || user;
+          await persistSecuritySettings(user.id, disabledSettings, deviceSecurityKey, activeToken, activeUser);
+          setAppLocked(false);
+          return;
+        }
         const safeSettings = {
           enabled: !!remoteSettings.enabled,
           method: remoteSettings.method || null,
@@ -171,8 +197,9 @@ export const SecurityProvider = ({ children }) => {
         }
         
         setSecuritySettings(safeSettings);
-        const authToken = await getAuthToken();
-        await persistSecuritySettings(user.id, safeSettings, deviceSecurityKey, authToken, user);
+        const activeToken = token || authToken || await getAuthToken();
+        const activeUser = userData || user;
+        await persistSecuritySettings(user.id, safeSettings, deviceSecurityKey, activeToken, activeUser);
         setAppLocked(skipLock ? false : !!safeSettings.enabled);
       } catch (remoteErr) {
         console.warn('[SecurityContext] Remote settings fetch failed, using local cache:', remoteErr?.message);
@@ -185,23 +212,24 @@ export const SecurityProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, deviceSecurityKey]);
+  }, [user?.id, deviceSecurityKey, authToken]);
+
 
   loadSecuritySettingsRef.current = loadSecuritySettings;
 
   const applySyncedSettings = useCallback(async (synced) => {
     setSecuritySettings(synced);
     if (user?.id) {
-      const authToken = await getAuthToken();
-      await persistSecuritySettings(user.id, synced, deviceSecurityKey, authToken, user);
+      const activeToken = authToken || await getAuthToken();
+      await persistSecuritySettings(user.id, synced, deviceSecurityKey, activeToken, user);
     }
-  }, [user?.id, deviceSecurityKey]);
+  }, [user?.id, deviceSecurityKey, authToken]);
 
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       isDeviceLockSessionRef.current = false;
       const skipLock = skipLockAfterLoginRef.current;
-      loadSecuritySettingsRef.current?.({ skipLock }).finally(() => {
+      loadSecuritySettingsRef.current?.({ skipLock, token: authToken, userData: user }).finally(() => {
         if (skipLock) {
           setAppLocked(false);
           skipLockAfterLoginRef.current = false;
@@ -215,7 +243,7 @@ export const SecurityProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, authToken]);
 
   const notifyCredentialLogin = useCallback(() => {
     skipLockAfterLoginRef.current = true;
@@ -307,6 +335,8 @@ export const SecurityProvider = ({ children }) => {
         }
 
         await applySyncedSettings(synced);
+        // Clear any pending local-disable flag since user is re-enabling
+        await AsyncStorage.removeItem(`@security_local_disabled_${user.id}`).catch(() => {});
         setAppLocked(true);
         return true;
       } catch (remoteErr) {
@@ -327,30 +357,59 @@ export const SecurityProvider = ({ children }) => {
     }
   }, [user?.id, securitySettings.configuredMethods, applySyncedSettings]);
 
-  // Disable security — keeps configured methods stored for future re-enable
+  // Disable security — keeps configured methods stored for future re-enable.
+  // Local state is applied immediately. Remote sync is attempted but non-blocking.
   const disableSecurity = useCallback(async () => {
-    let remoteConfiguredMethods = securitySettings.configuredMethods || {};
-    if (user?.id) {
-      try {
-        const remoteSettings = await appSecurityService.disableSecurity(user.id);
-        remoteConfiguredMethods = mergeConfiguredMethods(
-          remoteSettings.configuredMethods,
-          securitySettings.configuredMethods || {}
-        );
-      } catch (err) {
-        console.warn('[SecurityContext] Error disabling security:', err);
-      }
-    }
+    // 1. Apply locally right away so UI reflects the change instantly
     const newSettings = {
       enabled: false,
       method: null,
       failedAttempts: 0,
-      configuredMethods: remoteConfiguredMethods,
+      configuredMethods: securitySettings.configuredMethods || {},
     };
-    await applySyncedSettings(newSettings);
+    setSecuritySettings(newSettings);
     setAppLocked(false);
+
+    // 2. Persist local disabled flag so login-reload honours it even if remote fails
+    if (user?.id) {
+      try {
+        await AsyncStorage.setItem(`@security_local_disabled_${user.id}`, 'true');
+        await AsyncStorage.setItem(`@security_settings_${user.id}`, JSON.stringify(newSettings));
+        const activeToken = authToken || await getAuthToken();
+        await persistSecuritySettings(user.id, newSettings, deviceSecurityKey, activeToken, user);
+      } catch (e) {
+        console.warn('[SecurityContext] Failed to persist local disabled state:', e);
+      }
+
+      // 3. Attempt remote sync – best-effort, do not block or throw
+      try {
+        const remoteSettings = await appSecurityService.disableSecurity(user.id);
+        const remoteConfiguredMethods = mergeConfiguredMethods(
+          remoteSettings.configuredMethods,
+          newSettings.configuredMethods
+        );
+        const synced = {
+          enabled: false,
+          method: null,
+          failedAttempts: 0,
+          configuredMethods: remoteConfiguredMethods,
+        };
+        setSecuritySettings(synced);
+        await AsyncStorage.setItem(`@security_settings_${user.id}`, JSON.stringify(synced));
+        const activeToken = authToken || await getAuthToken();
+        await persistSecuritySettings(user.id, synced, deviceSecurityKey, activeToken, user);
+        // Remote success — clear the pending disable flag
+        await AsyncStorage.removeItem(`@security_local_disabled_${user.id}`);
+      } catch (remoteErr) {
+        console.warn('[SecurityContext] Remote disableSecurity failed (will retry on next sync):', remoteErr?.message);
+        // Keep local disabled state — the @security_local_disabled flag ensures
+        // loadSecuritySettings will override the remote 'enabled:true' on next login.
+      }
+    }
+
     return true;
-  }, [user?.id, securitySettings.configuredMethods, applySyncedSettings]);
+  }, [user?.id, securitySettings.configuredMethods, deviceSecurityKey, authToken]);
+
 
   // Verify PIN — server when logged in, always falls back to local device hash
   const verifyPin = useCallback(async (inputPin) => {
@@ -359,6 +418,7 @@ export const SecurityProvider = ({ children }) => {
 
     const pinCredKey = `@security_cred_${effectiveUserId}_pin`;
 
+    // 1. Try server verification first (authoritative)
     if (user?.id) {
       try {
         const result = await appSecurityService.verifySecurityCredential(user.id, 'pin', inputPin);
@@ -366,16 +426,21 @@ export const SecurityProvider = ({ children }) => {
           setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
           return true;
         }
+        // Server explicitly said wrong PIN — no need to check local
+        setSecuritySettings((prev) => ({ ...prev, failedAttempts: prev.failedAttempts + 1 }));
+        return false;
       } catch (networkErr) {
+        // Network failure only — fall through to local hash
         console.warn('[SecurityContext] PIN verify network failed, trying local hash:', networkErr?.message);
       }
     }
 
+    // 2. Offline fallback: check local hash
     try {
       const raw = await AsyncStorage.getItem(pinCredKey);
       if (raw) {
         const { method, hash } = JSON.parse(raw);
-        if (method === 'pin') {
+        if (method === 'pin' && hash) {
           const match = await verifyLocalHash('pin', inputPin, hash);
           if (match) {
             setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
@@ -390,11 +455,9 @@ export const SecurityProvider = ({ children }) => {
             setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
             return true;
           }
-        } else if (user?.id) {
-          console.warn('[SecurityContext] Local PIN hash is missing and server verify failed. Disabling corrupted lock.');
-          await disableSecurity();
-          return true;
         }
+        // No local hash available and network failed — cannot verify, deny access
+        // Do NOT auto-disable the lock or grant access here.
       }
     } catch (localErr) {
       console.warn('[SecurityContext] Local PIN verify also failed:', localErr?.message);
@@ -402,7 +465,7 @@ export const SecurityProvider = ({ children }) => {
 
     setSecuritySettings((prev) => ({ ...prev, failedAttempts: prev.failedAttempts + 1 }));
     return false;
-  }, [user?.id, disableSecurity, securitySettings.configuredMethods]);
+  }, [user?.id, securitySettings.configuredMethods]);
 
   // Verify Pattern — server when logged in, always falls back to local device hash
   const verifyPattern = useCallback(async (inputPattern) => {
@@ -411,6 +474,7 @@ export const SecurityProvider = ({ children }) => {
 
     const patternCredKey = `@security_cred_${effectiveUserId}_pattern`;
 
+    // 1. Try server verification first (authoritative)
     if (user?.id) {
       try {
         const result = await appSecurityService.verifySecurityCredential(user.id, 'pattern', inputPattern);
@@ -418,16 +482,21 @@ export const SecurityProvider = ({ children }) => {
           setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
           return true;
         }
+        // Server explicitly said wrong pattern — no need to check local
+        setSecuritySettings((prev) => ({ ...prev, failedAttempts: prev.failedAttempts + 1 }));
+        return false;
       } catch (networkErr) {
+        // Network failure only — fall through to local hash
         console.warn('[SecurityContext] Pattern verify network failed, trying local hash:', networkErr?.message);
       }
     }
 
+    // 2. Offline fallback: check local hash
     try {
       const raw = await AsyncStorage.getItem(patternCredKey);
       if (raw) {
         const { method, hash } = JSON.parse(raw);
-        if (method === 'pattern') {
+        if (method === 'pattern' && hash) {
           const match = await verifyLocalHash('pattern', inputPattern, hash);
           if (match) {
             setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
@@ -442,11 +511,8 @@ export const SecurityProvider = ({ children }) => {
             setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
             return true;
           }
-        } else if (user?.id) {
-          console.warn('[SecurityContext] Local pattern hash is missing and server verify failed. Disabling corrupted lock.');
-          await disableSecurity();
-          return true;
         }
+        // No local hash available and network failed — cannot verify, deny access
       }
     } catch (localErr) {
       console.warn('[SecurityContext] Local pattern verify also failed:', localErr?.message);
@@ -454,7 +520,7 @@ export const SecurityProvider = ({ children }) => {
 
     setSecuritySettings((prev) => ({ ...prev, failedAttempts: prev.failedAttempts + 1 }));
     return false;
-  }, [user?.id, disableSecurity, securitySettings.configuredMethods]);
+  }, [user?.id, securitySettings.configuredMethods]);
 
   // Verify Fingerprint
   const verifyFingerprint = useCallback(async () => {
@@ -599,6 +665,8 @@ export const SecurityProvider = ({ children }) => {
         configuredMethods: mergeConfiguredMethods(remoteSettings.configuredMethods, securitySettings.configuredMethods),
       };
       await applySyncedSettings(synced);
+      // Clear any pending local-disable flag since user is re-enabling
+      await AsyncStorage.removeItem(`@security_local_disabled_${user.id}`).catch(() => {});
       setAppLocked(true);
       return true;
     } catch (remoteErr) {

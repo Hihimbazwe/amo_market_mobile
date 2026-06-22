@@ -1,17 +1,11 @@
 import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { notifyIncomingCallFromPush } from '../utils/callNotificationBridge';
-
-// ─────────────────────────────────────────────────────────
-// In-app API polling was disabled for performance, but 
-// we are replacing it with true native Expo Push Notifications.
-// ─────────────────────────────────────────────────────────
 
 export const NotificationContext = createContext();
 
@@ -26,25 +20,7 @@ export const NotificationProvider = ({ children }) => {
   const notificationListener = useRef();
   const responseListener = useRef();
 
-  const handleCallNotification = (data) => {
-    console.log('[Notification] handleCallNotification data:', data);
-    if (!data || data.type !== 'INCOMING_CALL') return false;
-    try {
-      notifyIncomingCallFromPush({
-        callerId: data.callerId,
-        callerName: data.callerName,
-        targetId: data.targetId,
-        isVideo: data.isVideo === true || data.isVideo === 'true',
-        conversationId: data.conversationId,
-        callId: data.callId,
-      });
-      console.log('[Notification] notifyIncomingCallFromPush invoked for', data.callId);
-    } catch (err) {
-      console.warn('[Notification] Error notifying incoming call from push:', err);
-    }
-    return true;
-  };
-
+  // Load stored notifications on mount
   useEffect(() => {
     const loadStoredNotifications = async () => {
       try {
@@ -53,13 +29,13 @@ export const NotificationProvider = ({ children }) => {
           setNotificationsList(JSON.parse(stored));
         }
       } catch (err) {
-        console.warn('Failed to load notifications list', err);
+        console.warn('[NOTIF] Failed to load notifications list:', err);
       }
     };
     loadStoredNotifications();
   }, []);
 
-  // Dynamically set notification handler based on user settings
+  // Set notification handler based on user settings
   useEffect(() => {
     try {
       Notifications.setNotificationHandler({
@@ -70,10 +46,11 @@ export const NotificationProvider = ({ children }) => {
         }),
       });
     } catch (err) {
-      console.error('[PUSH] Error setting notification handler:', err);
+      console.warn('[NOTIF] Error setting notification handler:', err);
     }
   }, [pushNotificationsEnabled]);
 
+  // Load push notification settings from storage
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -82,7 +59,7 @@ export const NotificationProvider = ({ children }) => {
           setPushNotificationsEnabled(JSON.parse(stored));
         }
       } catch (err) {
-        console.warn('Failed to load push settings', err);
+        console.warn('[NOTIF] Failed to load push settings:', err);
       } finally {
         setLoadingSettings(false);
       }
@@ -95,33 +72,37 @@ export const NotificationProvider = ({ children }) => {
     try {
       await AsyncStorage.setItem('@push_enabled', JSON.stringify(val));
     } catch (err) {
-      console.error('Failed to save push setting', err);
+      console.warn('[NOTIF] Failed to save push setting:', err);
     }
   };
 
+  // Fetch unread chat count
   const fetchUnread = async () => {
     if (!user?.id) return;
     try {
       const apiUrl = API_BASE_URL || 'https://amomarket-cyan.vercel.app';
       const res = await fetch(`${apiUrl}/api/mobile/chat/conversations/unread-count`, {
-        headers: { 'x-user-id': user.id, 'ngrok-skip-browser-warning': 'true' }
+        headers: {
+          'x-user-id': user.id,
+          'ngrok-skip-browser-warning': 'true',
+        },
       });
       const data = await res.json();
       if (data && typeof data.total === 'number') {
         setUnreadChatCount(data.total);
       }
     } catch (e) {
-      console.warn('Failed to fetch unread chat count', e);
+      console.warn('[NOTIF] Failed to fetch unread chat count:', e);
     }
   };
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(fetchUnread, 15000); // Polling every 15s to keep navigation tab fresh
+    const interval = setInterval(fetchUnread, 15000);
     return () => clearInterval(interval);
   }, [user?.id]);
 
-  // Register push notifications when a user logs in
+  // Setup push notifications when user logs in
   useEffect(() => {
     if (!user?.id || loadingSettings) return;
 
@@ -129,11 +110,14 @@ export const NotificationProvider = ({ children }) => {
       try {
         if (pushNotificationsEnabled) {
           console.log('[PUSH] Attempting registration for user:', user.id);
+
           const token = await registerForPushNotificationsAsync();
+
           if (token) {
             console.log('[PUSH] Token acquired:', token);
             setExpoPushToken(token);
-            // Send the token to the backend
+
+            // Sync token to backend — failure here must never crash the app
             try {
               const res = await fetch(`${API_BASE_URL}/api/mobile/push-token`, {
                 method: 'POST',
@@ -147,16 +131,15 @@ export const NotificationProvider = ({ children }) => {
               const data = await res.json();
               console.log('[PUSH] Backend sync response:', data);
             } catch (err) {
-              console.error('[PUSH] Failed to sync push token with backend', err);
+              console.warn('[PUSH] Failed to sync token with backend - continuing anyway:', err);
             }
           } else {
-            console.warn('[PUSH] No token returned from registration');
+            console.warn('[PUSH] No token returned - push notifications unavailable');
           }
         } else {
-          // Tell backend to delete push token when notifications are disabled
-          console.log('[PUSH] Push notifications disabled. Telling server to unregister token...');
+          // Unregister token on backend when notifications disabled
           try {
-            const res = await fetch(`${API_BASE_URL}/api/mobile/push-token`, {
+            await fetch(`${API_BASE_URL}/api/mobile/push-token`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -165,73 +148,75 @@ export const NotificationProvider = ({ children }) => {
               },
               body: JSON.stringify({ token: 'DISABLED', enabled: false }),
             });
-            const data = await res.json();
-            console.log('[PUSH] Backend unregister response:', data);
           } catch (err) {
-            console.error('[PUSH] Failed to unregister push token on backend', err);
+            console.warn('[PUSH] Failed to unregister token on backend - continuing anyway:', err);
           }
         }
       } catch (err) {
-        console.error('[PUSH] Error in setupPushNotifications:', err);
+        // This catch is the last safety net — NEVER let push setup crash the app
+        console.warn('[PUSH] Push setup failed - app continues normally:', err);
       }
     };
 
+    // Fire and forget — push failure must never block the app
     setupPushNotifications();
 
-    Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
-        const data = response?.notification?.request?.content?.data || {};
-        handleCallNotification(data);
-      })
-      .catch((err) => console.warn('[PUSH] Failed to inspect last notification response:', err));
-
-    // Handle notifications received while app is running foreground
+    // Listen for notifications received in foreground
     try {
       notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-        setNotification(notification);
-        handleCallNotification(notification.request.content.data || {});
-        const newNotificationItem = {
-          id: notification.request.identifier || String(Date.now()),
-          title: notification.request.content.title || 'Notification',
-          message: notification.request.content.body || '',
-          data: notification.request.content.data || {},
-          createdAt: new Date().toISOString(),
-          read: false,
-        };
-        setNotificationsList(prev => {
-          if (prev.some(n => n.id === newNotificationItem.id)) return prev;
-          const updated = [newNotificationItem, ...prev];
-          AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e => console.warn(e));
-          return updated;
-        });
+        try {
+          setNotification(notification);
+          const newItem = {
+            id: notification.request.identifier || String(Date.now()),
+            title: notification.request.content.title || 'Notification',
+            message: notification.request.content.body || '',
+            data: notification.request.content.data || {},
+            createdAt: new Date().toISOString(),
+            read: false,
+          };
+          setNotificationsList(prev => {
+            if (prev.some(n => n.id === newItem.id)) return prev;
+            const updated = [newItem, ...prev];
+            AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e =>
+              console.warn('[NOTIF] Failed to persist notification:', e)
+            );
+            return updated;
+          });
+        } catch (err) {
+          console.warn('[NOTIF] Error handling received notification:', err);
+        }
       });
     } catch (err) {
-      console.error('[PUSH] Error adding notification received listener:', err);
+      console.warn('[NOTIF] Error adding notification received listener:', err);
     }
 
-    // Handle user tapping the notification
+    // Listen for user tapping a notification
     try {
       responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-        console.log(response);
-        const notification = response.notification;
-        handleCallNotification(notification.request.content.data || {});
-        const newNotificationItem = {
-          id: notification.request.identifier || String(Date.now()),
-          title: notification.request.content.title || 'Notification',
-          message: notification.request.content.body || '',
-          data: notification.request.content.data || {},
-          createdAt: new Date().toISOString(),
-          read: false,
-        };
-        setNotificationsList(prev => {
-          if (prev.some(n => n.id === newNotificationItem.id)) return prev;
-          const updated = [newNotificationItem, ...prev];
-          AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e => console.warn(e));
-          return updated;
-        });
+        try {
+          const notif = response.notification;
+          const newItem = {
+            id: notif.request.identifier || String(Date.now()),
+            title: notif.request.content.title || 'Notification',
+            message: notif.request.content.body || '',
+            data: notif.request.content.data || {},
+            createdAt: new Date().toISOString(),
+            read: false,
+          };
+          setNotificationsList(prev => {
+            if (prev.some(n => n.id === newItem.id)) return prev;
+            const updated = [newItem, ...prev];
+            AsyncStorage.setItem('@notifications_list', JSON.stringify(updated)).catch(e =>
+              console.warn('[NOTIF] Failed to persist notification:', e)
+            );
+            return updated;
+          });
+        } catch (err) {
+          console.warn('[NOTIF] Error handling notification response:', err);
+        }
       });
     } catch (err) {
-      console.error('[PUSH] Error adding notification response listener:', err);
+      console.warn('[NOTIF] Error adding notification response listener:', err);
     }
 
     return () => {
@@ -239,10 +224,10 @@ export const NotificationProvider = ({ children }) => {
         notificationListener.current?.remove();
         responseListener.current?.remove();
       } catch (err) {
-        console.error('[PUSH] Error removing listeners:', err);
+        console.warn('[NOTIF] Error removing listeners:', err);
       }
     };
-  }, [user?.id, pushNotificationsEnabled]);
+  }, [user?.id, pushNotificationsEnabled, loadingSettings]);
 
   const fetchNotifications = async () => {
     try {
@@ -251,54 +236,56 @@ export const NotificationProvider = ({ children }) => {
         setNotificationsList(JSON.parse(stored));
       }
     } catch (e) {
-      console.warn(e);
+      console.warn('[NOTIF] Failed to fetch notifications:', e);
     }
   };
 
   const markAllAsRead = async () => {
-    const updated = notificationsList.map(n => ({ ...n, read: true }));
-    setNotificationsList(updated);
     try {
+      const updated = notificationsList.map(n => ({ ...n, read: true }));
+      setNotificationsList(updated);
       await AsyncStorage.setItem('@notifications_list', JSON.stringify(updated));
     } catch (e) {
-      console.warn(e);
+      console.warn('[NOTIF] Failed to mark all as read:', e);
     }
   };
 
   const deleteNotification = async (id) => {
-    const updated = notificationsList.filter(n => n.id !== id);
-    setNotificationsList(updated);
     try {
+      const updated = notificationsList.filter(n => n.id !== id);
+      setNotificationsList(updated);
       await AsyncStorage.setItem('@notifications_list', JSON.stringify(updated));
     } catch (e) {
-      console.warn(e);
+      console.warn('[NOTIF] Failed to delete notification:', e);
     }
   };
 
   const clearAllNotifications = async () => {
-    setNotificationsList([]);
     try {
+      setNotificationsList([]);
       await AsyncStorage.removeItem('@notifications_list');
     } catch (e) {
-      console.warn(e);
+      console.warn('[NOTIF] Failed to clear notifications:', e);
     }
   };
 
   return (
-    <NotificationContext.Provider value={{
-      notifications: notificationsList,
-      unreadCount: notificationsList.filter(n => !n.read).length,
-      unreadChatCount: unreadChatCount,
-      refreshUnread: fetchUnread,
-      loading: false,
-      expoPushToken,
-      pushNotificationsEnabled,
-      togglePushNotifications,
-      fetchNotifications,
-      markAllAsRead,
-      deleteNotification,
-      clearAllNotifications,
-    }}>
+    <NotificationContext.Provider
+      value={{
+        notifications: notificationsList,
+        unreadCount: notificationsList.filter(n => !n.read).length,
+        unreadChatCount,
+        refreshUnread: fetchUnread,
+        loading: false,
+        expoPushToken,
+        pushNotificationsEnabled,
+        togglePushNotifications,
+        fetchNotifications,
+        markAllAsRead,
+        deleteNotification,
+        clearAllNotifications,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );
@@ -306,63 +293,61 @@ export const NotificationProvider = ({ children }) => {
 
 export const useNotifications = () => useContext(NotificationContext);
 
-async function registerForPushNotificationsAsync() {
-  let token;
+// ─── Push Token Registration ───────────────────────────────────────────────
 
+async function registerForPushNotificationsAsync() {
   try {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-      await Notifications.setNotificationChannelAsync('incoming-calls', {
-        name: 'Incoming calls',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 900, 700, 900],
-        sound: 'default',
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      });
+      try {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+      } catch (err) {
+        console.warn('[PUSH] Failed to set notification channel:', err);
+      }
     }
 
-    if (Device.isDevice) {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      if (finalStatus !== 'granted') {
-        console.warn('[PUSH] Failed to get push token for push notification!');
-        return null;
-      }
+    if (!Device.isDevice) {
+      console.warn('[PUSH] Must use physical device for push notifications');
+      return null;
+    }
 
-      // Use project ID explicitly or fallback to auto-detection
-      try {
-        const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-        if (!projectId) {
-          console.warn('[PUSH] No EAS Project ID found. Push notifications will not work until you add a projectId to app.json.');
-          return null;
-        }
-        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-      } catch (e) {
-        console.error('[PUSH] Error getting Expo Push Token:', e);
-        // Fallback without projectId (deprecated but might work in some dev environments)
-        try {
-          token = (await Notifications.getExpoPushTokenAsync()).data;
-        } catch (fallbackErr) {
-          console.error('[PUSH] Fallback also failed:', fallbackErr);
-          return null;
-        }
-      }
-    } else {
-      console.warn('[PUSH] Must use physical device for Push Notifications');
+    // Check existing permission
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.warn('[PUSH] Permission not granted - skipping token registration');
+      return null;
+    }
+
+    // Get project ID from app config
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId;
+
+    if (!projectId) {
+      console.warn('[PUSH] No EAS projectId found in app.json — push notifications disabled');
+      return null;
+    }
+
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      return tokenData.data;
+    } catch (err) {
+      console.warn('[PUSH] Failed to get push token:', err);
+      return null;
     }
   } catch (error) {
-    console.error('[PUSH] Unexpected error in registerForPushNotificationsAsync:', error);
+    console.warn('[PUSH] Unexpected error in registerForPushNotificationsAsync:', error);
     return null;
   }
-
-  return token || null;
 }

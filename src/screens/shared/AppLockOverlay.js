@@ -11,14 +11,18 @@ import FingerprintScreen from './FingerprintScreen';
 
 const AppLockOverlay = ({ visible, onUnlock }) => {
   const { colors } = useTheme();
-  const { securitySettings, verifyPin, verifyPattern, verifyFingerprint, unlockApp } = useAppSecurity();
+  const { securitySettings, verifyPin, verifyPattern, verifyFingerprint, unlockApp, notifyCredentialLogin } = useAppSecurity();
   const { logout, login } = useAuth();
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [locked, setLocked] = useState(true);
+  // Snapshot the method when the overlay first opens — prevents a mid-load
+  // re-render where securitySettings.method becomes null and closes the screen
+  const [lockedMethod, setLockedMethod] = useState(null);
   // When user taps "Use Fingerprint" from PIN screen, switch to fingerprint view
   const [showFingerprint, setShowFingerprint] = useState(false);
 
   const handleUnlockSuccess = async () => {
+    // Unlock the app UI immediately
     unlockApp();
     setLocked(false);
     setShowFingerprint(false);
@@ -30,6 +34,8 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
       if (deviceSecurity) {
         const parsed = JSON.parse(deviceSecurity);
         if (parsed.authToken && parsed.userData) {
+          // Signal to SecurityContext that the upcoming login() call should NOT re-lock the app
+          notifyCredentialLogin();
           // Restore auth session with stored token and user data
           await login({ token: parsed.authToken, user: parsed.userData });
           console.log('[AppLockOverlay] Auth session restored successfully');
@@ -105,15 +111,65 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
     }
   }, [unlockApp, logout]);
 
+  const handleBackPress = useCallback(async () => {
+    unlockApp();
+    await logout(true);
+
+    const navigateToHome = () => {
+      const nav = rootNavigationRef.current;
+      if (!nav?.reset) return false;
+
+      try {
+        nav.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+        });
+        return true;
+      } catch (err) {
+        try {
+          nav.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+          });
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    };
+
+    if (!navigateToHome()) {
+      setTimeout(navigateToHome, 100);
+    }
+  }, [unlockApp, logout]);
+
   useEffect(() => {
     if (visible) {
       setFailedAttempts(0);
       setLocked(true);
       setShowFingerprint(false);
+      // Snapshot the method at the moment the overlay opens.
+      // We use this snapshot for rendering so a background reload of settings
+      // cannot make the method transiently null and close the unlock screen.
+      if (securitySettings.method) {
+        setLockedMethod(securitySettings.method);
+      }
     }
   }, [visible]);
 
+  // Also update lockedMethod if settings load while overlay is already open
+  // (handles the case where settings load asynchronously after overlay appears)
+  useEffect(() => {
+    if (visible && locked && securitySettings.method && !lockedMethod) {
+      setLockedMethod(securitySettings.method);
+    }
+  }, [visible, locked, securitySettings.method, lockedMethod]);
+
   if (!visible) return null;
+
+  // Use the snapshotted method for rendering — this prevents a race where
+  // a background loadSecuritySettings sets method to null mid-unlock
+  const activeMethod = lockedMethod || securitySettings.method;
 
   return (
     <Modal
@@ -126,28 +182,31 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
         {locked && (
           <>
             {/* Fingerprint mode (primary) or user switched from PIN */}
-            {(securitySettings.method === 'fingerprint' || showFingerprint) && (
+            {(activeMethod === 'fingerprint' || showFingerprint) && (
               <FingerprintScreen
                 onSuccess={handleFingerprintVerify}
                 onUsePasswordPress={handleUsePasswordInstead}
+                onBackPress={handleBackPress}
               />
             )}
 
             {/* PIN mode */}
-            {securitySettings.method === 'pin' && !showFingerprint && (
+            {activeMethod === 'pin' && !showFingerprint && (
               <PINEntryScreen
                 onSuccess={handlePINVerify}
                 method="pin"
                 onFingerprintPress={() => setShowFingerprint(true)}
                 onUsePasswordPress={handleUsePasswordInstead}
+                onBackPress={handleBackPress}
               />
             )}
 
             {/* Pattern mode */}
-            {securitySettings.method === 'pattern' && !showFingerprint && (
+            {activeMethod === 'pattern' && !showFingerprint && (
               <PatternEntryScreen
                 onSuccess={handlePatternVerify}
                 onUsePasswordPress={handleUsePasswordInstead}
+                onBackPress={handleBackPress}
               />
             )}
           </>

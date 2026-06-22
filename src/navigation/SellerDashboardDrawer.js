@@ -70,12 +70,12 @@ const NAV_GROUPS = (t) => [
       { name: 'Followers', icon: Users, screen: 'SellerFollowers' },
     ],
   },
-  {
-    label: t('finance'),
-    items: [
-      { name: t('wallet'), icon: Wallet, screen: 'SellerWallet' },
-    ],
-  },
+  // {
+  //   label: t('finance'),
+  //   items: [
+  //     { name: t('wallet'), icon: Wallet, screen: 'SellerWallet' },
+  //   ],
+  // },
   {
     label: t('ACCOUNT'),
     items: [

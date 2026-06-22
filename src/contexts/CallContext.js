@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import Constants from 'expo-constants';
 
-
 let RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices;
 let isWebRTCSupported = false;
 
@@ -19,6 +18,7 @@ if (Constants.appOwnership !== 'expo') {
 }
 
 import io from 'socket.io-client';
+import InCallManager from 'react-native-incall-manager';
 import { API_BASE_URL, SIGNALING_URL } from '@env';
 import { useAuth } from '../context/AuthContext';
 import { Alert, Vibration } from 'react-native';
@@ -27,6 +27,14 @@ import { setIncomingCallNotificationHandler } from '../utils/callNotificationBri
 
 const CallContext = createContext(null);
 const CALL_TIMEOUT_MS = 45000;
+
+// DIAGNOSTIC TOGGLE: set true temporarily to force all ICE candidates through
+// TURN relay only (no direct/STUN paths allowed). If calls connect with this
+// on, NAT traversal was indeed the issue and TURN is doing its job — just
+// flip back to false once your permanent TURN server is in place. If calls
+// STILL fail with this on, the TURN server itself is unreachable from this
+// network/port, not a NAT problem.
+const FORCE_RELAY_FOR_TESTING = false;
 
 export const useCall = () => useContext(CallContext);
 
@@ -40,6 +48,7 @@ export const CallProvider = ({ children }) => {
   const [remoteStream, setRemoteStream] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [connectedAt, setConnectedAt] = useState(null);
   const [endedInfo, setEndedInfo] = useState(null);
 
@@ -357,6 +366,11 @@ export const CallProvider = ({ children }) => {
       // Queue ICE candidates if remote description isn't set yet
       socketRef.current.on('ice_candidate', async (data) => {
         try {
+          const candStr = data?.candidate?.candidate || '';
+          const typMatch = candStr.match(/typ (\w+)/);
+          const candType = typMatch ? typMatch[1] : 'unknown';
+          console.log('[CallContext] Remote ICE candidate type:', candType);
+
           if (pcRef.current && remoteDescriptionSetRef.current) {
             // Remote description ready — add immediately
             await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
@@ -385,6 +399,23 @@ export const CallProvider = ({ children }) => {
 
   const setupPeerConnection = async (targetId, isVideo = true) => {
     try {
+      // Start InCallManager BEFORE media/connection setup so the device's
+      // audio session is routed correctly (proximity sensor, earpiece vs
+      // speaker, audio focus) from the moment the call UI appears — not
+      // just once ICE connects. Without this, remote audio can be silent
+      // or routed to the wrong output even after the WebRTC connection
+      // itself succeeds, which was the root cause of "connected but no
+      // sound" symptoms.
+      try {
+        InCallManager.start({ media: isVideo ? 'video' : 'audio' });
+        // Video calls default to speaker; voice calls default to earpiece.
+        // User can toggle via toggleSpeaker().
+        InCallManager.setForceSpeakerphoneOn(isVideo);
+        setIsSpeakerOn(isVideo);
+      } catch (icmErr) {
+        console.warn('[CallContext] InCallManager start error:', icmErr);
+      }
+
       const configuration = {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -410,6 +441,7 @@ export const CallProvider = ({ children }) => {
             credential: 'openrelayproject',
           },
         ],
+        iceTransportPolicy: FORCE_RELAY_FOR_TESTING ? 'relay' : 'all',
       };
 
       pcRef.current = new RTCPeerConnection(configuration);
@@ -425,50 +457,19 @@ export const CallProvider = ({ children }) => {
 
       pcRef.current.onicecandidate = (event) => {
         if (event.candidate) {
-          // react-native-webrtc ICE candidate objects do not reliably expose the
-          // browser fields `.type/.protocol/.address`. The most portable field is
-          // the raw SDP candidate line at `.candidate`.
-          const rawCandidate = event.candidate.candidate;
-          console.log('[CallContext] Local ICE candidate raw:', rawCandidate);
-
-          // Best-effort parse of SDP candidate line to extract key markers.
-          // Example SDP candidate line:
-          // candidate:0 1 udp 2122260223 192.0.2.1 54400 typ host
-          // candidate:1 1 udp 2122260223 203.0.113.1 3478 typ srflx raddr 0.0.0.0 rport 0 generation 0
-          // candidate:2 1 udp 2122260223 198.51.100.1 5000 typ relay raddr 0.0.0.0 rport 0
-          try {
-            if (typeof rawCandidate === 'string') {
-              const parts = rawCandidate.trim().split(/\s+/);
-              // Indices are based on the SDP grammar.
-              // parts[0] = 'candidate:foundation'
-              // parts[1] = component
-              // parts[2] = transport
-              // parts[3] = priority
-              // parts[4] = connection-address
-              // parts[5] = port
-              // then a sequence of key/value markers incl. typ <host|srflx|relay>
-              const transport = parts[2];
-              const connAddr = parts[4];
-              const port = parts[5];
-              let typ = null;
-              const typIdx = parts.findIndex((p) => p === 'typ');
-              if (typIdx !== -1 && parts[typIdx + 1]) typ = parts[typIdx + 1];
-
-              console.log('[CallContext] Local ICE candidate derived:', {
-                transport,
-                connAddr,
-                port,
-                typ, // host | srflx | relay (TURN)
-              });
-            }
-          } catch (e) {
-            console.warn('[CallContext] ICE candidate parse error:', e);
-          }
+          // react-native-webrtc's candidate object does NOT expose .type/.protocol/.address
+          // like browser WebRTC does — those were always undefined before. The actual
+          // type (host/srflx/relay) lives inside the raw SDP candidate string itself,
+          // e.g. "candidate:842163049 1 udp 1677729535 1.2.3.4 5000 typ srflx ...".
+          // Parse it out so we can actually tell whether TURN relay is being used.
+          const candStr = event.candidate.candidate || '';
+          const typMatch = candStr.match(/typ (\w+)/);
+          const candType = typMatch ? typMatch[1] : 'unknown';
+          console.log('[CallContext] Local ICE candidate type:', candType, '| raw:', candStr);
 
           socketRef.current?.emit('ice_candidate', {
             targetId,
             callerId: user.id,
-            // Keep the candidate object as-is for compatibility with your signaling.
             candidate: event.candidate,
           });
         } else {
@@ -600,6 +601,12 @@ export const CallProvider = ({ children }) => {
     remoteDescriptionSetRef.current = false;
 
     try {
+      InCallManager.stop();
+    } catch (icmErr) {
+      console.warn('[CallContext] InCallManager stop error:', icmErr);
+    }
+
+    try {
       if (pcRef.current) {
         pcRef.current.close();
         pcRef.current = null;
@@ -622,6 +629,7 @@ export const CallProvider = ({ children }) => {
     setCallState('IDLE');
     setIsMuted(false);
     setIsVideoEnabled(true);
+    setIsSpeakerOn(false);
     callFinalizedRef.current = false;
   };
 
@@ -685,6 +693,16 @@ export const CallProvider = ({ children }) => {
     }
   };
 
+  const toggleSpeaker = () => {
+    try {
+      const next = !isSpeakerOn;
+      InCallManager.setForceSpeakerphoneOn(next);
+      setIsSpeakerOn(next);
+    } catch (err) {
+      console.warn('[CallContext] toggleSpeaker error:', err);
+    }
+  };
+
   return (
     <CallContext.Provider value={{
       callState,
@@ -694,6 +712,7 @@ export const CallProvider = ({ children }) => {
       remoteStream,
       isMuted,
       isVideoEnabled,
+      isSpeakerOn,
       connectedAt,
       endedInfo,
       startCall,
@@ -703,6 +722,7 @@ export const CallProvider = ({ children }) => {
       toggleMute,
       toggleVideo,
       switchCamera,
+      toggleSpeaker,
     }}>
       {children}
     </CallContext.Provider>

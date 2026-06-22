@@ -76,13 +76,13 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.removeItem('@auth_token');
       if (isManual) {
         await AsyncStorage.removeItem('@auto_logout_redirect');
-      }
-      // Navigate to home screen after logout
-      if (navigationRef?.current) {
-        navigationRef.current.reset({
-          index: 0,
-          routes: [{ name: 'MainApp' }],
-        });
+        // Navigate to home screen only on manual logout
+        if (navigationRef?.current) {
+          navigationRef.current.reset({
+            index: 0,
+            routes: [{ name: 'MainApp' }],
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to clear auth state', e);

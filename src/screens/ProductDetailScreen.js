@@ -44,6 +44,7 @@ import {
   AlertTriangle,
   X,
   CheckCircle2,
+  Check,
   ThumbsUp,
   MessageSquare,
   User,
@@ -200,10 +201,13 @@ const ProductDetailScreen = ({ route, navigation }) => {
     description: routeProduct?.description || 'No description available.',
     specifications: [
       { label: 'Category', value: routeProduct?.category || 'General' },
+      { label: 'Origin', value: routeProduct?.isAuthentic ? "Verified Authentic" : "Standard Quality" },
+      { label: 'Location', value: routeProduct?.district && routeProduct?.province ? `${routeProduct.district}, ${routeProduct.province}` : (routeProduct?.location || 'Unknown Location') },
       { label: 'Brand', value: routeProduct?.brand || 'Generic' },
       { label: 'Condition', value: routeProduct?.condition || 'New' },
       { label: 'Stock', value: routeProduct?.stock > 0 ? `${routeProduct.stock} units available` : 'Out of Stock' },
       ...(routeProduct?.weight ? [{ label: 'Weight', value: `${routeProduct.weight} kg` }] : []),
+      ...((routeProduct?.length || routeProduct?.width || routeProduct?.height) ? [{ label: 'Dimensions', value: `${routeProduct?.length || 0}x${routeProduct?.width || 0}x${routeProduct?.height || 0} cm` }] : []),
       ...(routeProduct?.deliveryOptions ? [{ label: 'Delivery', value: routeProduct.deliveryOptions }] : []),
       ...(routeProduct?.attributes?.length ? routeProduct.attributes.map(attr => ({ label: attr.name, value: attr.value })) : []),
     ],
@@ -845,8 +849,8 @@ const ProductDetailScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          {/* Delivery Information Section */}
-          {/* <View style={[{ 
+          {/* Delivery Information Section
+          <View style={[{ 
             backgroundColor: colors.card, 
             borderColor: colors.border, 
             borderWidth: 1,
@@ -925,34 +929,94 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   acc[v.name].push(v);
                   return acc;
                 }, {})
-              ).map(([varName, vars]) => (
-                <View key={varName} style={styles.variantGroup}>
-                  <CustomText style={styles.variantLabel}>Select {varName}</CustomText>
-                  <View style={styles.variantOptions}>
-                    {vars.map((v) => (
-                      <TouchableOpacity
-                        key={v.value}
-                        onPress={() => setSelectedVariants({ ...selectedVariants, [varName]: v.value })}
-                        style={[
-                          styles.variantOption,
-                          { backgroundColor: colors.card, borderColor: colors.border },
-                          selectedVariants[varName] === v.value && { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
-                          v.stock === 0 && { opacity: 0.3 }
-                        ]}
-                        disabled={v.stock === 0}
-                      >
-                        <CustomText style={[
-                          styles.variantOptionText,
-                          selectedVariants[varName] === v.value && { color: colors.primary }
-                        ]}>
-                          {v.value}
-                        </CustomText>
-                        {v.price > 0 && <CustomText style={styles.variantPrice}>+Rwf {v.price.toLocaleString()}</CustomText>}
-                      </TouchableOpacity>
-                    ))}
+              ).map(([varName, vars]) => {
+                const isColor = varName.toLowerCase().includes('color');
+                return (
+                  <View key={varName} style={styles.variantGroup}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <CustomText style={[styles.variantLabel, { marginBottom: 0 }]}>Select {varName}</CustomText>
+                      {selectedVariants[varName] && (
+                        <View style={{ backgroundColor: colors.primary + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                          <CustomText style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
+                            {selectedVariants[varName]}
+                          </CustomText>
+                        </View>
+                      )}
+                    </View>
+                    <View style={[styles.variantOptions, { gap: 10 }]}>
+                      {vars.map((v) => {
+                        const isSelected = selectedVariants[varName] === v.value;
+                        const isOutOfStock = v.stock === 0;
+
+                        return (
+                          <TouchableOpacity
+                            key={v.value}
+                            onPress={() => setSelectedVariants({ ...selectedVariants, [varName]: v.value })}
+                            style={[
+                              isColor ? {
+                                width: 40,
+                                height: 40,
+                                borderRadius: 20,
+                                borderWidth: 2,
+                                padding: 2,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderColor: isSelected ? colors.primary : colors.border,
+                                backgroundColor: isSelected ? colors.primary + '10' : colors.card,
+                              } : [
+                                styles.variantOption,
+                                { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 0 },
+                                isSelected && { borderColor: colors.primary, backgroundColor: colors.primary + '10' }
+                              ],
+                              isOutOfStock && { opacity: 0.3 }
+                            ]}
+                            disabled={isOutOfStock}
+                          >
+                            {isColor ? (
+                              <View style={{
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: 20,
+                                backgroundColor: v.value.toLowerCase(),
+                                borderWidth: v.value.toLowerCase() === 'white' ? 1 : 0,
+                                borderColor: 'rgba(0,0,0,0.1)'
+                              }} />
+                            ) : (
+                              <View style={{ alignItems: 'center' }}>
+                                <CustomText style={[
+                                  styles.variantOptionText,
+                                  isSelected && { color: colors.primary }
+                                ]}>
+                                  {v.value}
+                                </CustomText>
+                                {v.price > 0 && <CustomText style={[styles.variantPrice, { marginTop: 2 }]}>+Rwf {v.price.toLocaleString()}</CustomText>}
+                              </View>
+                            )}
+
+                            {isColor && isSelected && (
+                              <View style={{
+                                position: 'absolute',
+                                top: -4,
+                                right: -4,
+                                width: 14,
+                                height: 14,
+                                borderRadius: 7,
+                                backgroundColor: colors.primary,
+                                borderWidth: 2,
+                                borderColor: colors.background,
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <Check size={8} color="#fff" />
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
 

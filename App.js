@@ -257,7 +257,13 @@ const RootNavigator = () => {
   const [agentDrawerVisible, setAgentDrawerVisible] = React.useState(false);
 
   const INACTIVITY_LIMIT = 9 * 60 * 1000; // 9 minutes warning
-  const LOGOUT_LIMIT = 10 * 60 * 1000; // 10 minutes total
+  const BUYER_LOGOUT_LIMIT = 24 * 60 * 60 * 1000; // 24 hours
+  const SELLER_LOGOUT_LIMIT = 10 * 60 * 1000; // 10 minutes total
+
+  const isBuyerRole = !['SELLER', 'COURIER', 'AGENT'].includes(user?.role?.toUpperCase());
+  const LOGOUT_LIMIT = isBuyerRole ? BUYER_LOGOUT_LIMIT : SELLER_LOGOUT_LIMIT;
+
+  const lastActiveSaved = React.useRef(Date.now());
 
   const resetTimer = React.useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
@@ -265,10 +271,21 @@ const RootNavigator = () => {
 
     if (!user) return; // Only track logged-in users
 
+    const now = Date.now();
+    if (now - lastActiveSaved.current > 5000) { // Throttle AsyncStorage writes to 5 seconds
+      lastActiveSaved.current = now;
+      AsyncStorage.setItem('@last_active_time', now.toString()).catch(() => {});
+    }
+
+    if (isBuyerRole) {
+      // Buyers are not automatically logged out while the app is active and in the foreground.
+      return;
+    }
+
     inactivityTimer.current = setTimeout(() => {
       setShowWarning(true);
     }, INACTIVITY_LIMIT);
-  }, [user]);
+  }, [user, isBuyerRole, INACTIVITY_LIMIT]);
 
   const handleLogout = React.useCallback(async () => {
     setShowWarning(false);
@@ -285,20 +302,42 @@ const RootNavigator = () => {
   }, [logout, user, currentRouteObj]);
 
   React.useEffect(() => {
-    resetTimer();
+    const checkInitialState = async () => {
+      if (user) {
+        try {
+          const lastActiveStr = await AsyncStorage.getItem('@last_active_time');
+          if (lastActiveStr) {
+            const lastActive = parseInt(lastActiveStr, 10);
+            const elapsed = Date.now() - lastActive;
+            if (elapsed >= LOGOUT_LIMIT) {
+              handleLogout();
+              return;
+            } else if (!isBuyerRole && elapsed >= INACTIVITY_LIMIT) {
+              setShowWarning(true);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to read last active time', e);
+        }
+      }
+      resetTimer();
+    };
+    checkInitialState();
+    
     return () => {
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     };
-  }, [resetTimer]);
+  }, [user, LOGOUT_LIMIT, isBuyerRole, INACTIVITY_LIMIT, handleLogout, resetTimer]);
 
   React.useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
-        if (backgroundTime.current && user) {
-          const elapsed = Date.now() - backgroundTime.current;
+        if (user) {
+          const startTime = backgroundTime.current || lastActiveSaved.current;
+          const elapsed = Date.now() - startTime;
           if (elapsed >= LOGOUT_LIMIT) {
             handleLogout();
-          } else if (elapsed >= INACTIVITY_LIMIT) {
+          } else if (!isBuyerRole && elapsed >= INACTIVITY_LIMIT) {
             setShowWarning(true);
           } else {
             resetTimer();
@@ -307,14 +346,17 @@ const RootNavigator = () => {
           resetTimer();
         }
       } else if (nextAppState.match(/inactive|background/)) {
-        backgroundTime.current = Date.now();
+        const now = Date.now();
+        backgroundTime.current = now;
+        lastActiveSaved.current = now;
+        AsyncStorage.setItem('@last_active_time', now.toString()).catch(() => {});
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [user, resetTimer, handleLogout]);
+  }, [user, resetTimer, handleLogout, LOGOUT_LIMIT, isBuyerRole, INACTIVITY_LIMIT]);
 
   if (loading) {
     return <LoadingScreen />;

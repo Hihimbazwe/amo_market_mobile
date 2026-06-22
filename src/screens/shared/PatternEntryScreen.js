@@ -12,7 +12,7 @@ const GRID_SIZE = 3;
 const DOT_RADIUS = 16;
 const BOARD_SIZE = Math.min(width - 72, 320);
 
-const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCancel, onUsePasswordPress }) => {
+const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCancel, onUsePasswordPress, onBackPress }) => {
   const { colors } = useTheme();
   const navigationRef = useContext(NavigationRefContext);
   const [pattern, setPattern] = useState([]);
@@ -85,16 +85,30 @@ const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCan
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Back button in top left corner */}
-      <TouchableOpacity
-        onPress={() => navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
-        })}
-        style={[styles.backButton, { backgroundColor: colors.glass }]}
-      >
-        <ArrowLeft color={colors.foreground} size={24} />
-      </TouchableOpacity>
+      {/* Back button - show during setup OR when unlock provides an onBackPress handler */}
+      {(isSetup || !!onBackPress) && (
+        <TouchableOpacity
+          onPress={() => {
+            if (!isSetup && onBackPress) {
+              onBackPress();
+              return;
+            }
+            if (onCancel) {
+              onCancel();
+              return;
+            }
+            if (navigationRef?.current) {
+              navigationRef.current.reset({
+                index: 0,
+                routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+              });
+            }
+          }}
+          style={[styles.backButton, { backgroundColor: colors.glass }]}
+        >
+          <ArrowLeft color={colors.foreground} size={24} />
+        </TouchableOpacity>
+      )}
 
       <View style={styles.header}>
         <Lock size={44} color={colors.primary} style={{ marginBottom: 12 }} />

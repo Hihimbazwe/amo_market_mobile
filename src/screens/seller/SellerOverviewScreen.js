@@ -9,7 +9,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import DeactivationBanner from '../../components/DeactivationBanner';
-
 import { sellerService } from '../../api/sellerService';
 
 
@@ -80,12 +79,12 @@ const SellerOverviewScreen = () => {
       <DeactivationBanner />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        
+
         {/* Futuristic Search Bar */}
         <View style={[styles.searchContainer, { backgroundColor: colors.glass }]}>
           <Search color={colors.primary} size={20} style={styles.searchIcon} />
-          <TextInput 
-            placeholder={t('searchSellerPlaceholder')} 
+          <TextInput
+            placeholder={t('searchSellerPlaceholder')}
             placeholderTextColor={colors.muted}
             style={[styles.searchInput, { color: colors.foreground }]}
           />
@@ -104,7 +103,7 @@ const SellerOverviewScreen = () => {
               <CustomText style={[styles.actionBtnText, { color: '#F59E0B' }]}>Locked</CustomText>
             </View>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.primary }]}
               onPress={() => navigation.navigate('SellerProducts')}
             >
@@ -121,28 +120,28 @@ const SellerOverviewScreen = () => {
         ) : (
           <>
             {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
-              <Wallet color="#F97316" size={20} />
-            </View>
-            <CustomText style={[styles.statValue, { color: colors.foreground }]}>{formatPrice(data.revenue)}</CustomText>
-            <CustomText style={styles.statLabel}>{t('totalRevenue')}</CustomText>
-            <View style={styles.trendBadge}>
-              <ArrowUpRight color="#10B981" size={10} />
-              <CustomText style={styles.trendText}>+12%</CustomText>
-            </View>
-          </View>
-          
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
-              <Package color="#3B82F6" size={20} />
-            </View>
-            <CustomText style={[styles.statValue, { color: colors.foreground }]}>{data.activeProducts}</CustomText>
-            <CustomText style={styles.statLabel}>{t('activeProducts')}</CustomText>
-          </View>
+            <View style={styles.statsGrid}>
+              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
+                  <Wallet color="#F97316" size={20} />
+                </View>
+                <CustomText style={[styles.statValue, { color: colors.foreground }]}>{formatPrice(data.revenue)}</CustomText>
+                <CustomText style={styles.statLabel}>{t('totalRevenue')}</CustomText>
+                <View style={styles.trendBadge}>
+                  <ArrowUpRight color="#10B981" size={10} />
+                  <CustomText style={styles.trendText}>+12%</CustomText>
+                </View>
+              </View>
 
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                  <Package color="#3B82F6" size={20} />
+                </View>
+                <CustomText style={[styles.statValue, { color: colors.foreground }]}>{data.activeProducts}</CustomText>
+                <CustomText style={styles.statLabel}>{t('activeProducts')}</CustomText>
+              </View>
+
+              {/* <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(168, 85, 247, 0.1)' }]}>
               <ShoppingBag color="#A855F7" size={20} />
             </View>
@@ -156,81 +155,81 @@ const SellerOverviewScreen = () => {
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>{formatPrice(data.walletBalance)}</CustomText>
             <CustomText style={styles.statLabel}>{t('walletBalance')}</CustomText>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <CustomText style={styles.sectionTitle}>{t('recentOrders')}</CustomText>
-            <TouchableOpacity onPress={() => navigation.navigate('SellerOrders')}>
-              <CustomText style={styles.seeAllText}>{t('viewAll')}</CustomText>
-            </TouchableOpacity>
-          </View>
-          {data.recentOrders.length === 0 ? (
-            <View style={[styles.emptyRecent, { backgroundColor: colors.glass }]}>
-              <ShoppingBag color={colors.muted} size={32} />
-              <CustomText style={{ color: colors.muted, marginTop: 12, fontSize: 13 }}>{t('noRecentOrdersSeller')}</CustomText>
+          </View> */}
             </View>
-          ) : (
-            data.recentOrders.map((order) => {
-              const itemTitle = order.items && order.items.length > 0 && order.items[0].product ? order.items[0].product.title : 'Order Items';
-              const orderTotal = formatPrice(order.payment?.amount || 0);
-              return (
-                <TouchableOpacity 
-                  key={order.id} 
-                  style={[styles.orderRow, { borderBottomColor: colors.border }]}
-                  onPress={() => navigation.navigate('SellerOrders')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.productIcon, { backgroundColor: colors.glass }]}>
-                    <Package color={colors.muted} size={20} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <CustomText style={[styles.orderId, { color: colors.foreground }]} numberOfLines={1}>{itemTitle}</CustomText>
-                    <CustomText style={styles.orderTitle}>{new Date(order.createdAt).toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' })}</CustomText>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <CustomText style={[styles.orderAmount, { color: colors.foreground }]}>{orderTotal}</CustomText>
-                    <View style={[styles.statusBadge, { backgroundColor: order.status === 'PAID' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(249, 115, 22, 0.1)' }]}>
-                      <CustomText style={[styles.statusText, { color: order.status === 'PAID' ? '#3B82F6' : '#F97316' }]}>{order.status}</CustomText>
-                    </View>
-                  </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <CustomText style={styles.sectionTitle}>{t('recentOrders')}</CustomText>
+                <TouchableOpacity onPress={() => navigation.navigate('SellerOrders')}>
+                  <CustomText style={styles.seeAllText}>{t('viewAll')}</CustomText>
                 </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
-
-        {/* Upgrade Card */}
-        <TouchableOpacity style={[styles.upgradeCard, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('SellerMembership')}>
-          <View style={styles.upgradeContent}>
-            <View style={styles.upgradeIcon}>
-              <Zap color="white" size={20} fill="white" />
+              </View>
+              {data.recentOrders.length === 0 ? (
+                <View style={[styles.emptyRecent, { backgroundColor: colors.glass }]}>
+                  <ShoppingBag color={colors.muted} size={32} />
+                  <CustomText style={{ color: colors.muted, marginTop: 12, fontSize: 13 }}>{t('noRecentOrdersSeller')}</CustomText>
+                </View>
+              ) : (
+                data.recentOrders.map((order) => {
+                  const itemTitle = order.items && order.items.length > 0 && order.items[0].product ? order.items[0].product.title : 'Order Items';
+                  const orderTotal = formatPrice(order.payment?.amount || 0);
+                  return (
+                    <TouchableOpacity
+                      key={order.id}
+                      style={[styles.orderRow, { borderBottomColor: colors.border }]}
+                      onPress={() => navigation.navigate('SellerOrders')}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.productIcon, { backgroundColor: colors.glass }]}>
+                        <Package color={colors.muted} size={20} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <CustomText style={[styles.orderId, { color: colors.foreground }]} numberOfLines={1}>{itemTitle}</CustomText>
+                        <CustomText style={styles.orderTitle}>{new Date(order.createdAt).toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' })}</CustomText>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <CustomText style={[styles.orderAmount, { color: colors.foreground }]}>{orderTotal}</CustomText>
+                        <View style={[styles.statusBadge, { backgroundColor: order.status === 'PAID' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(249, 115, 22, 0.1)' }]}>
+                          <CustomText style={[styles.statusText, { color: order.status === 'PAID' ? '#3B82F6' : '#F97316' }]}>{order.status}</CustomText>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </View>
-            <View style={{ flex: 1 }}>
-              <CustomText style={styles.upgradeTitle}>{t('upgradeElite')}</CustomText>
-              <CustomText style={styles.upgradeDesc}>{t('upgradeEliteDesc')}</CustomText>
-            </View>
-            <ArrowUpRight color="white" size={20} />
-          </View>
-        </TouchableOpacity>
 
-        {/* Analytics Shortcut */}
-        <TouchableOpacity
-          style={[styles.analyticsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => navigation.navigate('SellerAnalytics')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.upgradeIcon, { backgroundColor: 'rgba(168,85,247,0.15)' }]}>
-            <BarChart2 color="#A855F7" size={20} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <CustomText style={[styles.upgradeTitle, { color: colors.foreground }]}>{t('viewAnalytics')}</CustomText>
-            <CustomText style={[styles.upgradeDesc, { color: colors.muted }]}>{t('analyticsDesc')}</CustomText>
-          </View>
-          <ArrowUpRight color={colors.muted} size={20} />
-        </TouchableOpacity>
-        </>
+            {/* Upgrade Card */}
+            <TouchableOpacity style={[styles.upgradeCard, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('SellerMembership')}>
+              <View style={styles.upgradeContent}>
+                <View style={styles.upgradeIcon}>
+                  <Zap color="white" size={20} fill="white" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <CustomText style={styles.upgradeTitle}>{t('upgradeElite')}</CustomText>
+                  <CustomText style={styles.upgradeDesc}>{t('upgradeEliteDesc')}</CustomText>
+                </View>
+                <ArrowUpRight color="white" size={20} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Analytics Shortcut */}
+            <TouchableOpacity
+              style={[styles.analyticsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => navigation.navigate('SellerAnalytics')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.upgradeIcon, { backgroundColor: 'rgba(168,85,247,0.15)' }]}>
+                <BarChart2 color="#A855F7" size={20} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <CustomText style={[styles.upgradeTitle, { color: colors.foreground }]}>{t('viewAnalytics')}</CustomText>
+                <CustomText style={[styles.upgradeDesc, { color: colors.muted }]}>{t('analyticsDesc')}</CustomText>
+              </View>
+              <ArrowUpRight color={colors.muted} size={20} />
+            </TouchableOpacity>
+          </>
         )}
 
       </ScrollView>

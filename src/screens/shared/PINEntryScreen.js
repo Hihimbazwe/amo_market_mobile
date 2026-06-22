@@ -8,7 +8,7 @@ import { NavigationRefContext } from '../../context/NavigationRefContext';
 
 const { width, height } = Dimensions.get('window');
 
-const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = false, onFingerprintPress, onCancel, onUsePasswordPress }) => {
+const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = false, onFingerprintPress, onCancel, onUsePasswordPress, onBackPress }) => {
   const { colors } = useTheme();
   const navigationRef = useContext(NavigationRefContext);
   const [pin, setPin] = useState('');
@@ -213,16 +213,30 @@ const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = 
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Back button in top left corner */}
-      <TouchableOpacity
-        onPress={() => navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
-        })}
-        style={[styles.backButton, { backgroundColor: colors.glass }]}
-      >
-        <ArrowLeft color={colors.foreground} size={24} />
-      </TouchableOpacity>
+      {/* Back button - show during setup OR when unlock provides an onBackPress handler */}
+      {(isSetup || !!onBackPress) && (
+        <TouchableOpacity
+          onPress={() => {
+            if (!isSetup && onBackPress) {
+              onBackPress();
+              return;
+            }
+            if (onCancel) {
+              onCancel();
+              return;
+            }
+            if (navigationRef?.current) {
+              navigationRef.current.reset({
+                index: 0,
+                routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+              });
+            }
+          }}
+          style={[styles.backButton, { backgroundColor: colors.glass }]}
+        >
+          <ArrowLeft color={colors.foreground} size={24} />
+        </TouchableOpacity>
+      )}
 
       <ScrollView
         contentContainerStyle={[styles.scrollContainer, isSetup && { paddingVertical: 12 }]}
