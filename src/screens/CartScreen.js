@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  SafeAreaView, 
+import {
+  View,
+  StyleSheet,
+  SafeAreaView,
   StatusBar,
   TouchableOpacity,
   FlatList,
@@ -18,7 +18,8 @@ import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { Colors as StaticColors } from '../theme/colors';
-import {Text} from 'react-native';
+import { Text } from 'react-native';
+
 const CartScreen = ({ navigation }) => {
   const { t } = useTranslation(['dashboard', 'common']);
   const { cartItems, cartTotal, loading, updateQuantity, removeFromCart, clearCart } = useCart();
@@ -91,21 +92,21 @@ const CartScreen = ({ navigation }) => {
 
     return (
       <View style={[styles.cartItem, { backgroundColor: colors.glass, borderColor: colors.border }]}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.checkboxContainer}
           onPress={() => toggleSelection(item.id)}
           activeOpacity={0.7}
         >
           <View style={[
-            styles.checkboxBase, 
+            styles.checkboxBase,
             selectedItemIds.includes(item.id) ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.muted }
           ]}>
             {selectedItemIds.includes(item.id) && <CheckSquare size={16} color="#FFF" />}
           </View>
         </TouchableOpacity>
-        
+
         <Image source={{ uri: imageUrl }} style={styles.productImage} />
-        
+
         <View style={styles.itemInfo}>
           <View style={styles.itemHeader}>
             <CustomText style={[styles.productTitle, { color: colors.foreground }]} numberOfLines={1}>
@@ -115,24 +116,24 @@ const CartScreen = ({ navigation }) => {
               <Trash2 size={18} color="#EF4444" />
             </TouchableOpacity>
           </View>
-          
+
           <CustomText style={[styles.categoryText, { color: colors.muted }]}>{product.category ? t(product.category.toLowerCase()) : ''}</CustomText>
-          
+
           <View style={styles.itemFooter}>
             <CustomText style={[styles.priceText, { color: colors.primary }]}>
               Rwf {product.price.toLocaleString()}
             </CustomText>
-            
+
             <View style={[styles.qtyControl, { backgroundColor: colors.glass, borderColor: colors.border, borderWidth: 1 }]}>
-              <TouchableOpacity 
-                style={styles.qtyBtn} 
+              <TouchableOpacity
+                style={styles.qtyBtn}
                 onPress={() => handleUpdateQty(product.id, item.quantity, -1)}
               >
                 <Minus size={14} color={colors.foreground} />
               </TouchableOpacity>
               <CustomText style={[styles.qtyText, { color: colors.foreground }]}>{item.quantity}</CustomText>
-              <TouchableOpacity 
-                style={styles.qtyBtn} 
+              <TouchableOpacity
+                style={styles.qtyBtn}
                 onPress={() => handleUpdateQty(product.id, item.quantity, 1)}
               >
                 <Plus size={14} color={colors.foreground} />
@@ -155,10 +156,15 @@ const CartScreen = ({ navigation }) => {
     );
   }
 
+  // Height of the sticky checkout bar:
+  // paddingVertical (16 * 2 = 32) + button row (~50) + iOS safe area (34 on notch devices, 0 on Android)
+  // 120 gives comfortable clearance on all devices.
+  const CHECKOUT_BAR_HEIGHT = Platform.OS === 'ios' ? 140 : 100;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
-      
+
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -195,7 +201,7 @@ const CartScreen = ({ navigation }) => {
             </CustomText>
           </View>
 
-          <CustomButton 
+          <CustomButton
             title={t('startShopping')}
             style={styles.button}
             onPress={() => navigation.navigate('Home')}
@@ -209,17 +215,24 @@ const CartScreen = ({ navigation }) => {
             data={cartItems}
             renderItem={renderCartItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              // The extra paddingBottom ensures the last cart item scrolls
+              // fully above the absolute-positioned checkout bar. Without
+              // this, the bar overlaps the bottom items, making their
+              // delete/quantity/select controls unreachable.
+              { paddingBottom: CHECKOUT_BAR_HEIGHT },
+            ]}
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
               <View style={[styles.selectAllContainer, { borderBottomColor: 'transparent' }]}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.selectAllRow}
                   onPress={handleSelectAll}
                   activeOpacity={0.7}
                 >
                   <View style={[
-                    styles.checkboxBase, 
+                    styles.checkboxBase,
                     selectedItemIds.length === cartItems.length ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.muted }
                   ]}>
                     {selectedItemIds.length === cartItems.length && <CheckSquare size={14} color="#FFF" />}
@@ -231,7 +244,7 @@ const CartScreen = ({ navigation }) => {
               </View>
             }
           />
-          
+
           {/* Sticky Bottom Checkout Bar */}
           <View style={[styles.summaryBox, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
             <View style={styles.totalRow}>
@@ -239,7 +252,7 @@ const CartScreen = ({ navigation }) => {
                 <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 2 }}>{t('total')}</CustomText>
                 <CustomText variant="h2" style={{ color: colors.primary }}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
               </View>
-              <CustomButton 
+              <CustomButton
                 title={t('checkout')}
                 style={styles.checkoutBtn}
                 onPress={handleCheckout}
@@ -351,7 +364,7 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 24,
     paddingTop: 12,
-    paddingBottom: 40,
+    // paddingBottom is applied dynamically above to clear the checkout bar.
   },
   cartItem: {
     flexDirection: 'row',

@@ -50,14 +50,7 @@
           "androidCollapsedTitle": "#{unread_notifications} new interactions",
           "iosDisplayInForeground": true
         }
-      ],
-      [
-        "react-native-webrtc",
-        {
-          "cameraPermission": "Allow AmoMarket to access your camera for video calls.",
-          "microphonePermission": "Allow AmoMarket to access your microphone for calls."
-        }
       ]
-        ]
+    ]
   }
 }
