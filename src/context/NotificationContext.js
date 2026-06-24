@@ -35,20 +35,8 @@ export const NotificationProvider = ({ children }) => {
     loadStoredNotifications();
   }, []);
 
-  // Set notification handler based on user settings
-  useEffect(() => {
-    try {
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: pushNotificationsEnabled,
-          shouldPlaySound: pushNotificationsEnabled,
-          shouldSetBadge: false,
-        }),
-      });
-    } catch (err) {
-      console.warn('[NOTIF] Error setting notification handler:', err);
-    }
-  }, [pushNotificationsEnabled]);
+  // Note: The global notification handler is set in index.js so it runs even
+  // before the React tree mounts (background/killed-app notifications).
 
   // Load push notification settings from storage
   useEffect(() => {
@@ -299,14 +287,25 @@ async function registerForPushNotificationsAsync() {
   try {
     if (Platform.OS === 'android') {
       try {
+        // Default general-purpose channel
         await Notifications.setNotificationChannelAsync('default', {
           name: 'default',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#FF231F7C',
         });
+        // High-priority channel for incoming call notifications
+        await Notifications.setNotificationChannelAsync('incoming-calls', {
+          name: 'Incoming Calls',
+          importance: Notifications.AndroidImportance.MAX,
+          sound: 'default',
+          vibrationPattern: [0, 500, 300, 500],
+          lightColor: '#22C55E',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+          bypassDnd: true,
+        });
       } catch (err) {
-        console.warn('[PUSH] Failed to set notification channel:', err);
+        console.warn('[PUSH] Failed to set notification channels:', err);
       }
     }
 

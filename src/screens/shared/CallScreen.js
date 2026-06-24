@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import Constants from 'expo-constants';
 
 let RTCView = null;
@@ -11,11 +11,9 @@ if (Constants.appOwnership !== 'expo') {
   }
 }
 import { useCall } from '../../contexts/CallContext';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Camera, Speaker } from 'lucide-react-native';
-import CustomText from '../../components/CustomText'; // Assuming this exists
-import { useTheme } from '../../context/ThemeContext'; // Assuming ThemeContext exists or fallback to static colors
-
-const { width, height } = Dimensions.get('window');
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Camera, Volume2, VolumeX } from 'lucide-react-native';
+import CustomText from '../../components/CustomText';
+import { useTheme } from '../../context/ThemeContext';
 
 const CallScreen = () => {
   const {
@@ -26,17 +24,21 @@ const CallScreen = () => {
     remoteStream,
     isMuted,
     isVideoEnabled,
+    isSpeakerOn,
     connectedAt,
     endedInfo,
+    isUpgradingToVideo,
     acceptCall,
     declineCall,
     endCall,
     toggleMute,
     toggleVideo,
-    switchCamera
+    switchCamera,
+    toggleSpeaker,
+    upgradeToVideo,
   } = useCall();
 
-  const { colors } = useTheme(); // fallback if not available
+  const { colors } = useTheme();
   const themeColors = colors || { background: '#000', foreground: '#fff', primary: '#3B82F6', muted: '#9CA3AF' };
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -60,7 +62,7 @@ const CallScreen = () => {
   const statusLabel = (() => {
     if (callState === 'RINGING') return incomingCallData ? 'Incoming call...' : 'Ringing...';
     if (callState === 'CALLING') return 'Calling...';
-    if (callState === 'CONNECTED') return formatDuration(elapsedSeconds);
+    if (callState === 'CONNECTED') return connectedAt ? formatDuration(elapsedSeconds) : 'Connecting...';
     if (callState === 'DECLINED') return 'Call declined';
     if (callState === 'ENDED') {
       if (endedInfo?.status === 'missed') return 'Missed call';
@@ -72,18 +74,21 @@ const CallScreen = () => {
 
   if (callState === 'IDLE') return null;
 
+  const isConnected = callState === 'CONNECTED';
+  const isVideoCall = activeCallData?.isVideo;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]}>
 
       {/* Background Video (Remote if connected, Local if calling/video enabled) */}
       <View style={styles.videoContainer}>
-        {callState === 'CONNECTED' && remoteStream && activeCallData?.isVideo && RTCView ? (
+        {isConnected && remoteStream && isVideoCall && RTCView ? (
           <RTCView
             streamURL={remoteStream.toURL()}
             style={styles.fullVideo}
             objectFit="cover"
           />
-        ) : callState === 'CALLING' && localStream && activeCallData?.isVideo && RTCView ? (
+        ) : callState === 'CALLING' && localStream && isVideoCall && RTCView ? (
           <RTCView
             streamURL={localStream.toURL()}
             style={styles.fullVideo}
@@ -101,7 +106,7 @@ const CallScreen = () => {
       </View>
 
       {/* Local Video PiP (when connected and video is on) */}
-      {callState === 'CONNECTED' && localStream && isVideoEnabled && activeCallData?.isVideo && RTCView && (
+      {isConnected && localStream && isVideoEnabled && isVideoCall && RTCView && (
         <View style={styles.pipVideoContainer}>
           <RTCView
             streamURL={localStream.toURL()}
@@ -127,36 +132,96 @@ const CallScreen = () => {
       <View style={styles.controlsContainer}>
         {callState === 'RINGING' && incomingCallData ? (
           <View style={styles.actionRow}>
-            <TouchableOpacity style={[styles.callButton, { backgroundColor: '#EF4444' }]} onPress={declineCall}>
-              <PhoneOff color="#FFF" size={32} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.callButton, { backgroundColor: '#22C55E' }]} onPress={acceptCall}>
-              <Phone color="#FFF" size={32} />
-            </TouchableOpacity>
+            <View style={styles.btnWithLabel}>
+              <TouchableOpacity style={[styles.callButton, { backgroundColor: '#EF4444' }]} onPress={declineCall}>
+                <PhoneOff color="#FFF" size={32} />
+              </TouchableOpacity>
+              <CustomText style={styles.btnLabel}>Decline</CustomText>
+            </View>
+            <View style={styles.btnWithLabel}>
+              <TouchableOpacity style={[styles.callButton, { backgroundColor: '#22C55E' }]} onPress={acceptCall}>
+                <Phone color="#FFF" size={32} />
+              </TouchableOpacity>
+              <CustomText style={styles.btnLabel}>Accept</CustomText>
+            </View>
           </View>
         ) : (
           <View style={styles.controlsGrid}>
+            {/* Row 1: Mute · Speaker · Video (if video call) · Camera flip (if video call) */}
             <View style={styles.actionRow}>
-              <TouchableOpacity style={[styles.controlBtn, isMuted && styles.controlBtnActive]} onPress={toggleMute}>
-                {isMuted ? <MicOff color="#FFF" size={24} /> : <Mic color="#FFF" size={24} />}
-              </TouchableOpacity>
-
-              {activeCallData?.isVideo && (
-                <TouchableOpacity style={[styles.controlBtn, !isVideoEnabled && styles.controlBtnActive]} onPress={toggleVideo}>
-                  {isVideoEnabled ? <Video color="#FFF" size={24} /> : <VideoOff color="#FFF" size={24} />}
+              {/* Mute toggle */}
+              <View style={styles.btnWithLabel}>
+                <TouchableOpacity
+                  style={[styles.controlBtn, isMuted && styles.controlBtnActive]}
+                  onPress={toggleMute}
+                >
+                  {isMuted ? <MicOff color="#FFF" size={22} /> : <Mic color="#FFF" size={22} />}
                 </TouchableOpacity>
+                <CustomText style={styles.btnLabel}>{isMuted ? 'Unmute' : 'Mute'}</CustomText>
+              </View>
+
+              {/* Speaker toggle — always visible during active call */}
+              <View style={styles.btnWithLabel}>
+                <TouchableOpacity
+                  style={[styles.controlBtn, isSpeakerOn && styles.controlBtnActive]}
+                  onPress={toggleSpeaker}
+                >
+                  {isSpeakerOn ? <Volume2 color="#FFF" size={22} /> : <VolumeX color="#FFF" size={22} />}
+                </TouchableOpacity>
+                <CustomText style={styles.btnLabel}>{isSpeakerOn ? 'Speaker' : 'Earpiece'}</CustomText>
+              </View>
+
+              {/* Video toggle — only for video calls */}
+              {isVideoCall && (
+                <View style={styles.btnWithLabel}>
+                  <TouchableOpacity
+                    style={[styles.controlBtn, !isVideoEnabled && styles.controlBtnActive]}
+                    onPress={toggleVideo}
+                  >
+                    {isVideoEnabled ? <Video color="#FFF" size={22} /> : <VideoOff color="#FFF" size={22} />}
+                  </TouchableOpacity>
+                  <CustomText style={styles.btnLabel}>{isVideoEnabled ? 'Cam on' : 'Cam off'}</CustomText>
+                </View>
               )}
 
-              {activeCallData?.isVideo && (
-                <TouchableOpacity style={styles.controlBtn} onPress={switchCamera}>
-                  <Camera color="#FFF" size={24} />
-                </TouchableOpacity>
+              {/* Camera flip — only for video calls */}
+              {isVideoCall && (
+                <View style={styles.btnWithLabel}>
+                  <TouchableOpacity style={styles.controlBtn} onPress={switchCamera}>
+                    <Camera color="#FFF" size={22} />
+                  </TouchableOpacity>
+                  <CustomText style={styles.btnLabel}>Flip</CustomText>
+                </View>
+              )}
+            </View>
+
+            {/* Row 2: Upgrade to Video (audio-only) + End Call */}
+            <View style={[styles.actionRow, { marginTop: 18 }]}>
+              {/* Upgrade to Video — only for audio calls in CONNECTED state */}
+              {isConnected && !isVideoCall && (
+                <View style={styles.btnWithLabel}>
+                  <TouchableOpacity
+                    style={[styles.controlBtn, styles.upgradeBtn, isUpgradingToVideo && styles.controlBtnActive]}
+                    onPress={upgradeToVideo}
+                    disabled={isUpgradingToVideo}
+                  >
+                    {isUpgradingToVideo
+                      ? <ActivityIndicator color="#FFF" size="small" />
+                      : <Video color="#FFF" size={22} />}
+                  </TouchableOpacity>
+                  <CustomText style={styles.btnLabel}>
+                    {isUpgradingToVideo ? 'Upgrading…' : 'Add Video'}
+                  </CustomText>
+                </View>
               )}
 
-              {/* End Call Button */}
-              <TouchableOpacity style={[styles.callButton, { backgroundColor: '#EF4444' }]} onPress={endCall}>
-                <PhoneOff color="#FFF" size={32} />
-              </TouchableOpacity>
+              {/* End Call */}
+              <View style={styles.btnWithLabel}>
+                <TouchableOpacity style={[styles.callButton, { backgroundColor: '#EF4444' }]} onPress={endCall}>
+                  <PhoneOff color="#FFF" size={32} />
+                </TouchableOpacity>
+                <CustomText style={styles.btnLabel}>End</CustomText>
+              </View>
             </View>
           </View>
         )}
@@ -224,13 +289,13 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     paddingBottom: 40,
-    paddingHorizontal: 30,
+    paddingHorizontal: 20,
     zIndex: 10,
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     width: '100%',
   },
   controlsGrid: {
@@ -252,16 +317,29 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   controlBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   controlBtnActive: {
     backgroundColor: 'rgba(255,255,255,0.8)',
-  }
+  },
+  upgradeBtn: {
+    backgroundColor: 'rgba(59,130,246,0.6)',
+  },
+  btnWithLabel: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  btnLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 4,
+  },
 });
 
 export default CallScreen;

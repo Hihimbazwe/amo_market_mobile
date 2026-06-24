@@ -51,6 +51,7 @@ export const CallProvider = ({ children }) => {
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [connectedAt, setConnectedAt] = useState(null);
   const [endedInfo, setEndedInfo] = useState(null);
+  const [isUpgradingToVideo, setIsUpgradingToVideo] = useState(false);
 
   const socketRef = useRef(null);
   const pcRef = useRef(null);
@@ -291,8 +292,7 @@ export const CallProvider = ({ children }) => {
         console.log('[CallContext] Call accepted by', data.targetId);
         clearCallTimeout();
         stopRingingFeedback();
-        const now = Date.now();
-        setConnectedAt(now);
+        // connectedAt is set AFTER the offer/answer completes — see webrtc_answer handler
         setCallState('CONNECTED');
         await createOffer(data.targetId);
       });
@@ -341,12 +341,18 @@ export const CallProvider = ({ children }) => {
             sdp: answer,
           });
           console.log('[CallContext] Sent webrtc_answer to', data.callerId);
+
+          // Mark connection time on the callee side — after the offer/answer is complete
+          if (!connectedAtRef.current) {
+            const now = Date.now();
+            setConnectedAt(now);
+          }
         } catch (err) {
           console.warn('[CallContext] Error handling webrtc_offer:', err);
         }
       });
 
-      // Caller receives answer → set remote description → drain ICE queue
+      // Caller receives answer → set remote description → drain ICE queue → mark connected
       socketRef.current.on('webrtc_answer', async (data) => {
         try {
           console.log('[CallContext] Received webrtc_answer');
@@ -357,6 +363,12 @@ export const CallProvider = ({ children }) => {
 
             // Drain any ICE candidates that arrived before the answer was processed
             await drainPendingIceCandidates();
+
+            // Mark connection time on the caller side — after the offer/answer is complete
+            if (!connectedAtRef.current) {
+              const now = Date.now();
+              setConnectedAt(now);
+            }
           }
         } catch (err) {
           console.warn('[CallContext] Error handling webrtc_answer:', err);
@@ -383,6 +395,47 @@ export const CallProvider = ({ children }) => {
           console.warn('[CallContext] Error adding ICE candidate:', e);
         }
       });
+
+      // Receiver side: remote wants to upgrade the audio call to video
+      socketRef.current.on('upgrade_to_video', async (data) => {
+        try {
+          console.log('[CallContext] Remote requested video upgrade from', data.callerId);
+          // Update local activeCallData to reflect video mode
+          setActiveCallData(prev => prev ? { ...prev, isVideo: true } : prev);
+
+          if (!pcRef.current) {
+            console.warn('[CallContext] upgrade_to_video: no peer connection');
+            return;
+          }
+          // Acquire local video track
+          const videoStream = await mediaDevices.getUserMedia({ audio: false, video: true });
+          const videoTrack = videoStream.getVideoTracks()[0];
+          if (videoTrack) {
+            pcRef.current.addTrack(videoTrack, localStreamRef.current || videoStream);
+            // Merge into existing local stream so PiP shows it
+            if (localStreamRef.current) {
+              localStreamRef.current.addTrack(videoTrack);
+              setLocalStream(localStreamRef.current);
+            } else {
+              localStreamRef.current = videoStream;
+              setLocalStream(videoStream);
+            }
+          }
+
+          // Renegotiate: create a new offer
+          const offer = await pcRef.current.createOffer();
+          await pcRef.current.setLocalDescription(offer);
+          socketRef.current?.emit('webrtc_offer', {
+            targetId: data.callerId,
+            callerId: user.id,
+            sdp: offer,
+          });
+          console.log('[CallContext] Sent renegotiation offer after video upgrade');
+        } catch (err) {
+          console.warn('[CallContext] Error handling upgrade_to_video:', err);
+        }
+      });
+
     } catch (err) {
       console.warn('[CallContext] Failed to connect to signaling server:', err);
     }
@@ -446,6 +499,7 @@ export const CallProvider = ({ children }) => {
 
       pcRef.current = new RTCPeerConnection(configuration);
 
+      // getUserMedia — hard failure: if we can't get media the call must end
       try {
         const stream = await mediaDevices.getUserMedia({ audio: true, video: isVideo });
         setLocalStream(stream);
@@ -453,6 +507,17 @@ export const CallProvider = ({ children }) => {
         stream.getTracks().forEach((track) => pcRef.current.addTrack(track, stream));
       } catch (err) {
         console.warn('[CallContext] getUserMedia error:', err);
+        // Hard failure — tear down the peer connection and end the call gracefully
+        try { pcRef.current.close(); } catch (_) {}
+        pcRef.current = null;
+        Alert.alert(
+          'Camera/Microphone Error',
+          isVideo
+            ? 'Could not access your camera or microphone. Please check permissions and try again.'
+            : 'Could not access your microphone. Please check permissions and try again.',
+        );
+        finishCall({ status: 'canceled', direction: 'outgoing', notifyRemote: true });
+        return; // abort rest of setup
       }
 
       pcRef.current.onicecandidate = (event) => {
@@ -568,8 +633,11 @@ export const CallProvider = ({ children }) => {
         targetName: incomingCallData.callerName,
         direction: 'incoming',
       });
-      const now = Date.now();
-      setConnectedAt(now);
+      // NOTE: connectedAt is intentionally NOT set here.
+      // It is set later in the webrtc_offer handler, after the offer/answer
+      // exchange is complete and media is actually flowing — not at the moment
+      // the user taps "Accept". This prevents the call timer from starting
+      // before the WebRTC connection is established.
       setCallState('CONNECTED');
       setIncomingCallData(null);
       await setupPeerConnection(incomingCallData.callerId, incomingCallData.isVideo);
@@ -630,6 +698,7 @@ export const CallProvider = ({ children }) => {
     setIsMuted(false);
     setIsVideoEnabled(true);
     setIsSpeakerOn(false);
+    setIsUpgradingToVideo(false);
     callFinalizedRef.current = false;
   };
 
@@ -703,6 +772,82 @@ export const CallProvider = ({ children }) => {
     }
   };
 
+  /**
+   * upgradeToVideo — upgrades an active audio-only call to video.
+   * Acquires the local camera, adds the video track to the existing
+   * peer connection, triggers renegotiation via a new webrtc_offer,
+   * and signals the remote side via the "upgrade_to_video" socket event
+   * so they also switch to video mode.
+   */
+  const upgradeToVideo = async () => {
+    if (!pcRef.current || !activeCallRef.current) {
+      console.warn('[CallContext] upgradeToVideo: no active call or peer connection');
+      return;
+    }
+    if (activeCallRef.current?.isVideo) {
+      console.log('[CallContext] upgradeToVideo: already a video call');
+      return;
+    }
+    try {
+      setIsUpgradingToVideo(true);
+
+      // Acquire video track
+      const videoStream = await mediaDevices.getUserMedia({ audio: false, video: true });
+      const videoTrack = videoStream.getVideoTracks()[0];
+
+      if (!videoTrack) {
+        throw new Error('No video track acquired from getUserMedia');
+      }
+
+      // Add video track to existing peer connection
+      pcRef.current.addTrack(videoTrack, localStreamRef.current || videoStream);
+
+      // Merge into existing local stream for PiP display
+      if (localStreamRef.current) {
+        localStreamRef.current.addTrack(videoTrack);
+        setLocalStream(localStreamRef.current);
+      } else {
+        localStreamRef.current = videoStream;
+        setLocalStream(videoStream);
+      }
+
+      // Update InCallManager for video routing
+      try {
+        InCallManager.start({ media: 'video' });
+        InCallManager.setForceSpeakerphoneOn(true);
+        setIsSpeakerOn(true);
+      } catch (icmErr) {
+        console.warn('[CallContext] upgradeToVideo InCallManager error:', icmErr);
+      }
+
+      // Signal the remote side that we're upgrading
+      const targetId = activeCallRef.current.targetId;
+      socketRef.current?.emit('upgrade_to_video', {
+        callerId: user.id,
+        targetId,
+      });
+
+      // Trigger renegotiation: create and send a new offer with the video track included
+      const offer = await pcRef.current.createOffer();
+      await pcRef.current.setLocalDescription(offer);
+      socketRef.current?.emit('webrtc_offer', {
+        targetId,
+        callerId: user.id,
+        sdp: offer,
+      });
+      console.log('[CallContext] Sent renegotiation offer for video upgrade to', targetId);
+
+      // Update local call data to reflect video mode
+      setActiveCallData(prev => prev ? { ...prev, isVideo: true } : prev);
+      setIsVideoEnabled(true);
+    } catch (err) {
+      console.warn('[CallContext] upgradeToVideo error:', err);
+      Alert.alert('Camera Error', 'Could not access your camera. Please check permissions and try again.');
+    } finally {
+      setIsUpgradingToVideo(false);
+    }
+  };
+
   return (
     <CallContext.Provider value={{
       callState,
@@ -715,6 +860,7 @@ export const CallProvider = ({ children }) => {
       isSpeakerOn,
       connectedAt,
       endedInfo,
+      isUpgradingToVideo,
       startCall,
       acceptCall,
       declineCall,
@@ -723,6 +869,7 @@ export const CallProvider = ({ children }) => {
       toggleVideo,
       switchCamera,
       toggleSpeaker,
+      upgradeToVideo,
     }}>
       {children}
     </CallContext.Provider>
