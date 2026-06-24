@@ -105,10 +105,10 @@ const AppLockSettings = ({ t }) => {
     });
   }, [currentMethod, verifyAndExecute]);
 
-  // Change Method card — require current credential verification first.
+  // Change Method card — no verification needed here, just show the selector
   const handleChangeMethod = useCallback(() => {
-    verifyAndExecute(() => setShowMethodSelector(true));
-  }, [verifyAndExecute]);
+    setShowMethodSelector(true);
+  }, []);
 
   // Manage Methods card — require current credential verification first.
   const handleManageMethods = useCallback(() => {
@@ -293,19 +293,6 @@ const AppLockSettings = ({ t }) => {
                 Change{'\n'}Method
               </CustomText>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[lockStyles.quickAction, { backgroundColor: colors.background, borderColor: colors.border }]}
-              onPress={handleManageMethods}
-              activeOpacity={0.7}
-            >
-              <View style={[lockStyles.quickActionIcon, { backgroundColor: '#10b981' + '18' }]}>
-                <Settings2 color="#10b981" size={18} />
-              </View>
-              <CustomText style={[lockStyles.quickActionLabel, { color: colors.foreground }]}>
-                Manage{'\n'}Methods
-              </CustomText>
-            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -332,7 +319,6 @@ const AppLockSettings = ({ t }) => {
             </CustomText>
 
             {['pin', 'pattern', ...(fingerprintAvailable ? ['fingerprint'] : [])].map(method => {
-              if (isEnabled && !configuredMethods[method]) return null;
               const info = getMethodInfo(method);
               if (!info) return null;
               const Icon = info.icon;

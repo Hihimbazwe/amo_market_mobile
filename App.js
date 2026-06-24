@@ -301,6 +301,8 @@ const RootNavigator = () => {
     logout(false);
   }, [logout, user, currentRouteObj]);
 
+  const isColdStart = React.useRef(true);
+
   React.useEffect(() => {
     const checkInitialState = async () => {
       if (user) {
@@ -309,7 +311,12 @@ const RootNavigator = () => {
           if (lastActiveStr) {
             const lastActive = parseInt(lastActiveStr, 10);
             const elapsed = Date.now() - lastActive;
-            if (elapsed >= LOGOUT_LIMIT) {
+            // For buyers: only auto-logout on a cold start (app was fully closed),
+            // not when resuming from background (recent apps).
+            if (isColdStart.current && isBuyerRole && elapsed >= BUYER_LOGOUT_LIMIT) {
+              handleLogout();
+              return;
+            } else if (!isBuyerRole && elapsed >= SELLER_LOGOUT_LIMIT) {
               handleLogout();
               return;
             } else if (!isBuyerRole && elapsed >= INACTIVITY_LIMIT) {
@@ -320,6 +327,8 @@ const RootNavigator = () => {
           console.warn('Failed to read last active time', e);
         }
       }
+      // After the first check, this is no longer a cold start
+      isColdStart.current = false;
       resetTimer();
     };
     checkInitialState();
@@ -327,7 +336,7 @@ const RootNavigator = () => {
     return () => {
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     };
-  }, [user, LOGOUT_LIMIT, isBuyerRole, INACTIVITY_LIMIT, handleLogout, resetTimer]);
+  }, [user, BUYER_LOGOUT_LIMIT, SELLER_LOGOUT_LIMIT, isBuyerRole, INACTIVITY_LIMIT, handleLogout, resetTimer]);
 
   React.useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -335,11 +344,18 @@ const RootNavigator = () => {
         if (user) {
           const startTime = backgroundTime.current || lastActiveSaved.current;
           const elapsed = Date.now() - startTime;
-          if (elapsed >= LOGOUT_LIMIT) {
-            handleLogout();
-          } else if (!isBuyerRole && elapsed >= INACTIVITY_LIMIT) {
-            setShowWarning(true);
+          // Buyers: app is in recent apps/background = still "open" = never auto-logout on resume.
+          // Only non-buyers get the inactivity-while-backgrounded check.
+          if (!isBuyerRole) {
+            if (elapsed >= SELLER_LOGOUT_LIMIT) {
+              handleLogout();
+            } else if (elapsed >= INACTIVITY_LIMIT) {
+              setShowWarning(true);
+            } else {
+              resetTimer();
+            }
           } else {
+            // Buyer returned from background: reset the timer, no logout
             resetTimer();
           }
         } else {
@@ -356,7 +372,7 @@ const RootNavigator = () => {
     return () => {
       subscription.remove();
     };
-  }, [user, resetTimer, handleLogout, LOGOUT_LIMIT, isBuyerRole, INACTIVITY_LIMIT]);
+  }, [user, resetTimer, handleLogout, BUYER_LOGOUT_LIMIT, SELLER_LOGOUT_LIMIT, isBuyerRole, INACTIVITY_LIMIT]);
 
   if (loading) {
     return <LoadingScreen />;
