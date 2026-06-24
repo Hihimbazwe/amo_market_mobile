@@ -26,7 +26,7 @@ const BuyerOverviewScreen = () => {
   const { t } = useLanguage();
   const navigation = useNavigation();
   const firstName = user?.name?.split(' ')[0] || 'there';
-  
+
   const [orders, setOrders] = useState([]);
   const [disputes, setDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +79,7 @@ const BuyerOverviewScreen = () => {
         if (slotDate) {
           const diffMs = slotDate.getTime() - new Date().getTime();
           const diffHours = diffMs / (1000 * 60 * 60);
-          
+
           // Show if within 4 hours upcoming OR up to 2 hours LATE
           if (diffHours >= -2 && diffHours <= 4 && diffHours < minDiff) {
             minDiff = diffHours;
@@ -105,14 +105,14 @@ const BuyerOverviewScreen = () => {
         </TouchableOpacity>
         <CustomText variant="h2">{t('dashboard')}</CustomText>
       </View>
-      
+
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={true}>
-        
+
         {/* Futuristic Search Bar */}
         <View style={[styles.searchContainer, { backgroundColor: colors.glass }]}>
           <Search color={colors.primary} size={20} style={styles.searchIcon} />
-          <TextInput 
-            placeholder={t('searchPlaceholder')} 
+          <TextInput
+            placeholder={t('searchPlaceholder')}
             placeholderTextColor={colors.muted}
             style={[styles.searchInput, { color: colors.foreground }]}
           />
@@ -120,7 +120,7 @@ const BuyerOverviewScreen = () => {
 
         {/* Pickup Reminder Banner */}
         {upcomingPickupOrder && (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => navigation.navigate('Orders')}
             style={[styles.reminderBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}
           >
@@ -171,7 +171,7 @@ const BuyerOverviewScreen = () => {
             </CustomText>
             <CustomText style={[styles.statLabel, { color: colors.muted }]}>{t('totalSpent')}</CustomText>
           </View>
-          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
+          {/* <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
               <ShieldAlert color="#F97316" size={20} />
             </View>
@@ -184,7 +184,7 @@ const BuyerOverviewScreen = () => {
             </View>
             <CustomText style={[styles.statValue, { color: colors.foreground }]}>0</CustomText>
             <CustomText style={[styles.statLabel, { color: colors.muted }]}>{t('notification').toUpperCase()}</CustomText>
-          </View>
+          </View> */}
         </View>
 
         {/* Recent Orders */}
@@ -197,7 +197,7 @@ const BuyerOverviewScreen = () => {
           </View>
           {loading ? (
             <View style={{ alignItems: 'center', padding: 20 }}>
-               <Loader2 color={colors.primary} size={24} className="animate-spin" />
+              <Loader2 color={colors.primary} size={24} className="animate-spin" />
             </View>
           ) : orders.length === 0 ? (
             <CustomText style={{ color: colors.muted, textAlign: 'center', marginVertical: 20 }}>{t('noRecentOrders')}</CustomText>

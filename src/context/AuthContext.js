@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(nextToken);
       setIsAuthenticated(true);
       await AsyncStorage.setItem('@auth_user', JSON.stringify(nextUser));
+      await AsyncStorage.setItem('@last_active_time', Date.now().toString());
       if (nextToken) {
         await AsyncStorage.setItem('@auth_token', nextToken);
       } else {

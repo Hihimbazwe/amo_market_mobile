@@ -12,7 +12,7 @@ const GRID_SIZE = 3;
 const DOT_RADIUS = 16;
 const BOARD_SIZE = Math.min(width - 72, 320);
 
-const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCancel, onUsePasswordPress, onBackPress }) => {
+const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, isModal = false, onCancel, onUsePasswordPress, onBackPress, customTitle, customSubtitle }) => {
   const { colors } = useTheme();
   const navigationRef = useContext(NavigationRefContext);
   const [pattern, setPattern] = useState([]);
@@ -84,7 +84,7 @@ const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCan
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }, isModal && { paddingTop: 20 }]}>
       {/* Back button - show during setup OR when unlock provides an onBackPress handler */}
       {(isSetup || !!onBackPress) && (
         <TouchableOpacity
@@ -104,7 +104,7 @@ const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCan
               });
             }
           }}
-          style={[styles.backButton, { backgroundColor: colors.glass }]}
+          style={[styles.backButton, { backgroundColor: colors.glass }, isModal && { top: 20 }]}
         >
           <ArrowLeft color={colors.foreground} size={24} />
         </TouchableOpacity>
@@ -113,10 +113,10 @@ const PatternEntryScreen = ({ onSuccess, onSetupComplete, isSetup = false, onCan
       <View style={styles.header}>
         <Lock size={44} color={colors.primary} style={{ marginBottom: 12 }} />
         <CustomText variant="h2" style={{ textAlign: 'center', marginBottom: 4 }}>
-          {isSetup ? (step === 'enter' ? 'Draw Your Pattern' : 'Confirm Pattern') : 'Enter Pattern'}
+          {customTitle || (isSetup ? (step === 'enter' ? 'Draw Your Pattern' : 'Confirm Pattern') : 'Enter Pattern')}
         </CustomText>
         <CustomText style={{ color: colors.muted, textAlign: 'center', fontSize: 13 }}>
-          {isSetup ? 'Connect at least 4 dots' : 'Draw your pattern to unlock'}
+          {customSubtitle || (isSetup ? 'Connect at least 4 dots' : 'Draw your pattern to unlock')}
         </CustomText>
       </View>
 

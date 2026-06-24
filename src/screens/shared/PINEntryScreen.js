@@ -8,7 +8,7 @@ import { NavigationRefContext } from '../../context/NavigationRefContext';
 
 const { width, height } = Dimensions.get('window');
 
-const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = false, onFingerprintPress, onCancel, onUsePasswordPress, onBackPress }) => {
+const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = false, isModal = false, onFingerprintPress, onCancel, onUsePasswordPress, onBackPress, customTitle, customSubtitle }) => {
   const { colors } = useTheme();
   const navigationRef = useContext(NavigationRefContext);
   const [pin, setPin] = useState('');
@@ -232,14 +232,14 @@ const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = 
               });
             }
           }}
-          style={[styles.backButton, { backgroundColor: colors.glass }]}
+          style={[styles.backButton, { backgroundColor: colors.glass }, isModal && { top: 20 }]}
         >
           <ArrowLeft color={colors.foreground} size={24} />
         </TouchableOpacity>
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContainer, isSetup && { paddingVertical: 12 }]}
+        contentContainerStyle={[styles.scrollContainer, isSetup && { paddingVertical: 12 }, isModal && { paddingTop: 20, paddingVertical: 16 }]}
         showsVerticalScrollIndicator={false}
         bounces={false}
         keyboardShouldPersistTaps="handled"
@@ -249,14 +249,14 @@ const PINEntryScreen = ({ onSuccess, onSetupComplete, method = 'pin', isSetup = 
           <View style={[styles.header, isSetup && { marginBottom: 12 }]}>
             <Lock size={isSetup ? 40 : 52} color={colors.primary} style={{ marginBottom: isSetup ? 8 : 14 }} />
             <CustomText variant="h2" style={[styles.title, isSetup && { fontSize: 20 }]}>
-              {isSetup ? (step === 'enter' ? 'Set Your PIN' : 'Confirm PIN') : 'Enter PIN'}
+              {customTitle || (isSetup ? (step === 'enter' ? 'Set Your PIN' : 'Confirm PIN') : 'Enter PIN')}
             </CustomText>
             <CustomText style={[styles.subtitle, { color: colors.muted }, isSetup && { fontSize: 13, lineHeight: 18 }]}>
-              {isSetup
+              {customSubtitle || (isSetup
                 ? step === 'enter'
                   ? 'Create a 6-digit PIN to secure your app'
                   : 'Enter the same PIN again to confirm'
-                : 'Unlock your app with your PIN'}
+                : 'Unlock your app with your PIN')}
             </CustomText>
           </View>
 

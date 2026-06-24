@@ -25,12 +25,12 @@ const AppLockSettings = ({ t }) => {
   } = useAppSecurity();
 
   const [fingerprintAvailable, setFingerprintAvailable] = useState(false);
+  const [verifyMethod, setVerifyMethod] = useState(null);
   const [setupMethod, setSetupMethod] = useState(null);
   const [showMethodSelector, setShowMethodSelector] = useState(false);
   const [updateMode, setUpdateMode] = useState(false);
   const [showManageMethods, setShowManageMethods] = useState(false);
-  const [verifyingCurrentCredential, setVerifyingCurrentCredential] = useState(false);
-  const [currentCredentialVerified, setCurrentCredentialVerified] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -59,6 +59,15 @@ const AppLockSettings = ({ t }) => {
         return null;
     }
   };
+
+  const verifyAndExecute = useCallback((action) => {
+    if (currentMethod && currentMethod !== 'fingerprint') {
+      setVerifyMethod(currentMethod);
+      setPendingAction(() => action);
+    } else {
+      action();
+    }
+  }, [currentMethod]);
 
   // Toggle ON -> open method selector. Toggle OFF -> disable immediately, no verification.
   const handleMainToggle = useCallback(async (newValue) => {
@@ -90,22 +99,21 @@ const AppLockSettings = ({ t }) => {
       return;
     }
 
-    // Start with verification mode for PIN/Pattern
-    setVerifyingCurrentCredential(true);
-    setCurrentCredentialVerified(false);
-    setSetupMethod(currentMethod);
-    setUpdateMode(true);
-  }, [currentMethod]);
+    verifyAndExecute(() => {
+      setSetupMethod(currentMethod);
+      setUpdateMode(true);
+    });
+  }, [currentMethod, verifyAndExecute]);
 
-  // Change Method card — opens method selector directly, no verification gate.
+  // Change Method card — require current credential verification first.
   const handleChangeMethod = useCallback(() => {
-    setShowMethodSelector(true);
-  }, []);
+    verifyAndExecute(() => setShowMethodSelector(true));
+  }, [verifyAndExecute]);
 
-  // Manage Methods card — opens manage modal directly, no verification gate.
+  // Manage Methods card — require current credential verification first.
   const handleManageMethods = useCallback(() => {
-    setShowManageMethods(true);
-  }, []);
+    verifyAndExecute(() => setShowManageMethods(true));
+  }, [verifyAndExecute]);
 
   const handleSwitchToMethod = useCallback(async (method) => {
     setShowMethodSelector(false);
@@ -160,25 +168,25 @@ const AppLockSettings = ({ t }) => {
     setUpdateMode(false);
   }, []);
 
+  const handleVerifyComplete = useCallback(async (method, credential) => {
+    const verified = await verifyCurrentCredential(method, credential);
+    if (verified) {
+      setVerifyMethod(null);
+      if (pendingAction) {
+        setTimeout(() => {
+          pendingAction();
+          setPendingAction(null);
+        }, 300);
+      }
+      return true;
+    }
+    return false;
+  }, [verifyCurrentCredential, pendingAction]);
+
   const handlePINSetupComplete = useCallback(async (enteredPin) => {
     let ok = false;
     
-    // If verifying current credential, verify it first
-    if (verifyingCurrentCredential && !currentCredentialVerified) {
-      const verified = await verifyCurrentCredential('pin', enteredPin);
-      if (verified) {
-        setCurrentCredentialVerified(true);
-        setVerifyingCurrentCredential(false);
-        // Now allow user to enter new PIN
-        Alert.alert('Verified', 'Current PIN verified. Please enter your new PIN.');
-        return;
-      } else {
-        Alert.alert('Incorrect PIN', 'The PIN you entered is incorrect. Please try again.');
-        return;
-      }
-    }
-    
-    // If current credential is verified, proceed with update
+    // Proceed with update
     if (updateMode) {
       ok = await updateMethod('pin', enteredPin);
     } else if (isEnabled) {
@@ -188,34 +196,17 @@ const AppLockSettings = ({ t }) => {
     }
     setSetupMethod(null);
     setUpdateMode(false);
-    setVerifyingCurrentCredential(false);
-    setCurrentCredentialVerified(false);
     if (ok) {
       Alert.alert(t?.('success') || 'Success', updateMode ? 'PIN updated successfully.' : 'PIN lock saved.');
     } else {
       Alert.alert(t?.('error') || 'Error', 'Could not save PIN lock settings.');
     }
-  }, [enableSecurity, updateMethod, configureAndActivateMethod, updateMode, isEnabled, t, verifyingCurrentCredential, currentCredentialVerified, verifyCurrentCredential]);
+  }, [enableSecurity, updateMethod, configureAndActivateMethod, updateMode, isEnabled, t]);
 
   const handlePatternSetupComplete = useCallback(async (enteredPattern) => {
     let ok = false;
     
-    // If verifying current credential, verify it first
-    if (verifyingCurrentCredential && !currentCredentialVerified) {
-      const verified = await verifyCurrentCredential('pattern', enteredPattern);
-      if (verified) {
-        setCurrentCredentialVerified(true);
-        setVerifyingCurrentCredential(false);
-        // Now allow user to enter new pattern
-        Alert.alert('Verified', 'Current pattern verified. Please enter your new pattern.');
-        return;
-      } else {
-        Alert.alert('Incorrect Pattern', 'The pattern you entered is incorrect. Please try again.');
-        return;
-      }
-    }
-    
-    // If current credential is verified, proceed with update
+    // Proceed with update
     if (updateMode) {
       ok = await updateMethod('pattern', enteredPattern);
     } else if (isEnabled) {
@@ -225,14 +216,12 @@ const AppLockSettings = ({ t }) => {
     }
     setSetupMethod(null);
     setUpdateMode(false);
-    setVerifyingCurrentCredential(false);
-    setCurrentCredentialVerified(false);
     if (ok) {
       Alert.alert(t?.('success') || 'Success', updateMode ? 'Pattern updated successfully.' : 'Pattern lock saved.');
     } else {
       Alert.alert(t?.('error') || 'Error', 'Could not save pattern lock settings.');
     }
-  }, [enableSecurity, updateMethod, configureAndActivateMethod, updateMode, isEnabled, t, verifyingCurrentCredential, currentCredentialVerified, verifyCurrentCredential]);
+  }, [enableSecurity, updateMethod, configureAndActivateMethod, updateMode, isEnabled, t]);
 
   const handleFingerprintSetupComplete = useCallback(async () => {
     let ok = false;
@@ -304,6 +293,19 @@ const AppLockSettings = ({ t }) => {
                 Change{'\n'}Method
               </CustomText>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[lockStyles.quickAction, { backgroundColor: colors.background, borderColor: colors.border }]}
+              onPress={handleManageMethods}
+              activeOpacity={0.7}
+            >
+              <View style={[lockStyles.quickActionIcon, { backgroundColor: '#10b981' + '18' }]}>
+                <Settings2 color="#10b981" size={18} />
+              </View>
+              <CustomText style={[lockStyles.quickActionLabel, { color: colors.foreground }]}>
+                Manage{'\n'}Methods
+              </CustomText>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -329,67 +331,34 @@ const AppLockSettings = ({ t }) => {
               {isEnabled ? 'Change Lock Method' : 'Enable App Lock'}
             </CustomText>
 
-            <TouchableOpacity
-              style={[lockStyles.methodOption, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => handleSwitchToMethod('pin')}
-            >
-              <View style={[lockStyles.iconWrap, { backgroundColor: '#3b82f6' + '18' }]}>
-                <Keyboard color="#3b82f6" size={24} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <CustomText style={[lockStyles.optionTitle, { color: colors.foreground }]}>PIN Lock</CustomText>
-                <CustomText style={[lockStyles.optionSubtitle, { color: colors.muted }]}>
-                  {configuredMethods.pin ? 'Already configured' : 'Use a 6-digit PIN'}
-                </CustomText>
-              </View>
-              {configuredMethods.pin && currentMethod === 'pin' && (
-                <View style={[lockStyles.activeBadge, { backgroundColor: '#f97316' }]}>
-                  <CustomText style={lockStyles.activeBadgeText}>Active</CustomText>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[lockStyles.methodOption, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => handleSwitchToMethod('pattern')}
-            >
-              <View style={[lockStyles.iconWrap, { backgroundColor: '#8b5cf6' + '18' }]}>
-                <Grid3x3 color="#8b5cf6" size={24} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <CustomText style={[lockStyles.optionTitle, { color: colors.foreground }]}>Pattern Lock</CustomText>
-                <CustomText style={[lockStyles.optionSubtitle, { color: colors.muted }]}>
-                  {configuredMethods.pattern ? 'Already configured' : 'Draw a pattern'}
-                </CustomText>
-              </View>
-              {configuredMethods.pattern && currentMethod === 'pattern' && (
-                <View style={[lockStyles.activeBadge, { backgroundColor: '#f97316' }]}>
-                  <CustomText style={lockStyles.activeBadgeText}>Active</CustomText>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {fingerprintAvailable && (
-              <TouchableOpacity
-                style={[lockStyles.methodOption, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => handleSwitchToMethod('fingerprint')}
-              >
-                <View style={[lockStyles.iconWrap, { backgroundColor: '#ec4899' + '18' }]}>
-                  <Fingerprint color="#ec4899" size={24} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 16 }}>
-                  <CustomText style={[lockStyles.optionTitle, { color: colors.foreground }]}>Fingerprint Lock</CustomText>
-                  <CustomText style={[lockStyles.optionSubtitle, { color: colors.muted }]}>
-                    {configuredMethods.fingerprint ? 'Already configured' : 'Use biometric authentication'}
-                  </CustomText>
-                </View>
-                {configuredMethods.fingerprint && currentMethod === 'fingerprint' && (
-                  <View style={[lockStyles.activeBadge, { backgroundColor: '#f97316' }]}>
-                    <CustomText style={lockStyles.activeBadgeText}>Active</CustomText>
+            {['pin', 'pattern', ...(fingerprintAvailable ? ['fingerprint'] : [])].map(method => {
+              if (isEnabled && !configuredMethods[method]) return null;
+              const info = getMethodInfo(method);
+              if (!info) return null;
+              const Icon = info.icon;
+              return (
+                <TouchableOpacity
+                  key={method}
+                  style={[lockStyles.methodOption, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => handleSwitchToMethod(method)}
+                >
+                  <View style={[lockStyles.iconWrap, { backgroundColor: info.color + '18' }]}>
+                    <Icon color={info.color} size={24} />
                   </View>
-                )}
-              </TouchableOpacity>
-            )}
+                  <View style={{ flex: 1, marginLeft: 16 }}>
+                    <CustomText style={[lockStyles.optionTitle, { color: colors.foreground }]}>{info.title}</CustomText>
+                    <CustomText style={[lockStyles.optionSubtitle, { color: colors.muted }]}>
+                      {configuredMethods[method] ? 'Already configured' : info.subtitle}
+                    </CustomText>
+                  </View>
+                  {configuredMethods[method] && currentMethod === method && (
+                    <View style={[lockStyles.activeBadge, { backgroundColor: '#f97316' }]}>
+                      <CustomText style={lockStyles.activeBadgeText}>Active</CustomText>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
 
             <TouchableOpacity
               style={[lockStyles.cancelButton, { backgroundColor: colors.border }]}
@@ -470,6 +439,54 @@ const AppLockSettings = ({ t }) => {
         </TouchableOpacity>
       </Modal>
 
+      {/* Verify PIN/Pattern Modal */}
+      <Modal
+        visible={verifyMethod !== null}
+        transparent
+        animationType={verifyMethod === 'pattern' ? 'fade' : 'slide'}
+        onRequestClose={() => { setVerifyMethod(null); setPendingAction(null); }}
+      >
+        <TouchableOpacity
+          style={verifyMethod === 'pattern' ? lockStyles.patternModalOverlay : lockStyles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => { setVerifyMethod(null); setPendingAction(null); }}
+        >
+          {verifyMethod === 'pin' ? (
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+              <TouchableOpacity
+                style={[lockStyles.modalContent, { backgroundColor: colors.background, borderColor: colors.border }]}
+                activeOpacity={1}
+                onPress={(e) => e.stopPropagation()}
+              >
+                <PINEntryScreen
+                  isSetup={false}
+                  isModal={true}
+                  customTitle="Verify Current PIN"
+                  customSubtitle="Enter your current PIN to continue"
+                  onSuccess={(pin) => handleVerifyComplete('pin', pin)}
+                  onCancel={() => { setVerifyMethod(null); setPendingAction(null); }}
+                />
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          ) : verifyMethod === 'pattern' ? (
+            <TouchableOpacity
+              style={[lockStyles.patternModalContent, { backgroundColor: colors.background, borderColor: colors.border }]}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <PatternEntryScreen
+                isSetup={false}
+                isModal={true}
+                customTitle="Verify Current Pattern"
+                customSubtitle="Draw your current pattern to continue"
+                onSuccess={(pattern) => handleVerifyComplete('pattern', pattern)}
+                onCancel={() => { setVerifyMethod(null); setPendingAction(null); }}
+              />
+            </TouchableOpacity>
+          ) : null}
+        </TouchableOpacity>
+      </Modal>
+
       {/* PIN Setup Modal */}
       <Modal
         visible={setupMethod === 'pin'}
@@ -493,8 +510,10 @@ const AppLockSettings = ({ t }) => {
             >
               <PINEntryScreen
                 isSetup={true}
+                isModal={true}
+                customTitle={updateMode ? "Update PIN" : undefined}
                 onSetupComplete={handlePINSetupComplete}
-                onSetupMethod={() => setSetupMethod(null)}
+                onCancel={() => setSetupMethod(null)}
               />
             </TouchableOpacity>
           </KeyboardAvoidingView>
@@ -520,8 +539,9 @@ const AppLockSettings = ({ t }) => {
           >
             <PatternEntryScreen
               isSetup={true}
-              isModal={true}
+              customTitle={updateMode ? "Update Pattern" : undefined}
               onSetupComplete={handlePatternSetupComplete}
+              onCancel={() => setSetupMethod(null)}
             />
           </TouchableOpacity>
         </TouchableOpacity>
