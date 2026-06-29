@@ -188,6 +188,7 @@ export const appSecurityService = {
           method,
           pin: method === 'pin' ? credential : undefined,
           pattern: method === 'pattern' ? credential : undefined,
+          deviceUnlock: true,
         }),
       });
       return await parseJson(res, 'Failed to verify security credential');

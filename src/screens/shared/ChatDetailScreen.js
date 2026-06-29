@@ -1491,8 +1491,11 @@ export default function ChatDetailScreen() {
       )}
 
       {/* Input Bar */}
-      <View>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        style={{ flex: 0 }}
+      >
           {isSellerDeactivated ? (
             /* Deactivated seller — show a locked input bar */
             <View style={[styles.inputBarWrapper, { backgroundColor: colors.background, borderTopColor: 'rgba(245,158,11,0.3)' }]}>
@@ -1602,8 +1605,7 @@ export default function ChatDetailScreen() {
               </View>
             </View>
           )}
-        </KeyboardAvoidingView>
-      </View>
+      </KeyboardAvoidingView>
 
       {/* ── Report Modal ── */}
       <Modal visible={attachmentVisible} transparent animationType="fade" onRequestClose={() => setAttachmentVisible(false)}>

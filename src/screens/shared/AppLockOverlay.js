@@ -9,9 +9,23 @@ import PINEntryScreen from './PINEntryScreen';
 import PatternEntryScreen from './PatternEntryScreen';
 import FingerprintScreen from './FingerprintScreen';
 
+const DEFAULT_SECURITY_SETTINGS = {
+  enabled: false,
+  method: null,
+  failedAttempts: 0,
+  configuredMethods: {},
+};
+
 const AppLockOverlay = ({ visible, onUnlock }) => {
   const { colors } = useTheme();
-  const { securitySettings, verifyPin, verifyPattern, verifyFingerprint, unlockApp, notifyCredentialLogin } = useAppSecurity();
+  const {
+    securitySettings = DEFAULT_SECURITY_SETTINGS,
+    verifyPin,
+    verifyPattern,
+    verifyFingerprint,
+    unlockApp,
+    notifyCredentialLogin,
+  } = useAppSecurity();
   const { logout, login } = useAuth();
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [locked, setLocked] = useState(true);
@@ -79,7 +93,7 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
   };
 
   const handleUsePasswordInstead = useCallback(async () => {
-    unlockApp();
+    unlockApp(true);
     await logout(true);
 
     const navigateToLogin = () => {
@@ -109,10 +123,10 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
     if (!navigateToLogin()) {
       setTimeout(navigateToLogin, 100);
     }
-  }, [unlockApp, logout]);
+  }, [unlockApp, logout])
 
   const handleBackPress = useCallback(async () => {
-    unlockApp();
+    unlockApp(true);
     await logout(true);
 
     const navigateToHome = () => {
@@ -141,7 +155,7 @@ const AppLockOverlay = ({ visible, onUnlock }) => {
     if (!navigateToHome()) {
       setTimeout(navigateToHome, 100);
     }
-  }, [unlockApp, logout]);
+  }, [unlockApp, logout])
 
   useEffect(() => {
     if (visible) {

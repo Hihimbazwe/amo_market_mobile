@@ -29,6 +29,12 @@ const verifyLocalHash = async (method, credential, storedHash) => {
 };
 
 const METHODS = ['pin', 'pattern', 'fingerprint'];
+const DEFAULT_SECURITY_SETTINGS = {
+  enabled: false,
+  method: null, // 'pin', 'pattern', 'fingerprint' - currently active method
+  failedAttempts: 0,
+  configuredMethods: {}, // Store all configured methods: { pin: { hash, timestamp }, pattern: { hash, timestamp }, fingerprint: { enabled, timestamp } }
+};
 
 const loadLocalConfiguredMethods = async (userId) => {
   const configuredMethods = {};
@@ -99,14 +105,28 @@ const restoreAuthSession = async (authToken) => {
   }
 };
 
+const loadDeviceSecuritySession = async (deviceSecurityKey) => {
+  try {
+    const stored = await AsyncStorage.getItem(deviceSecurityKey);
+    if (!stored) return null;
+
+    const parsed = JSON.parse(stored);
+    if (!parsed?.enabled || !parsed?.method) return null;
+
+    if (parsed.authToken) {
+      await restoreAuthSession(parsed.authToken);
+    }
+
+    return parsed;
+  } catch (err) {
+    console.warn('[SecurityContext] Error loading device security session:', err);
+    return null;
+  }
+};
+
 export const SecurityProvider = ({ children }) => {
   const { user, isAuthenticated, authToken } = useAuth();
-  const [securitySettings, setSecuritySettings] = useState({
-    enabled: false,
-    method: null, // 'pin', 'pattern', 'fingerprint' - currently active method
-    failedAttempts: 0,
-    configuredMethods: {}, // Store all configured methods: { pin: { hash, timestamp }, pattern: { hash, timestamp }, fingerprint: { enabled, timestamp } }
-  });
+  const [securitySettings, setSecuritySettings] = useState(DEFAULT_SECURITY_SETTINGS);
 
   const [appLocked, setAppLocked] = useState(false);
   const [deviceLocked, setDeviceLocked] = useState(false);
@@ -117,6 +137,7 @@ export const SecurityProvider = ({ children }) => {
   const deviceLockUserIdRef = useRef(null);
   const skipLockAfterLoginRef = useRef(false);
   const isDeviceLockSessionRef = useRef(false);
+  const suppressUnlockToastRef = useRef(false);
   const loadSecuritySettingsRef = useRef(null);
 
   // Configurable inactivity period in milliseconds (default: 30 seconds)
@@ -238,7 +259,7 @@ export const SecurityProvider = ({ children }) => {
     } else if (!isDeviceLockSessionRef.current) {
       deviceLockUserIdRef.current = null;
       setAppLocked(false);
-      setSecuritySettings({ enabled: false, method: null, failedAttempts: 0, configuredMethods: {} });
+      setSecuritySettings(DEFAULT_SECURITY_SETTINGS);
       setLoading(false);
     } else {
       setLoading(false);
@@ -413,15 +434,17 @@ export const SecurityProvider = ({ children }) => {
 
   // Verify PIN — server when logged in, always falls back to local device hash
   const verifyPin = useCallback(async (inputPin) => {
-    const effectiveUserId = user?.id || deviceLockUserIdRef.current;
+    const deviceSession = user?.id ? null : await loadDeviceSecuritySession(deviceSecurityKey);
+    const effectiveUserId = user?.id || deviceLockUserIdRef.current || deviceSession?.userId;
     if (!effectiveUserId) return false;
+    deviceLockUserIdRef.current = effectiveUserId;
 
     const pinCredKey = `@security_cred_${effectiveUserId}_pin`;
 
     // 1. Try server verification first (authoritative)
-    if (user?.id) {
+    if (effectiveUserId) {
       try {
-        const result = await appSecurityService.verifySecurityCredential(user.id, 'pin', inputPin);
+        const result = await appSecurityService.verifySecurityCredential(effectiveUserId, 'pin', inputPin);
         if (result.success) {
           setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
           return true;
@@ -465,19 +488,21 @@ export const SecurityProvider = ({ children }) => {
 
     setSecuritySettings((prev) => ({ ...prev, failedAttempts: prev.failedAttempts + 1 }));
     return false;
-  }, [user?.id, securitySettings.configuredMethods]);
+  }, [user?.id, securitySettings.configuredMethods, deviceSecurityKey]);
 
   // Verify Pattern — server when logged in, always falls back to local device hash
   const verifyPattern = useCallback(async (inputPattern) => {
-    const effectiveUserId = user?.id || deviceLockUserIdRef.current;
+    const deviceSession = user?.id ? null : await loadDeviceSecuritySession(deviceSecurityKey);
+    const effectiveUserId = user?.id || deviceLockUserIdRef.current || deviceSession?.userId;
     if (!effectiveUserId) return false;
+    deviceLockUserIdRef.current = effectiveUserId;
 
     const patternCredKey = `@security_cred_${effectiveUserId}_pattern`;
 
     // 1. Try server verification first (authoritative)
-    if (user?.id) {
+    if (effectiveUserId) {
       try {
-        const result = await appSecurityService.verifySecurityCredential(user.id, 'pattern', inputPattern);
+        const result = await appSecurityService.verifySecurityCredential(effectiveUserId, 'pattern', inputPattern);
         if (result.success) {
           setSecuritySettings((prev) => ({ ...prev, failedAttempts: 0 }));
           return true;
@@ -520,7 +545,7 @@ export const SecurityProvider = ({ children }) => {
 
     setSecuritySettings((prev) => ({ ...prev, failedAttempts: prev.failedAttempts + 1 }));
     return false;
-  }, [user?.id, securitySettings.configuredMethods]);
+  }, [user?.id, securitySettings.configuredMethods, deviceSecurityKey]);
 
   // Verify Fingerprint
   const verifyFingerprint = useCallback(async () => {
@@ -550,7 +575,8 @@ export const SecurityProvider = ({ children }) => {
     }
   }, [user?.id]);
 
-  const unlockApp = useCallback(() => {
+  const unlockApp = useCallback((suppressToast = false) => {
+    suppressUnlockToastRef.current = suppressToast;
     setAppLocked(false);
     // Don't clear isDeviceLockSessionRef here - it should be cleared when user logs in normally
     // This allows the auth restoration in AppLockOverlay to work properly
@@ -566,9 +592,8 @@ export const SecurityProvider = ({ children }) => {
   // Load device security settings and lock app (for AuthOverlay when logged out)
   const loadDeviceSecurityAndLock = useCallback(async () => {
     try {
-      const stored = await AsyncStorage.getItem(deviceSecurityKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
+      const parsed = await loadDeviceSecuritySession(deviceSecurityKey);
+      if (parsed) {
         if (parsed.enabled && parsed.method) {
           let userId = parsed.userId || null;
 
@@ -587,11 +612,6 @@ export const SecurityProvider = ({ children }) => {
 
           deviceLockUserIdRef.current = userId;
           isDeviceLockSessionRef.current = true;
-
-          // Restore auth session if token is available
-          if (parsed.authToken) {
-            await restoreAuthSession(parsed.authToken);
-          }
 
           let configuredMethods = {};
           if (userId) {
@@ -800,6 +820,8 @@ export const SecurityProvider = ({ children }) => {
 
   const value = {
     securitySettings,
+    setSecuritySettings,
+    suppressUnlockToastRef,
     appLocked,
     deviceLocked,
     loading,

@@ -14,7 +14,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  FlatList
+  FlatList,
+  Linking
 } from 'react-native';
 import {
   User,
@@ -39,7 +40,8 @@ import {
   Package,
   ArrowRight,
   Home,
-  ShoppingBag
+  ShoppingBag,
+  AlertCircle
 } from 'lucide-react-native';
 import CustomText from '../components/CustomText';
 import CustomButton from '../components/CustomButton';
@@ -48,19 +50,51 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { locationService } from '../api/locationService';
 import { checkoutService } from '../api/checkoutService';
-import {Text, } from 'react-native';
+import { Text, } from 'react-native';
 const { width } = Dimensions.get('window');
 
-const validateRwandaPhoneNumber = (phone) => {
-  if (!phone) return false;
-  const cleaned = phone.replace(/[^+\d]/g, '');
-  const rwandaRegex = /^(?:\+250|250|0)?(7[23789]\d{7})$/;
-  return rwandaRegex.test(cleaned);
+// Returns an error string if invalid, empty string if valid (or empty input)
+const validateRwandaPhoneNumber = (value) => {
+  const cleaned = value.trim().replace(/\s+/g, "");
+
+  if (!cleaned) {
+    return "";
+  }
+
+  if (!/^\+?\d*$/.test(cleaned)) {
+    return "Phone number can only contain digits and an optional leading +.";
+  }
+
+  let normalized = cleaned;
+
+  if (normalized.startsWith("+250")) {
+    normalized = "0" + normalized.slice(4);
+  } else if (normalized.startsWith("250")) {
+    normalized = "0" + normalized.slice(3);
+  }
+
+  // Only check prefix once at least 3 digits are available
+  if (normalized.length >= 3) {
+    const validPrefixes = ["072", "073", "078", "079"];
+    if (!validPrefixes.some(prefix => normalized.startsWith(prefix))) {
+      return "Phone number must start with 072, 073, 078, or 079.";
+    }
+  }
+
+  if (normalized.length > 10) {
+    return "Phone number is too long.";
+  }
+
+  if (normalized.length === 10 && !/^0\d{9}$/.test(normalized)) {
+    return "Invalid phone number.";
+  }
+
+  return "";
 };
 
 const CheckoutScreen = ({ route, navigation }) => {
   const { cartItems, cartTotal, clearCart, removeFromCart } = useCart();
-  
+
   const selectedItemIds = route.params?.selectedItemIds;
   const buyNowProduct = route.params?.buyNowProduct;
   const buyNowQty = route.params?.qty || 1;
@@ -96,6 +130,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   // Recipient Details
   const [recipientName, setRecipientName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState(''); // ← inline error state
   const [giftMessage, setGiftMessage] = useState('');
 
   // Delivery Method
@@ -129,7 +164,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [cardholderName, setCardholderName] = useState('');
-  
+
   // Custom Date/Time Picker State
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [activeSellerId, setActiveSellerId] = useState(null); // For which seller are we choosing a time?
@@ -138,7 +173,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Fees
   const deliveryFee = useMemo(() => (pickupType === 'PICKUP' ? 0 : 1000), [pickupType]);
-  const protectionFee = 500;
+  const protectionFee = 0;
   const totalAmount = checkoutTotal + deliveryFee + protectionFee;
 
   useEffect(() => {
@@ -154,6 +189,18 @@ const CheckoutScreen = ({ route, navigation }) => {
     };
     init();
   }, []);
+
+  // ─── Real-time phone validation handler ────────────────────────────────────
+  const handlePhoneChange = (value) => {
+    setPhoneNumber(value);
+    // Only show error once user has typed something meaningful (3+ chars)
+    if (value.length >= 3) {
+      setPhoneError(validateRwandaPhoneNumber(value));
+    } else {
+      setPhoneError('');
+    }
+  };
+  // ───────────────────────────────────────────────────────────────────────────
 
   const onProvinceChange = async (p) => {
     setLoc({ province: p, district: '', sector: '', cell: '', village: '' });
@@ -198,6 +245,21 @@ const CheckoutScreen = ({ route, navigation }) => {
     setAgents(data);
   };
 
+  const openMapForLocation = async (address) => {
+    try {
+      const encodedAddress = encodeURIComponent(address);
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Error', 'Unable to open maps on this device');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Unable to open maps');
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (!recipientName.trim() || !phoneNumber.trim()) {
       Alert.alert('Missing Details', 'Please fill in the recipient details.');
@@ -205,11 +267,9 @@ const CheckoutScreen = ({ route, navigation }) => {
       return;
     }
 
-    if (!validateRwandaPhoneNumber(phoneNumber)) {
-      Alert.alert(
-        'Invalid Phone Number',
-        'Please enter a valid Rwanda phone number (e.g., +250 78X XXX XXX or 078X XXX XXX).'
-      );
+    const phoneValidationError = validateRwandaPhoneNumber(phoneNumber);
+    if (phoneValidationError) {
+      Alert.alert('Invalid Phone Number', phoneValidationError);
       setStep(1);
       return;
     }
@@ -223,7 +283,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     setLoading(true);
     try {
       const address = [loc.village, loc.cell, loc.sector, loc.district, loc.province].filter(Boolean).join(', ');
-      
+
       // Construct sellerPickups array if it's a pickup order
       const sellerPickups = [];
       if (pickupType === 'PICKUP') {
@@ -235,10 +295,10 @@ const CheckoutScreen = ({ route, navigation }) => {
             sellerGroups[sellerId] = {
               sellerId,
               locationId: 'default', // Added to satisfy backend schema
-              address: seller?.locationAddress || 
-                       (item.product?.district && item.product?.province 
-                         ? `${item.product.district}, ${item.product.province}`
-                         : 'Location not set'),
+              address: seller?.locationAddress ||
+                (item.product?.district && item.product?.province
+                  ? `${item.product.district}, ${item.product.province}`
+                  : 'Location not set'),
               slot: sellerPickupSlots[sellerId] || ''
             };
           }
@@ -265,7 +325,7 @@ const CheckoutScreen = ({ route, navigation }) => {
       };
 
       const order = await checkoutService.placeOrder(user.id, orderData);
-      
+
       if (pickupType !== 'PICKUP') {
         const paymentData = {
           orderId: order.id,
@@ -276,7 +336,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
         await checkoutService.processPayment(user.id, paymentData);
       }
-      
+
       // Remove only the items that were checked out
       if (buyNowProduct) {
         // Don't clear cart for buy now
@@ -331,6 +391,48 @@ const CheckoutScreen = ({ route, navigation }) => {
     </View>
   );
 
+  // ─── Phone input with inline error ─────────────────────────────────────────
+  const renderPhoneInput = () => {
+    const hasError = !!phoneError;
+    const isValid = !hasError && phoneNumber.length >= 10;
+
+    return (
+      <View style={{ marginBottom: 20 }}>
+        <View style={[
+          styles.inputWrapper,
+          {
+            backgroundColor: colors.glass,
+            borderColor: hasError ? '#ef4444' : isValid ? '#4ade80' : colors.border,
+            marginBottom: 0,
+          }
+        ]}>
+          <Phone size={18} color={hasError ? '#ef4444' : isValid ? '#4ade80' : colors.muted} />
+          <TextInput
+            style={[styles.input, { color: colors.foreground }]}
+            placeholder="+250 7XX XXX XXX"
+            placeholderTextColor={colors.muted}
+            value={phoneNumber}
+            onChangeText={handlePhoneChange}
+            keyboardType="phone-pad"
+          />
+          {isValid && <CheckCircle2 size={18} color="#4ade80" style={{ marginRight: 4 }} />}
+          {hasError && <AlertCircle size={18} color="#ef4444" style={{ marginRight: 4 }} />}
+        </View>
+        {hasError && (
+          <View style={styles.inlineErrorRow}>
+            <CustomText style={styles.inlineErrorText}>{phoneError}</CustomText>
+          </View>
+        )}
+        {isValid && (
+          <View style={styles.inlineSuccessRow}>
+            <CustomText style={styles.inlineSuccessText}>Valid Rwanda number</CustomText>
+          </View>
+        )}
+      </View>
+    );
+  };
+  // ───────────────────────────────────────────────────────────────────────────
+
   const openPicker = (label, options, onSelect) => {
     if (!options || options.length === 0) {
       if (locLoading) return; // Wait for loading
@@ -348,7 +450,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     <View style={[styles.dropdownGroup, disabled && { opacity: 0.5 }]}>
       {renderLabel(label)}
       <View style={[styles.dropdownWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.dropdownTrigger, { borderColor: colors.border }]}
           disabled={disabled || locLoading}
           onPress={() => openPicker(label, options, onValueChange)}
@@ -367,7 +469,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   );
 
   const renderPickerModal = () => {
-    const filteredData = pickerData.filter(item => 
+    const filteredData = pickerData.filter(item =>
       item.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -386,7 +488,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                 <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>Done</CustomText>
               </TouchableOpacity>
             </View>
-            
+
             <View style={[styles.searchWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
               <TextInput
                 style={[styles.searchInput, { color: colors.foreground }]}
@@ -429,7 +531,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
-      
+
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: colors.glass }]}>
           <ChevronLeft color={colors.foreground} size={24} />
@@ -454,7 +556,7 @@ const CheckoutScreen = ({ route, navigation }) => {
               <CustomText variant="h1" style={[styles.successTitle, { color: colors.foreground }]}>
                 Order Placed!
               </CustomText>
-              
+
               <CustomText style={[styles.successSubtitle, { color: colors.muted }]}>
                 Your order has been placed successfully and is now being processed.
               </CustomText>
@@ -480,11 +582,11 @@ const CheckoutScreen = ({ route, navigation }) => {
                 style={styles.modalTrackBtn}
                 onPress={() => {
                   setSuccessModalVisible(false);
-                  navigation.navigate('MainApp', { 
+                  navigation.navigate('MainApp', {
                     screen: 'Me',
                     params: {
-                      screen: 'OrderTracking', 
-                      params: { orderId: lastOrderId } 
+                      screen: 'OrderTracking',
+                      params: { orderId: lastOrderId }
                     }
                   });
                 }}
@@ -509,227 +611,211 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent} 
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-        {renderStepIndicator()}
+          {renderStepIndicator()}
 
-        {step === 1 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
-                <CustomText style={styles.stepCounterText}>1</CustomText>
+          {step === 1 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
+                  <CustomText style={styles.stepCounterText}>1</CustomText>
+                </View>
+                <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Recipient Details</CustomText>
               </View>
-              <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Recipient Details</CustomText>
-            </View>
-            
-            <View style={styles.form}>
-              {renderLabel('FULL NAME')}
-              {renderInput(<User size={18} color={colors.muted} />, 'John Doe', recipientName, setRecipientName)}
-              
-              {renderLabel('PHONE NUMBER')}
-              {renderInput(<Phone size={18} color={colors.muted} />, '+250 7XX XXX XXX', phoneNumber, setPhoneNumber, 'phone-pad')}
-              
-              {renderLabel('GIFT MESSAGE (OPTIONAL)')}
-              <View style={[styles.textAreaWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
-                <TextInput
-                  style={[styles.textArea, { color: colors.foreground }]}
-                  placeholder="Enter a personal message..."
-                  placeholderTextColor={colors.muted}
-                  value={giftMessage}
-                  onChangeText={setGiftMessage}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-            </View>
-          </View>
-        )}
 
-        {step === 2 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
-                <CustomText style={styles.stepCounterText}>2</CustomText>
-              </View>
-              <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Pickup Locations</CustomText>
-            </View>
-
-            <View style={styles.toggleRow}>
-              {/* <TouchableOpacity 
-                onPress={() => {
-                  setPickupType('DELIVERY');
-                  setPaymentMethod('MOBILE_MONEY');
-                }}
-                style={[
-                  styles.toggleBtn, 
-                  { backgroundColor: colors.glass, borderColor: colors.border },
-                  pickupType === 'DELIVERY' && { backgroundColor: colors.primary + '20', borderColor: colors.primary }
-                ]}
-              >
-                <Truck size={20} color={pickupType === 'DELIVERY' ? colors.primary : colors.muted} />
-                <CustomText style={[styles.toggleText, { color: pickupType === 'DELIVERY' ? colors.primary : colors.muted }]}>Delivery</CustomText>
-              </TouchableOpacity> */}
-              
-              <TouchableOpacity 
-                onPress={() => {
-                  setPickupType('PICKUP');
-                  setPaymentMethod('CASH_ON_DELIVERY');
-                }}
-                style={[
-                  styles.toggleBtn, 
-                  { backgroundColor: colors.glass, borderColor: colors.border },
-                  pickupType === 'PICKUP' && { backgroundColor: colors.primary + '20', borderColor: colors.primary }
-                ]}
-              >
-                <Building2 size={20} color={pickupType === 'PICKUP' ? colors.primary : colors.muted} />
-                <CustomText style={[styles.toggleText, { color: pickupType === 'PICKUP' ? colors.primary : colors.muted }]}>Pickup</CustomText>
-              </TouchableOpacity>
-            </View>
-
-            {pickupType === 'DELIVERY' ? (
-              /* <View style={styles.form}>
-                {locLoading && <ActivityIndicator color={colors.primary} size="small" style={{ marginBottom: 12 }} />}
-                {renderDropdown('PROVINCE', loc.province, onProvinceChange, provinces)}
-                {renderDropdown('DISTRICT', loc.district, onDistrictChange, districts, !loc.province)}
-                {renderDropdown('SECTOR', loc.sector, onSectorChange, sectors, !loc.district)}
-                {renderDropdown('CELL', loc.cell, onCellChange, cells, !loc.sector)}
-                {renderDropdown('VILLAGE', loc.village, onVillageChange, villages, !loc.cell)}
-              </View> */
-              null
-            ) : (
               <View style={styles.form}>
-                {renderLabel('SELLER PICKUP LOCATIONS')}
-                {(() => {
-                  const sellerGroups = {};
-                  checkoutItems.forEach(item => {
-                    const seller = item.product?.seller;
-                    const sellerId = seller?.id || 'unknown';
-                    if (!sellerGroups[sellerId]) {
-                      sellerGroups[sellerId] = {
-                        name: seller?.user?.name || 'Store',
-                        location: seller?.locationAddress || 
-                                  (item.product?.district && item.product?.province 
-                                    ? `${item.product.district}, ${item.product.province}`
-                                    : 'Location not set'),
-                        items: []
-                      };
-                    }
-                    sellerGroups[sellerId].items.push(item);
-                  });
+                {renderLabel('FULL NAME')}
+                {renderInput(<User size={18} color={colors.muted} />, 'John Doe', recipientName, setRecipientName)}
 
-                  return Object.entries(sellerGroups).map(([id, group]) => (
-                    <View 
-                      key={id} 
-                      style={[
-                        styles.sellerPickupCard, 
-                        { backgroundColor: colors.glass, borderColor: colors.border, marginBottom: 16 }
-                      ]}
-                    >
-                      <View style={styles.pickupHeader}>
-                        <View style={[styles.storeIconBox, { backgroundColor: colors.primary + '15' }]}>
-                          <Store size={18} color={colors.primary} />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <CustomText style={[styles.pickupName, { color: colors.foreground }]}>{group.name}</CustomText>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                            <MapPin size={12} color={colors.muted} />
-                            <CustomText style={[styles.pickupAddress, { color: colors.muted }]}>{group.location}</CustomText>
-                          </View>
-                        </View>
-                      </View>
-                      
-                      <View style={[styles.divider, { backgroundColor: colors.border, marginVertical: 12 }]} />
-                      
-                      <View style={styles.pickupItemsList}>
-                        {group.items.map((gi, idx) => (
-                          <CustomText key={idx} style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>
-                            • {gi.product.title} (x{gi.quantity})
-                          </CustomText>
-                        ))}
-                      </View>
+                {renderLabel('PHONE NUMBER')}
+                {/* ↓ inline-validating phone field replaces the old renderInput call */}
+                {renderPhoneInput()}
 
-                      <View style={{ marginTop: 12 }}>
-                        <CustomText style={{ fontSize: 10, color: colors.muted, fontWeight: 'bold', marginBottom: 8 }}>PICKUP TIME</CustomText>
-                        <TouchableOpacity 
-                          style={[styles.dropdownTrigger, { backgroundColor: colors.background, borderColor: colors.border, height: 44 }]}
-                          onPress={() => {
-                            setActiveSellerId(id);
-                            setTimePickerVisible(true);
-                          }}
-                        >
-                          <Clock size={14} color={colors.muted} style={{ marginRight: 8 }} />
-                          <CustomText style={[styles.dropdownValue, { color: sellerPickupSlots[id] ? colors.foreground : colors.muted, fontSize: 13 }]}>
-                            {sellerPickupSlots[id] || "Choose time"}
-                          </CustomText>
-                          <ChevronDown size={14} color={colors.muted} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ));
-                })()}
-
+                {renderLabel('GIFT MESSAGE (OPTIONAL)')}
+                <View style={[styles.textAreaWrapper, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                  <TextInput
+                    style={[styles.textArea, { color: colors.foreground }]}
+                    placeholder="Enter a personal message..."
+                    placeholderTextColor={colors.muted}
+                    value={giftMessage}
+                    onChangeText={setGiftMessage}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
               </View>
-            )}
-          </View>
-        )}
-
-        {step === 3 && (
-          <View style={styles.section}>
-             <View style={styles.sectionHeader}>
-              <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
-                <CustomText style={styles.stepCounterText}>3</CustomText>
-              </View>
-              <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>
-                {pickupType === 'PICKUP' ? 'Pay at Store' : 'Payment Method'}
-              </CustomText>
             </View>
+          )}
 
-            {pickupType === 'PICKUP' ? (
-              <View style={[styles.paymentForm, { backgroundColor: colors.glass, padding: 20, borderRadius: 16 }]}>
-                <View style={[styles.walletBalance, { backgroundColor: colors.primary + '10', marginBottom: 16 }]}>
-                  <Building2 size={32} color={colors.primary} />
-                  <View style={{ marginLeft: 16, flex: 1 }}>
-                    <CustomText variant="h3" style={{ color: colors.foreground }}>Pay directly at store</CustomText>
-                    <CustomText style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
-                      No payment is required now. You will pay the seller when you collect your order.
-                    </CustomText>
+          {step === 2 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
+                  <CustomText style={styles.stepCounterText}>2</CustomText>
+                </View>
+                <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Pickup Locations</CustomText>
+              </View>
+
+              <View style={styles.toggleRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setPickupType('PICKUP');
+                    setPaymentMethod('CASH_ON_DELIVERY');
+                  }}
+                  style={[
+                    styles.toggleBtn,
+                    { backgroundColor: colors.glass, borderColor: colors.border },
+                    pickupType === 'PICKUP' && { backgroundColor: colors.primary + '20', borderColor: colors.primary }
+                  ]}
+                >
+                  <Building2 size={20} color={pickupType === 'PICKUP' ? colors.primary : colors.muted} />
+                  <CustomText style={[styles.toggleText, { color: pickupType === 'PICKUP' ? colors.primary : colors.muted }]}>Pickup</CustomText>
+                </TouchableOpacity>
+              </View>
+
+              {pickupType === 'DELIVERY' ? (
+                null
+              ) : (
+                <View style={styles.form}>
+                  {renderLabel('SELLER PICKUP LOCATIONS')}
+                  {(() => {
+                    const sellerGroups = {};
+                    checkoutItems.forEach(item => {
+                      const seller = item.product?.seller;
+                      const sellerId = seller?.id || 'unknown';
+                      if (!sellerGroups[sellerId]) {
+                        sellerGroups[sellerId] = {
+                          name: seller?.user?.name || 'Store',
+                          location: seller?.locationAddress ||
+                            (item.product?.district && item.product?.province
+                              ? `${item.product.district}, ${item.product.province}`
+                              : 'Location not set'),
+                          items: []
+                        };
+                      }
+                      sellerGroups[sellerId].items.push(item);
+                    });
+
+                    return Object.entries(sellerGroups).map(([id, group]) => (
+                      <View
+                        key={id}
+                        style={[
+                          styles.sellerPickupCard,
+                          { backgroundColor: colors.glass, borderColor: colors.border, marginBottom: 16 }
+                        ]}
+                      >
+                        <View style={styles.pickupHeader}>
+                          <View style={[styles.storeIconBox, { backgroundColor: colors.primary + '15' }]}>
+                            <Store size={18} color={colors.primary} />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <CustomText style={[styles.pickupName, { color: colors.foreground }]}>{group.name}</CustomText>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                              <MapPin size={12} color={colors.muted} />
+                              <CustomText style={[styles.pickupAddress, { color: colors.muted }]}>{group.location}</CustomText>
+                            </View>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => openMapForLocation(group.location)}
+                            style={[styles.mapButton, { backgroundColor: colors.primary + '15' }]}
+                          >
+                            <MapPin size={16} color={colors.primary} />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={[styles.divider, { backgroundColor: colors.border, marginVertical: 12 }]} />
+
+                        <View style={styles.pickupItemsList}>
+                          {group.items.map((gi, idx) => (
+                            <CustomText key={idx} style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>
+                              • {gi.product.title} (x{gi.quantity})
+                            </CustomText>
+                          ))}
+                        </View>
+
+                        <View style={{ marginTop: 12 }}>
+                          <CustomText style={{ fontSize: 10, color: colors.muted, fontWeight: 'bold', marginBottom: 8 }}>PICKUP TIME</CustomText>
+                          <TouchableOpacity
+                            style={[styles.dropdownTrigger, { backgroundColor: colors.background, borderColor: colors.border, height: 44 }]}
+                            onPress={() => {
+                              setActiveSellerId(id);
+                              setTimePickerVisible(true);
+                            }}
+                          >
+                            <Clock size={14} color={colors.muted} style={{ marginRight: 8 }} />
+                            <CustomText style={[styles.dropdownValue, { color: sellerPickupSlots[id] ? colors.foreground : colors.muted, fontSize: 13 }]}>
+                              {sellerPickupSlots[id] || "Choose time"}
+                            </CustomText>
+                            <ChevronDown size={14} color={colors.muted} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ));
+                  })()}
+
+                </View>
+              )}
+            </View>
+          )}
+
+          {step === 3 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
+                  <CustomText style={styles.stepCounterText}>3</CustomText>
+                </View>
+                <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>
+                  {pickupType === 'PICKUP' ? 'Pay at Store' : 'Payment Method'}
+                </CustomText>
+              </View>
+
+              {pickupType === 'PICKUP' ? (
+                <View style={[styles.paymentForm, { backgroundColor: colors.glass, padding: 20, borderRadius: 16 }]}>
+                  <View style={[styles.walletBalance, { backgroundColor: colors.primary + '10', marginBottom: 16 }]}>
+                    <Building2 size={32} color={colors.primary} />
+                    <View style={{ marginLeft: 16, flex: 1 }}>
+                      <CustomText variant="h3" style={{ color: colors.foreground }}>Pay directly at store</CustomText>
+                      <CustomText style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
+                        No payment is required now. You will pay the seller when you collect your order.
+                      </CustomText>
+                    </View>
+                  </View>
+
+                  <View style={{ gap: 12 }}>
+                    {[
+                      'Show your pickup code at the store',
+                      'Pay the seller directly (cash or mobile money)',
+                      'Funds go straight to the seller — no escrow hold'
+                    ].map((text, i) => (
+                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <CheckCircle2 size={16} color="#4ade80" />
+                        <CustomText style={{ color: colors.muted, fontSize: 13, marginLeft: 10 }}>{text}</CustomText>
+                      </View>
+                    ))}
                   </View>
                 </View>
-
-                <View style={{ gap: 12 }}>
-                  {[
-                    'Show your pickup code at the store',
-                    'Pay the seller directly (cash or mobile money)',
-                    'Funds go straight to the seller — no escrow hold'
-                  ].map((text, i) => (
-                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <CheckCircle2 size={16} color="#4ade80" />
-                      <CustomText style={{ color: colors.muted, fontSize: 13, marginLeft: 10 }}>{text}</CustomText>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : (
-              <>
-                <View style={styles.paymentMethods}>
-                  {[
-                    { id: 'MOBILE_MONEY', label: 'Mobile Money', icon: Smartphone },
-                    { id: 'BANK_TRANSFER', label: 'Bank Transfer', icon: Building },
-                    { id: 'CARD', label: 'Card Payment', icon: CreditCard },
-                    { id: 'WALLET', label: 'AMO Wallet', icon: Wallet },
-                  ].map(method => (
-                     <TouchableOpacity 
-                        key={method.id} 
+              ) : (
+                <>
+                  <View style={styles.paymentMethods}>
+                    {[
+                      { id: 'MOBILE_MONEY', label: 'Mobile Money', icon: Smartphone },
+                      { id: 'BANK_TRANSFER', label: 'Bank Transfer', icon: Building },
+                      { id: 'CARD', label: 'Card Payment', icon: CreditCard },
+                      { id: 'WALLET', label: 'AMO Wallet', icon: Wallet },
+                    ].map(method => (
+                      <TouchableOpacity
+                        key={method.id}
                         onPress={() => setPaymentMethod(method.id)}
                         style={[
-                          styles.paymentMethodItem, 
+                          styles.paymentMethodItem,
                           { backgroundColor: colors.glass, borderColor: paymentMethod === method.id ? colors.primary : colors.border }
                         ]}
                       >
@@ -739,204 +825,197 @@ const CheckoutScreen = ({ route, navigation }) => {
                         </CustomText>
                         {paymentMethod === method.id && <CheckCircle2 size={18} color={colors.primary} />}
                       </TouchableOpacity>
-                  ))}
+                    ))}
+                  </View>
+
+                  {paymentMethod === 'MOBILE_MONEY' && (
+                    <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
+                      <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>You will receive a USSD prompt on your phone to authorize the transaction.</CustomText>
+                      {renderLabel('MOBILE NUMBER')}
+                      {renderPhoneInput()}
+                    </View>
+                  )}
+
+                  {paymentMethod === 'BANK_TRANSFER' && (
+                    <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
+                      <View style={styles.bankInfoRow}>
+                        <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Bank:</CustomText>
+                        <CustomText style={[styles.bankValue, { color: colors.foreground }]}>Bank of Kigali</CustomText>
+                      </View>
+                      <View style={styles.bankInfoRow}>
+                        <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Account:</CustomText>
+                        <CustomText style={[styles.bankValue, { color: colors.foreground }]}>00040-0123456-78</CustomText>
+                      </View>
+                      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                      <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Please upload proof of payment after the transfer.</CustomText>
+                    </View>
+                  )}
+
+                  {paymentMethod === 'CARD' && (
+                    <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
+                      <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your card details are encrypted and never stored.</CustomText>
+
+                      {renderLabel('CARD NUMBER')}
+                      {renderInput(<CreditCard size={18} color={colors.muted} />, '1234 5678 9012 3456', cardNumber, setCardNumber, 'numeric')}
+
+                      <View style={styles.formRow}>
+                        <View style={{ flex: 1, marginRight: 10 }}>
+                          {renderLabel('EXPIRY DATE')}
+                          {renderInput(null, 'MM / YY', expiryDate, setExpiryDate)}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          {renderLabel('CVV')}
+                          {renderInput(null, '•••', cvv, setCvv, 'numeric')}
+                        </View>
+                      </View>
+
+                      {renderLabel('CARDHOLDER NAME')}
+                      {renderInput(<User size={18} color={colors.muted} />, 'Name on card', cardholderName, setCardholderName)}
+                    </View>
+                  )}
+
+                  {paymentMethod === 'WALLET' && (
+                    <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
+                      <View style={[styles.walletBalance, { backgroundColor: colors.primary + '10' }]}>
+                        <View>
+                          <CustomText style={[styles.walletLabel, { color: colors.foreground }]}>AMO Wallet Balance</CustomText>
+                          <CustomText style={[styles.walletAmount, { color: colors.primary }]}>Rwf 0</CustomText>
+                        </View>
+                        <Wallet size={32} color={colors.primary} opacity={0.3} />
+                      </View>
+                      <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your wallet balance will be deducted upon order confirmation.</CustomText>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          )}
+
+          {step === 4 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
+                  <CustomText style={styles.stepCounterText}>4</CustomText>
+                </View>
+                <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Review & Confirm</CustomText>
+              </View>
+
+              <View style={[styles.summaryCard, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                <CustomText variant="h3" style={[styles.summaryTitle, { color: colors.muted }]}>Order Summary</CustomText>
+
+                <View style={styles.itemsReview}>
+                  {checkoutItems.map(item => {
+                    const imageUrl = item.product.media?.[0]?.url || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=200&q=80';
+                    return (
+                      <View key={item.id} style={styles.reviewItem}>
+                        <Image source={{ uri: imageUrl }} style={styles.reviewProductImage} />
+                        <View style={styles.reviewItemInfo}>
+                          <CustomText style={[styles.reviewItemText, { color: colors.foreground }]} numberOfLines={1}>
+                            {item.product.title}
+                          </CustomText>
+                          <CustomText style={[styles.reviewItemQty, { color: colors.muted }]}>Qty: {item.quantity}</CustomText>
+                          <CustomText style={[styles.reviewPrice, { color: colors.primary }]}>
+                            Rwf {(item.product.price * item.quantity).toLocaleString()}
+                          </CustomText>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
 
-                {paymentMethod === 'MOBILE_MONEY' && (
-                  <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                    <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>You will receive a USSD prompt on your phone to authorize the transaction.</CustomText>
-                    {renderLabel('MOBILE NUMBER')}
-                    {renderInput(<Smartphone size={18} color={colors.muted} />, '+250 7XX XXX XXX', phoneNumber, setPhoneNumber, 'phone-pad')}
-                  </View>
-                )}
+                {/* <View style={[styles.divider, { backgroundColor: colors.border }]} /> */}
 
-                {paymentMethod === 'BANK_TRANSFER' && (
-                  <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                    <View style={styles.bankInfoRow}>
-                      <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Bank:</CustomText>
-                      <CustomText style={[styles.bankValue, { color: colors.foreground }]}>Bank of Kigali</CustomText>
-                    </View>
-                    <View style={styles.bankInfoRow}>
-                      <CustomText style={[styles.bankLabel, { color: colors.muted }]}>Account:</CustomText>
-                      <CustomText style={[styles.bankValue, { color: colors.foreground }]}>00040-0123456-78</CustomText>
-                    </View>
-                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                    <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Please upload proof of payment after the transfer.</CustomText>
-                  </View>
-                )}
+                {/* <View style={styles.summaryRow}>
+                  <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Subtotal</CustomText>
+                  <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>Rwf {checkoutTotal.toLocaleString()}</CustomText>
+                </View>
+                <View style={styles.summaryRow}>
+                  <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Delivery</CustomText>
+                  <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>
+                    {deliveryFee > 0 ? `Rwf ${deliveryFee.toLocaleString()}` : 'Free'}
+                  </CustomText>
+                </View> */}
 
-                {paymentMethod === 'CARD' && (
-                  <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                    <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your card details are encrypted and never stored.</CustomText>
-                    
-                    {renderLabel('CARD NUMBER')}
-                    {renderInput(<CreditCard size={18} color={colors.muted} />, '1234 5678 9012 3456', cardNumber, setCardNumber, 'numeric')}
-                    
-                    <View style={styles.formRow}>
-                      <View style={{ flex: 1, marginRight: 10 }}>
-                        {renderLabel('EXPIRY DATE')}
-                        {renderInput(null, 'MM / YY', expiryDate, setExpiryDate)}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        {renderLabel('CVV')}
-                        {renderInput(null, '•••', cvv, setCvv, 'numeric')}
-                      </View>
-                    </View>
-                    
-                    {renderLabel('CARDHOLDER NAME')}
-                    {renderInput(<User size={18} color={colors.muted} />, 'Name on card', cardholderName, setCardholderName)}
-                  </View>
-                )}
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-                {paymentMethod === 'WALLET' && (
-                  <View style={[styles.paymentForm, { backgroundColor: colors.glass }]}>
-                    <View style={[styles.walletBalance, { backgroundColor: colors.primary + '10' }]}>
-                      <View>
-                        <CustomText style={[styles.walletLabel, { color: colors.foreground }]}>AMO Wallet Balance</CustomText>
-                        <CustomText style={[styles.walletAmount, { color: colors.primary }]}>Rwf 0</CustomText>
-                      </View>
-                      <Wallet size={32} color={colors.primary} opacity={0.3} />
-                    </View>
-                    <CustomText style={[styles.paymentInfoText, { color: colors.muted }]}>Your wallet balance will be deducted upon order confirmation.</CustomText>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-        )}
+                <View style={styles.totalRow}>
+                  <CustomText variant="h2" style={{ color: colors.foreground }}>Total</CustomText>
+                  <CustomText variant="h1" style={{ color: colors.primary }}>Rwf {totalAmount.toLocaleString()}</CustomText>
+                </View>
 
-        {step === 4 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.stepCounter, { backgroundColor: colors.primary }]}>
-                <CustomText style={styles.stepCounterText}>4</CustomText>
-              </View>
-              <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Review & Confirm</CustomText>
-            </View>
-
-            <View style={[styles.summaryCard, { backgroundColor: colors.glass, borderColor: colors.border }]}>
-              <CustomText variant="h3" style={[styles.summaryTitle, { color: colors.muted }]}>Order Summary</CustomText>
-              
-              <View style={styles.itemsReview}>
-                {checkoutItems.map(item => {
-                  const imageUrl = item.product.media?.[0]?.url || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=200&q=80';
-                  return (
-                    <View key={item.id} style={styles.reviewItem}>
-                      <Image source={{ uri: imageUrl }} style={styles.reviewProductImage} />
-                      <View style={styles.reviewItemInfo}>
-                        <CustomText style={[styles.reviewItemText, { color: colors.foreground }]} numberOfLines={1}>
-                          {item.product.title}
-                        </CustomText>
-                        <CustomText style={[styles.reviewItemQty, { color: colors.muted }]}>Qty: {item.quantity}</CustomText>
-                        <CustomText style={[styles.reviewPrice, { color: colors.primary }]}>
-                          Rwf {(item.product.price * item.quantity).toLocaleString()}
-                        </CustomText>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              <View style={styles.summaryRow}>
-                <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Subtotal</CustomText>
-                <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>Rwf {checkoutTotal.toLocaleString()}</CustomText>
-              </View>
-              <View style={styles.summaryRow}>
-                <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Delivery</CustomText>
-                <CustomText style={[styles.summaryValue, { color: colors.foreground }]}>
-                  {deliveryFee > 0 ? `Rwf ${deliveryFee.toLocaleString()}` : 'Free'}
-                </CustomText>
-              </View>
-              <View style={styles.summaryRow}>
-                <CustomText style={[styles.summaryLabel, { color: colors.muted }]}>Protection Fee</CustomText>
-                <CustomText style={[styles.summaryValue, { color: '#4ade80' }]}>Rwf {protectionFee.toLocaleString()}</CustomText>
-              </View>
-
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              <View style={styles.totalRow}>
-                <CustomText variant="h2" style={{ color: colors.foreground }}>Total</CustomText>
-                <CustomText variant="h1" style={{ color: colors.primary }}>Rwf {totalAmount.toLocaleString()}</CustomText>
-              </View>
-
-              <View style={[styles.protectionBadge, { backgroundColor: colors.primary + '10' }]}>
-                <ShieldCheck size={18} color="#4ade80" />
-                <CustomText style={[styles.protectionText, { color: colors.muted }]}>
-                  {pickupType === 'PICKUP' 
-                    ? 'Pay directly at store. Funds go straight to the seller.'
-                    : 'Funds held in escrow until delivery is confirmed.'
-                  }
-                </CustomText>
+                <View style={[styles.protectionBadge, { backgroundColor: colors.primary + '10' }]}>
+                  <ShieldCheck size={18} color="#4ade80" />
+                  <CustomText style={[styles.protectionText, { color: colors.muted }]}>
+                    {pickupType === 'PICKUP'
+                      ? 'Pay directly at store. Funds go straight to the seller.'
+                      : 'Funds held in escrow until delivery is confirmed.'
+                    }
+                  </CustomText>
+                </View>
               </View>
             </View>
-          </View>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
 
-      {/* Footer Navigation */}
-      <View style={[styles.footer, { backgroundColor: colors.glass, borderTopColor: colors.border }]}>
-        {step > 1 && (
-          <TouchableOpacity 
-            style={[styles.navBtn, styles.prevBtn, { borderStyle: 'solid', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass }]}
-            onPress={() => setStep(step - 1)}
-          >
-            <ChevronLeft size={20} color={colors.foreground} />
-            <CustomText style={{ color: colors.foreground, marginLeft: 4 }}>Back</CustomText>
-          </TouchableOpacity>
-        )}
-        
-        <CustomButton
-          title={step === 4 ? (loading ? 'Processing...' : (pickupType === 'PICKUP' ? 'Confirm Order — Pay at Store' : 'Place Order')) : 'Continue'}
-          style={[styles.primaryNavBtn, step === 1 && { flex: 1 }]}
-          loading={loading}
-          onPress={() => {
-            if (step === 1) {
-              if (!recipientName.trim()) {
-                Alert.alert('Invalid Input', 'Please enter the recipient name.');
-                return;
-              }
-              if (!phoneNumber.trim()) {
-                Alert.alert('Invalid Input', 'Please enter the phone number.');
-                return;
-              }
-              if (!validateRwandaPhoneNumber(phoneNumber)) {
-                Alert.alert(
-                  'Invalid Phone Number',
-                  'Please enter a valid Rwanda phone number (e.g., +250 78X XXX XXX or 078X XXX XXX).'
-                );
-                return;
-              }
-              setStep(2);
-            } else if (step === 3) {
-              if (paymentMethod === 'MOBILE_MONEY' && pickupType !== 'PICKUP') {
+        {/* Footer Navigation */}
+        <View style={[styles.footer, { backgroundColor: colors.glass, borderTopColor: colors.border }]}>
+          {step > 1 && (
+            <TouchableOpacity
+              style={[styles.navBtn, styles.prevBtn, { borderStyle: 'solid', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass }]}
+              onPress={() => setStep(step - 1)}
+            >
+              <ChevronLeft size={20} color={colors.foreground} />
+              <CustomText style={{ color: colors.foreground, marginLeft: 4 }}>Back</CustomText>
+            </TouchableOpacity>
+          )}
+
+          <CustomButton
+            title={step === 4 ? (loading ? 'Processing...' : (pickupType === 'PICKUP' ? 'Confirm Order — Pay at Store' : 'Place Order')) : 'Continue'}
+            style={[styles.primaryNavBtn, step === 1 && { flex: 1 }]}
+            loading={loading}
+            onPress={() => {
+              if (step === 1) {
+                if (!recipientName.trim()) {
+                  Alert.alert('Invalid Input', 'Please enter the recipient name.');
+                  return;
+                }
                 if (!phoneNumber.trim()) {
-                  Alert.alert('Invalid Input', 'Please enter the mobile number for payment.');
+                  Alert.alert('Invalid Input', 'Please enter the phone number.');
                   return;
                 }
-                if (!validateRwandaPhoneNumber(phoneNumber)) {
-                  Alert.alert(
-                    'Invalid Phone Number',
-                    'Please enter a valid Rwanda phone number for payment (e.g., +250 78X XXX XXX or 078X XXX XXX).'
-                  );
+                const err = validateRwandaPhoneNumber(phoneNumber);
+                if (err) {
+                  // Error is already shown inline; just scroll attention to it
+                  setPhoneError(err);
                   return;
                 }
+                setStep(2);
+              } else if (step === 3) {
+                if (paymentMethod === 'MOBILE_MONEY' && pickupType !== 'PICKUP') {
+                  if (!phoneNumber.trim()) {
+                    Alert.alert('Invalid Input', 'Please enter the mobile number for payment.');
+                    return;
+                  }
+                  const err = validateRwandaPhoneNumber(phoneNumber);
+                  if (err) {
+                    setPhoneError(err);
+                    return;
+                  }
+                }
+                setStep(4);
+              } else if (step < 4) {
+                setStep(step + 1);
+              } else {
+                handlePlaceOrder();
               }
-              setStep(4);
-            } else if (step < 4) {
-              setStep(step + 1);
-            } else {
-              handlePlaceOrder();
-            }
-          }}
-        >
-          {step < 4 && <ChevronRight size={20} color="#FFF" style={{ marginLeft: 4 }} />}
-        </CustomButton>
-      </View>
+            }}
+          >
+            {step < 4 && <ChevronRight size={20} color="#FFF" style={{ marginLeft: 4 }} />}
+          </CustomButton>
+        </View>
       </KeyboardAvoidingView>
       {renderPickerModal()}
-      
+
       {/* Custom Pickup Time Picker Modal */}
       <Modal
         visible={timePickerVisible}
@@ -995,10 +1074,10 @@ const CheckoutScreen = ({ route, navigation }) => {
                   let [hour, minute] = timeStr.split(':').map(n => parseInt(n, 10));
                   if (period === 'PM' && hour !== 12) hour += 12;
                   if (period === 'AM' && hour === 12) hour = 0;
-                  
+
                   const slotTime = new Date(today);
                   slotTime.setHours(hour, minute, 0, 0);
-                  
+
                   // Must be at least 1 hour from now for "Pro" preparation time
                   return slotTime.getTime() > (today.getTime() + 60 * 60 * 1000);
                 }).map((time) => {
@@ -1026,21 +1105,21 @@ const CheckoutScreen = ({ route, navigation }) => {
                 '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
                 '05:00 PM', '05:30 PM', '06:00 PM'
               ].filter((time) => {
-                  const today = new Date();
-                  if (selectedDate.toDateString() !== today.toDateString()) return true;
-                  const [timeStr, period] = time.split(' ');
-                  let [hour, minute] = timeStr.split(':').map(n => parseInt(n, 10));
-                  if (period === 'PM' && hour !== 12) hour += 12;
-                  if (period === 'AM' && hour === 12) hour = 0;
-                  
-                  const slotTime = new Date(today);
-                  slotTime.setHours(hour, minute, 0, 0);
-                  return slotTime.getTime() > (today.getTime() + 60 * 60 * 1000);
+                const today = new Date();
+                if (selectedDate.toDateString() !== today.toDateString()) return true;
+                const [timeStr, period] = time.split(' ');
+                let [hour, minute] = timeStr.split(':').map(n => parseInt(n, 10));
+                if (period === 'PM' && hour !== 12) hour += 12;
+                if (period === 'AM' && hour === 12) hour = 0;
+
+                const slotTime = new Date(today);
+                slotTime.setHours(hour, minute, 0, 0);
+                return slotTime.getTime() > (today.getTime() + 60 * 60 * 1000);
               }).length === 0 && (
-                <CustomText style={{ color: '#ef4444', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
-                  No more pickup slots available for today. Please select tomorrow.
-                </CustomText>
-              )}
+                  <CustomText style={{ color: '#ef4444', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+                    No more pickup slots available for today. Please select tomorrow.
+                  </CustomText>
+                )}
 
               <CustomButton
                 title="Confirm Schedule"
@@ -1149,6 +1228,30 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 14,
   },
+  // ─── Inline validation styles ──────────────────────────────────────────────
+  inlineErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  inlineErrorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  inlineSuccessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  inlineSuccessText: {
+    color: '#4ade80',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  // ──────────────────────────────────────────────────────────────────────────
   textAreaWrapper: {
     borderWidth: 1,
     borderRadius: 14,
@@ -1225,6 +1328,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94A3B8',
     marginLeft: 24,
+  },
+  mapButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   pickupHours: {
     fontSize: 11,

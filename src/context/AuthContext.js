@@ -13,11 +13,14 @@ export const AuthProvider = ({ children }) => {
 
 
   useEffect(() => {
+    let isMounted = true;
+
     // Load persisted user data on startup
     const loadStorageData = async () => {
       try {
         const storedUser = await AsyncStorage.getItem('@auth_user');
         const storedToken = await AsyncStorage.getItem('@auth_token');
+        if (!isMounted) return;
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
           setUser(parsedUser);
@@ -27,11 +30,17 @@ export const AuthProvider = ({ children }) => {
       } catch (e) {
         console.error('Failed to load auth state', e);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     loadStorageData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = async (userData) => {

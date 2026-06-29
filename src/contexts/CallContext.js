@@ -187,7 +187,10 @@ export const CallProvider = ({ children }) => {
   };
 
   const receiveIncomingCall = (data) => {
-    if (!data?.callerId || data.callerId === user?.id) return;
+    if (!data || typeof data !== 'object' || !data.callerId || data.callerId === user?.id) {
+      console.warn('[CallContext] receiveIncomingCall received invalid data or self-call attempt:', data);
+      return;
+    }
     const normalized = {
       callId: data.callId || `${data.callerId}-${Date.now()}`,
       targetId: data.callerId,
@@ -521,6 +524,7 @@ export const CallProvider = ({ children }) => {
       }
 
       pcRef.current.onicecandidate = (event) => {
+        if (!pcRef.current) return; // Guard against unmounted component/cleanup
         if (event.candidate) {
           // react-native-webrtc's candidate object does NOT expose .type/.protocol/.address
           // like browser WebRTC does — those were always undefined before. The actual
@@ -543,6 +547,7 @@ export const CallProvider = ({ children }) => {
       };
 
       pcRef.current.ontrack = (event) => {
+        if (!pcRef.current) return; // Guard against unmounted component/cleanup
         console.log('[CallContext] ontrack fired, streams:', event.streams?.length);
         if (event.streams && event.streams[0]) {
           setRemoteStream(event.streams[0]);
@@ -550,14 +555,17 @@ export const CallProvider = ({ children }) => {
       };
 
       pcRef.current.oniceconnectionstatechange = () => {
+        if (!pcRef.current) return; // Guard against unmounted component/cleanup
         console.log('[CallContext] ICE connection state:', pcRef.current?.iceConnectionState);
       };
 
       pcRef.current.onconnectionstatechange = () => {
+        if (!pcRef.current) return; // Guard against unmounted component/cleanup
         console.log('[CallContext] Peer connection state:', pcRef.current?.connectionState);
       };
 
       pcRef.current.onsignalingstatechange = () => {
+        if (!pcRef.current) return; // Guard against unmounted component/cleanup
         console.log('[CallContext] Signaling state:', pcRef.current?.signalingState);
       };
     } catch (err) {

@@ -365,6 +365,10 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.loadingContainer}>
                 <ActivityIndicator color={colors.primary} />
               </View>
+            ) : filteredProducts.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <CustomText style={[styles.emptyText, { color: colors.muted }]}>No product found for this category</CustomText>
+              </View>
             ) : (
               filteredProducts.map((item) => (
                 <ProductCard key={item.id} product={item} onPress={() => navigation.navigate('ProductDetail', { product: item })} />
@@ -373,8 +377,8 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* PRO Banner */}
-        <View style={[styles.section, { marginBottom: 32 }]}>
+        {/* PRO Banner - Commented out */}
+        {/* <View style={[styles.section, { marginBottom: 32 }]}>
           <GlassContainer style={styles.proBanner}>
             <View style={styles.proBadge}>
               <CustomText style={styles.proBadgeText}>⭐ {t('proSeller')}</CustomText>
@@ -392,7 +396,7 @@ const HomeScreen = ({ navigation }) => {
               onPress={() => { }}
             />
           </GlassContainer>
-        </View>
+        </View> */}
       </ScrollView>
 
       {/* Scroll to Top Floating Button */}
@@ -685,6 +689,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
   scrollTopButton: {
     position: 'absolute',

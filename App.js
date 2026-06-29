@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import './src/i18n';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, AppState, Platform, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -59,29 +59,7 @@ import { NavigationRefContext, rootNavigationRef } from './src/context/Navigatio
 
 console.log('📡 [ENV] API_BASE_URL loaded as:', API_BASE_URL);
 
-// Network Performance Logger
-const originalFetch = global.fetch;
-global.fetch = async (...args) => {
-  const url = args[0];
-  const startTime = Date.now();
-  console.log(`🌐 API CALL STARTED: ${url}`);
-  try {
-    const response = await originalFetch(...args);
-    const duration = Date.now() - startTime;
-    const emoji = duration < 500 ? '✅' : duration < 1500 ? '⚠️' : '🚨';
-    console.log(`${emoji} API DONE: ${url}`);
-    console.log(`⏱️  Time: ${duration}ms ${duration > 1500 ? '← TOO SLOW!' : ''}`);
-    console.log(`📦 Status: ${response.status}`);
-    return response;
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    console.log(`❌ API FAILED: ${url}`);
-    console.log(`⏱️  Time: ${duration}ms`);
-    console.log(`💥 Error: ${error.message}`);
-    throw error;
-  }
-};
-
+// ...existing code...
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -203,9 +181,9 @@ const AppTabs = () => {
     >
       {!isSellingDisabled && <Tab.Screen name="Home" component={HomeStack} />}
       {!isSellingDisabled && (
-        <Tab.Screen 
-          name="Cart" 
-          component={CartScreen} 
+        <Tab.Screen
+          name="Cart"
+          component={CartScreen}
           options={{
             tabBarBadge: cartCount > 0 ? cartCount : null,
             tabBarBadgeStyle: { backgroundColor: '#e67e22', fontSize: 10 }
@@ -274,7 +252,7 @@ const RootNavigator = () => {
     const now = Date.now();
     if (now - lastActiveSaved.current > 5000) { // Throttle AsyncStorage writes to 5 seconds
       lastActiveSaved.current = now;
-      AsyncStorage.setItem('@last_active_time', now.toString()).catch(() => {});
+      AsyncStorage.setItem('@last_active_time', now.toString()).catch(() => { });
     }
 
     if (isBuyerRole) {
@@ -332,7 +310,7 @@ const RootNavigator = () => {
       resetTimer();
     };
     checkInitialState();
-    
+
     return () => {
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     };
@@ -365,7 +343,7 @@ const RootNavigator = () => {
         const now = Date.now();
         backgroundTime.current = now;
         lastActiveSaved.current = now;
-        AsyncStorage.setItem('@last_active_time', now.toString()).catch(() => {});
+        AsyncStorage.setItem('@last_active_time', now.toString()).catch(() => { });
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
       }
     });
@@ -418,45 +396,45 @@ const RootNavigator = () => {
           <CourierDrawerContext.Provider value={{ visible: courierDrawerVisible, setVisible: setCourierDrawerVisible, toggleDrawer: () => setCourierDrawerVisible(v => !v) }}>
             <AgentDrawerContext.Provider value={{ visible: agentDrawerVisible, setVisible: setAgentDrawerVisible, toggleDrawer: () => setAgentDrawerVisible(v => !v) }}>
               <NavigationRefContext.Provider value={navigationRef}>
-              <NavigationContainer 
-                ref={(node) => {
-                  navigationRef.current = node;
-                  rootNavigationRef.current = node;
-                }}
-                linking={linking}
-                onStateChange={(state) => {
-                  if (!state) return;
-                  try {
-                    let route = state.routes[state.index];
-                    while (route && route.state && typeof route.state.index === 'number') {
-                      const nextRoute = route.state.routes[route.state.index];
-                      if (nextRoute) {
-                        route = nextRoute;
-                      } else {
-                        break;
+                <NavigationContainer
+                  ref={(node) => {
+                    navigationRef.current = node;
+                    rootNavigationRef.current = node;
+                  }}
+                  linking={linking}
+                  onStateChange={(state) => {
+                    if (!state) return;
+                    try {
+                      let route = state.routes[state.index];
+                      while (route && route.state && typeof route.state.index === 'number') {
+                        const nextRoute = route.state.routes[route.state.index];
+                        if (nextRoute) {
+                          route = nextRoute;
+                        } else {
+                          break;
+                        }
                       }
-                    }
-                    if (route && route.name) {
-                      setCurrentRoute(route.name);
-                      if (user) {
-                        setCurrentRouteObj({ name: route.name, params: route.params });
+                      if (route && route.name) {
+                        setCurrentRoute(route.name);
+                        if (user) {
+                          setCurrentRouteObj({ name: route.name, params: route.params });
+                        }
                       }
+                    } catch (err) {
+                      console.warn('[NAVIGATION] Error tracking route state', err);
                     }
-                  } catch (err) {
-                    console.warn('[NAVIGATION] Error tracking route state', err);
-                  }
-                }}
-              >
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="MainApp" component={AppTabs} />
-                  <Stack.Screen name="Checkout" component={CheckoutScreen} />
-                  <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
-                  {!user && (
-                    <Stack.Screen name="Auth" component={AuthStack} />
-                  )}
-                </Stack.Navigator>
-                <AuthOverlay currentRoute={currentRoute} />
-              </NavigationContainer>
+                  }}
+                >
+                  <Stack.Navigator screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="MainApp" component={AppTabs} />
+                    <Stack.Screen name="Checkout" component={CheckoutScreen} />
+                    <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
+                    {!user && (
+                      <Stack.Screen name="Auth" component={AuthStack} />
+                    )}
+                  </Stack.Navigator>
+                  <AuthOverlay currentRoute={currentRoute} />
+                </NavigationContainer>
               </NavigationRefContext.Provider>
             </AgentDrawerContext.Provider>
           </CourierDrawerContext.Provider>
@@ -474,16 +452,68 @@ const RootNavigator = () => {
 
 // Security wrapper component
 const SecurityWrapper = ({ children }) => {
-  const { appLocked } = useAppSecurity();
+  const { appLocked, suppressUnlockToastRef } = useAppSecurity();
+  const [showToast, setShowToast] = React.useState(false);
+  const prevLockedRef = React.useRef(appLocked);
+
+  React.useEffect(() => {
+    if (prevLockedRef.current && !appLocked && !suppressUnlockToastRef.current) {
+      const { ToastAndroid, Platform } = require('react-native');
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('App unlocked successfully', ToastAndroid.SHORT);
+      } else {
+        setShowToast(true);
+        const timer = setTimeout(() => setShowToast(false), 2500);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevLockedRef.current = appLocked;
+    suppressUnlockToastRef.current = false;
+  }, [appLocked]);
+
   return (
     <>
       {children}
       <AppLockOverlay visible={appLocked} />
+      {showToast && (
+        <View style={styles.toastContainer}>
+          <CustomText style={styles.toastText}>App unlocked successfully</CustomText>
+        </View>
+      )}
     </>
   );
 };
 
 export default function App() {
+  useEffect(() => {
+    const originalFetch = global.fetch;
+    global.fetch = async (...args) => {
+      const url = args[0];
+      const startTime = Date.now();
+      console.log(`🌐 API CALL STARTED: ${url}`);
+      try {
+        const response = await originalFetch(...args);
+        const duration = Date.now() - startTime;
+        const emoji = duration < 500 ? '✅' : duration < 1500 ? '⚠️' : '🚨';
+        console.log(`${emoji} API DONE: ${url}`);
+        console.log(`⏱️  Time: ${duration}ms ${duration > 1500 ? '← TOO SLOW!' : ''}`);
+        console.log(`📦 Status: ${response.status}`);
+        return response;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        console.log(`❌ API FAILED: ${url}`);
+        console.log(`⏱️  Time: ${duration}ms`);
+        console.log(`💥 Error: ${error.message}`);
+        throw error;
+      }
+    };
+
+    // Cleanup function to restore original fetch if component unmounts
+    return () => {
+      global.fetch = originalFetch;
+    };
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
@@ -548,5 +578,28 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '900',
     textAlign: 'center',
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(185, 83, 16, 0.95)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  toastText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   }
 });

@@ -12,7 +12,12 @@
           "package_name": "com.ihyacinthe.amo_mobile_market"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "628531278836-evaft7mi1n5cjghebvnc7v4hlicvusaj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAhOMtb-tXYyM1RFoc18L1J_uUNucL4rZw"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "628531278836-evaft7mi1n5cjghebvnc7v4hlicvusaj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

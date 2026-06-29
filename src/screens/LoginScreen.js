@@ -164,9 +164,15 @@ const LoginScreen = ({ navigation }) => {
       // Redirect based on role
       const role = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
       if (['SELLER', 'COURIER', 'AGENT'].includes(role)) {
-        navigation.navigate('MainApp', { screen: 'Me' });
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { screen: 'Me' } }],
+        });
       } else {
-        navigation.navigate('MainApp', { screen: 'Home' });
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+        });
       }
 
     } catch (error) {
@@ -289,9 +295,15 @@ const LoginScreen = ({ navigation }) => {
       const role = result.user?.role?.toUpperCase() || result.role?.toUpperCase();
 
       if (['SELLER', 'COURIER', 'AGENT'].includes(role)) {
-        navigation.navigate('MainApp', { screen: 'Me' });
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { screen: 'Me' } }],
+        });
       } else {
-        navigation.navigate('MainApp', { screen: 'Home' });
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp', params: { screen: 'Home' } }],
+        });
       }
 
     } catch (error) {

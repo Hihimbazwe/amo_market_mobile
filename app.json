@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -23,7 +23,11 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#030712"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ]
     },
     "notification": {
       "icon": "./assets/icon.png",
@@ -34,10 +38,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "a9961d64-b0ee-4472-b5e2-546ad16ffddf"
+        "projectId": "6d96059b-cab0-46cb-b5b6-683cfd4ca5cd"
       }
     },
-    "owner": "ihimbazwe",
+    "owner": "ihyacinthee",
     "plugins": [
       "expo-video",
       "expo-contacts",

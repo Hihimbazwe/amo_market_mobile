@@ -215,14 +215,8 @@ const CartScreen = ({ navigation }) => {
             data={cartItems}
             renderItem={renderCartItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={[
-              styles.listContent,
-              // The extra paddingBottom ensures the last cart item scrolls
-              // fully above the absolute-positioned checkout bar. Without
-              // this, the bar overlaps the bottom items, making their
-              // delete/quantity/select controls unreachable.
-              { paddingBottom: CHECKOUT_BAR_HEIGHT },
-            ]}
+            contentContainerStyle={styles.listContent}
+            style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
               <View style={[styles.selectAllContainer, { borderBottomColor: 'transparent' }]}>
@@ -249,7 +243,7 @@ const CartScreen = ({ navigation }) => {
           <View style={[styles.summaryBox, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
             <View style={styles.totalRow}>
               <View>
-                <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 2 }}>{t('total')}</CustomText>
+                <CustomText style={{ color: colors.muted, fontSize: 12, marginBottom: 0 }}>{t('total')}</CustomText>
                 <CustomText variant="h2" style={{ color: colors.primary }}>Rwf {selectedCartTotal.toLocaleString()}</CustomText>
               </View>
               <CustomButton
@@ -364,7 +358,6 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 24,
     paddingTop: 12,
-    // paddingBottom is applied dynamically above to clear the checkout bar.
   },
   cartItem: {
     flexDirection: 'row',
@@ -440,10 +433,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   summaryBox: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingBottom: Platform.OS === 'ios' ? 34 : 16,

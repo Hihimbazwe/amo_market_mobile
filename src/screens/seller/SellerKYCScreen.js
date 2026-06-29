@@ -3,7 +3,7 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicato
 import {
   Menu, ShieldCheck, ShieldAlert, Clock, Upload, CreditCard, Camera,
   Building2, CheckCircle2, XCircle, AlertCircle, ChevronRight,
-  Phone, Smartphone, Zap, Check, X, Mail, Star, Wallet,
+  Phone, Smartphone, Zap, Check, X, Mail, Star, Wallet, FileText,
 } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -12,32 +12,37 @@ import { SellerDrawerContext } from '../../context/SellerDrawerContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { sellerService } from '../../api/sellerService';
 import { aiService } from '../../api/aiService';
 
 const STEPS = ["Business Profile"];
 
 const getKycSteps = (profile) => [
-  {
-    id: 'id',
-    title: 'National ID / Passport',
-    subtitle: 'Upload front and back of your national ID or a valid passport',
-    icon: CreditCard,
-    status: profile?.idDocumentUrl ? 'approved' : 'not_started',
-  },
-  {
-    id: 'cit',
-    title: 'CIT Tax Declaration',
-    subtitle: 'Upload your latest Corporate Income Tax (CIT) declaration',
-    icon: ShieldAlert,
-    status: profile?.citDeclarationUrl ? 'approved' : 'not_started',
-  },
+  // Hidden to match the current Amomarket web KYC flow.
+  // {
+  //   id: 'id',
+  //   title: 'National ID / Passport',
+  //   subtitle: 'Optional: clear photo or scan of your valid government-issued ID',
+  //   icon: CreditCard,
+  //   status: profile?.idDocumentUrl ? 'approved' : 'not_started',
+  //   required: false,
+  // },
+  // {
+  //   id: 'cit',
+  //   title: 'CIT Tax Declaration',
+  //   subtitle: 'Optional: latest Corporate Income Tax declaration document',
+  //   icon: ShieldAlert,
+  //   status: profile?.citDeclarationUrl ? 'approved' : 'not_started',
+  //   required: false,
+  // },
   {
     id: 'business',
-    title: 'Business Registration',
-    subtitle: 'Upload your RDB certificate or business registration document',
+    title: 'RDB Certificate',
+    subtitle: 'Required: Rwanda Development Board business registration certificate',
     icon: Building2,
     status: profile?.rdbCertificateUrl ? 'approved' : 'not_started',
+    required: true,
   },
 ];
 
@@ -74,6 +79,7 @@ export default function SellerKYCScreen() {
   });
   const [uploading, setUploading] = useState(null);
   const [idValidation, setIdValidation] = useState({ status: 'pending', reason: '' }); // pending, validating, valid, invalid
+  const [tinNumber, setTinNumber] = useState('');
 
   const fetchProfileAndPlans = async () => {
     if (!user?.id) return;
@@ -85,6 +91,12 @@ export default function SellerKYCScreen() {
       setProfile(kycData);
       setDbPlans(plansData);
       if (kycData?.phone) setPhone(kycData.phone);
+      if (kycData?.tinNumber) setTinNumber(kycData.tinNumber);
+      setDocs({
+        id: kycData?.idDocumentUrl || null,
+        cit: kycData?.citDeclarationUrl || null,
+        business: kycData?.rdbCertificateUrl || null,
+      });
       if (kycData?.kycSubmitted) {
         // If already submitted, we can still show the profile or redirect
       }
@@ -105,6 +117,23 @@ export default function SellerKYCScreen() {
     fetchProfileAndPlans();
   };
 
+  const uploadDocumentAsset = async (stepId, asset, base64 = null) => {
+    if (!asset?.uri) return;
+    setUploading(stepId);
+    try {
+      const uploadRes = await sellerService.uploadKycFile(user.id, asset);
+      if (!uploadRes?.url) throw new Error('Upload failed: no file URL returned.');
+      setDocs(prev => ({ ...prev, [stepId]: uploadRes.url }));
+      if (stepId === 'id' && base64) {
+        handleIDValidation(base64);
+      }
+    } catch (error) {
+      Alert.alert('Upload Failed', error.message || 'Could not upload this document. Please try again.');
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const pickImage = async (stepId) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -113,12 +142,19 @@ export default function SellerKYCScreen() {
       base64: true,
     });
 
-    if (!result.canceled && result.assets[0].base64) {
-      const base64 = result.assets[0].base64;
-      setDocs(prev => ({ ...prev, [stepId]: base64 }));
-      if (stepId === 'id') {
-        handleIDValidation(base64);
-      }
+    if (!result.canceled && result.assets?.[0]) {
+      await uploadDocumentAsset(stepId, result.assets[0], result.assets[0].base64 || null);
+    }
+  };
+
+  const pickDocument = async (stepId) => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['image/*', 'application/pdf'],
+      copyToCacheDirectory: true,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      await uploadDocumentAsset(stepId, result.assets[0]);
     }
   };
 
@@ -130,11 +166,10 @@ export default function SellerKYCScreen() {
         setIdValidation({ status: 'valid', reason: result.reason });
       } else {
         setIdValidation({ status: 'invalid', reason: result.reason });
-        Alert.alert('ID Validation Failed', result.reason);
       }
     } catch (error) {
       console.error('Validation error:', error);
-      setIdValidation({ status: 'invalid', reason: 'Validation system unavailable. Please try again.' });
+      setIdValidation({ status: 'pending', reason: 'AI validation unavailable. An admin can still review your document.' });
     }
   };
 
@@ -152,12 +187,8 @@ export default function SellerKYCScreen() {
       base64: true,
     });
 
-    if (!result.canceled && result.assets[0].base64) {
-      const base64 = result.assets[0].base64;
-      setDocs(prev => ({ ...prev, [stepId]: base64 }));
-      if (stepId === 'id') {
-        handleIDValidation(base64);
-      }
+    if (!result.canceled && result.assets?.[0]) {
+      await uploadDocumentAsset(stepId, result.assets[0], result.assets[0].base64 || null);
     }
   };
 
@@ -168,29 +199,36 @@ export default function SellerKYCScreen() {
       [
         { text: 'Take Photo', onPress: () => takePhoto(stepId) },
         { text: 'Choose from Gallery', onPress: () => pickImage(stepId) },
+        { text: 'Choose File / PDF', onPress: () => pickDocument(stepId) },
         { text: 'Cancel', style: 'cancel' },
       ]
     );
   };
 
   const handleSubmitKyc = async () => {
-    if (!docs.id || !docs.cit || !docs.business || !phone) {
-      Alert.alert('Missing Info', 'Please complete all document uploads and enter your phone number.');
+    if (!docs.business) {
+      Alert.alert('Missing Info', 'Please upload your RDB Certificate.');
       return;
     }
-
-    if (idValidation.status !== 'valid') {
-      Alert.alert('ID Not Validated', idValidation.reason || 'Please upload a clear, valid ID document before submitting.');
+    if (!tinNumber.trim()) {
+      Alert.alert('Missing Info', 'Please enter your TIN number.');
       return;
     }
+    // Phone is hidden to match the current Amomarket web KYC flow.
+    // if (!phone.trim()) {
+    //   Alert.alert('Missing Info', 'Please enter your business phone number.');
+    //   return;
+    // }
 
     setLoadingSubmit(true);
     try {
       await sellerService.submitKYC(user.id, {
-        idDocumentUrl: docs.id,
-        citDeclarationUrl: docs.cit,
+        // Hidden to match the current Amomarket web KYC flow.
+        // idDocumentUrl: docs.id || null,
+        // citDeclarationUrl: docs.cit || null,
         rdbCertificateUrl: docs.business,
-        phone: phone,
+        tinNumber: tinNumber.trim(),
+        // phone: phone.trim(),
       });
       
       Alert.alert('Success', 'Business Profile submitted successfully!', [
@@ -318,13 +356,30 @@ export default function SellerKYCScreen() {
                 </View>
              </View>
 
+             {/* Hidden to match the current Amomarket web KYC flow.
              <View style={styles.inputGroup}>
                 <CustomText style={styles.inputLabel}>BUSINESS CONTACT</CustomText>
                 <View style={[styles.inputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
                   <Phone color={colors.muted} size={18} />
-                  <TextInput 
+                  <TextInput
                     placeholder="Phone number (+250...)" placeholderTextColor={colors.muted}
                     value={phone} onChangeText={setPhone} keyboardType="phone-pad"
+                    style={[styles.textInput, { color: colors.foreground }]}
+                  />
+                </View>
+             </View>
+             */}
+
+             <View style={styles.inputGroup}>
+                <CustomText style={styles.inputLabel}>TIN NUMBER</CustomText>
+                <View style={[styles.inputBox, { backgroundColor: colors.glass, borderColor: colors.border }]}>
+                  <FileText color={colors.muted} size={18} />
+                  <TextInput
+                    placeholder="Enter your 9-digit TIN number"
+                    placeholderTextColor={colors.muted}
+                    value={tinNumber}
+                    onChangeText={setTinNumber}
+                    keyboardType="number-pad"
                     style={[styles.textInput, { color: colors.foreground }]}
                   />
                 </View>
@@ -343,7 +398,7 @@ export default function SellerKYCScreen() {
                     ]}
                     onPress={() => handleUpload(s.id)}
                    >
-                     {s.id === 'id' && idValidation.status === 'validating' ? (
+                     {uploading === s.id || (s.id === 'id' && idValidation.status === 'validating') ? (
                         <ActivityIndicator size="small" color={colors.primary} />
                      ) : docs[s.id] ? (
                         s.id === 'id' && idValidation.status === 'invalid' ? <XCircle color={colors.error} size={20} /> : <CheckCircle2 color="#10B981" size={20} />
@@ -351,8 +406,14 @@ export default function SellerKYCScreen() {
                         <s.icon color={colors.muted} size={20} />
                      )}
                      <CustomText style={[styles.docUploadLabel, { color: docs[s.id] ? (s.id === 'id' && idValidation.status === 'invalid' ? colors.error : '#10B981') : colors.muted }]}>{s.title}</CustomText>
-                     <CustomText style={{ fontSize: 9, color: docs[s.id] ? (s.id === 'id' && idValidation.status === 'invalid' ? colors.error : colors.muted) : colors.muted, opacity: 0.7 }}>
-                        {s.id === 'id' && idValidation.status === 'validating' ? "Validating..." : docs[s.id] ? (s.id === 'id' && idValidation.status === 'invalid' ? idValidation.reason : "Selected") : "Tap to upload"}
+                     <CustomText style={{ fontSize: 9, color: docs[s.id] ? (s.id === 'id' && idValidation.status === 'invalid' ? colors.error : colors.muted) : colors.muted, opacity: 0.7, textAlign: 'center' }}>
+                        {uploading === s.id
+                          ? "Uploading..."
+                          : s.id === 'id' && idValidation.status === 'validating'
+                            ? "Validating..."
+                            : docs[s.id]
+                              ? (s.id === 'id' && idValidation.status === 'invalid' ? idValidation.reason : "Uploaded")
+                              : s.required ? "Required" : "Optional"}
                      </CustomText>
                    </TouchableOpacity>
                 ))}

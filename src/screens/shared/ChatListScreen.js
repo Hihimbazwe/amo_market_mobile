@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Contacts from 'expo-contacts';
-import { Menu, Search, MessageCircle, Plus, Archive, Trash2, Pin, PinOff, Lock, Users, X, Settings, Radio, Megaphone } from 'lucide-react-native';
+import { Menu, Search, MessageCircle, Plus, Archive, Trash2, Pin, PinOff, Lock, Users, X, Settings, Radio, Megaphone, CheckCircle2, AlertCircle, Phone } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CustomText from '../../components/CustomText';
 import { useTheme } from '../../context/ThemeContext';
@@ -58,6 +58,45 @@ function formatTime(date) {
 function normalizeSearch(value) {
   return (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
+
+// Returns an error string if invalid, empty string if valid (or empty input)
+const validateRwandaPhoneNumber = (value) => {
+  const cleaned = value.trim().replace(/\s+/g, "");
+
+  if (!cleaned) {
+    return "";
+  }
+
+  if (!/^\+?\d*$/.test(cleaned)) {
+    return "Phone number can only contain digits and an optional leading +.";
+  }
+
+  let normalized = cleaned;
+
+  if (normalized.startsWith("+250")) {
+    normalized = "0" + normalized.slice(4);
+  } else if (normalized.startsWith("250")) {
+    normalized = "0" + normalized.slice(3);
+  }
+
+  // Only check prefix once at least 3 digits are available
+  if (normalized.length >= 3) {
+    const validPrefixes = ["072", "073", "078", "079"];
+    if (!validPrefixes.some(prefix => normalized.startsWith(prefix))) {
+      return "Phone number must start with 072, 073, 078, or 079.";
+    }
+  }
+
+  if (normalized.length > 10) {
+    return "Phone number is too long.";
+  }
+
+  if (normalized.length === 10 && !/^0\d{9}$/.test(normalized)) {
+    return "Invalid phone number.";
+  }
+
+  return "";
+};
 
 const ATTACHMENT_PREFIX = '__AMO_ATTACHMENT__:';
 const parseAttachmentMessage = (text) => {
@@ -300,6 +339,7 @@ export default function ChatListScreen() {
   const [startingChatId, setStartingChatId] = useState(null);
   const [inviteVisible, setInviteVisible] = useState(false);
   const [inviteContact, setInviteContact] = useState('');
+  const [invitePhoneError, setInvitePhoneError] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [contactSearch, setContactSearch] = useState('');
@@ -723,9 +763,31 @@ export default function ChatListScreen() {
     }, 400);
   };
 
+  const handleInviteContactChange = (value) => {
+    setInviteContact(value);
+    // Check if it looks like a phone number (contains digits)
+    const isPhoneNumber = /^\+?\d/.test(value.trim());
+    // Only show error once user has typed something meaningful (3+ chars)
+    if (isPhoneNumber && value.length >= 3) {
+      setInvitePhoneError(validateRwandaPhoneNumber(value));
+    } else {
+      setInvitePhoneError('');
+    }
+  };
+
   const handleInviteSubmit = async () => {
     const contact = inviteContact.trim();
     if (!contact || inviteLoading || !user?.id) return;
+
+    // Validate phone number if it looks like one
+    const isPhoneNumber = /^\+?\d/.test(contact);
+    if (isPhoneNumber) {
+      const phoneError = validateRwandaPhoneNumber(contact);
+      if (phoneError) {
+        Alert.alert('Invalid Phone Number', phoneError);
+        return;
+      }
+    }
 
     setInviteLoading(true);
     try {
@@ -733,6 +795,7 @@ export default function ChatListScreen() {
       if (result.status === 'existing') {
         setInviteVisible(false);
         setInviteContact('');
+        setInvitePhoneError('');
         openConversationFromInvite(result.conversationId, result.user);
         return;
       }
@@ -743,12 +806,14 @@ export default function ChatListScreen() {
         await Linking.openURL(`sms:${result.contact}${separator}body=${body}`);
         setInviteVisible(false);
         setInviteContact('');
+        setInvitePhoneError('');
         return;
       }
 
       Alert.alert('Invite Sent', 'We sent an invitation email with a secure chat link.');
       setInviteVisible(false);
       setInviteContact('');
+      setInvitePhoneError('');
     } catch (e) {
       Alert.alert('Invite Failed', e.message || 'Could not create this invite.');
     } finally {
@@ -1116,15 +1181,44 @@ export default function ChatListScreen() {
               Enter an email or phone number. If they already have an account, the chat opens immediately.
             </CustomText>
 
-            <TextInput
-              value={inviteContact}
-              onChangeText={setInviteContact}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              placeholder="Email or phone number"
-              placeholderTextColor={colors.muted}
-              style={[styles.inviteInput, { color: colors.foreground, borderColor: colors.glassBorder, backgroundColor: colors.background }]}
-            />
+            <View style={{ marginBottom: 16 }}>
+              {(() => {
+                const hasError = !!invitePhoneError;
+                const isPhoneNumber = /^\+?\d/.test(inviteContact.trim());
+                const isValid = !hasError && isPhoneNumber && inviteContact.length >= 10;
+
+                return (
+                  <View style={[
+                    styles.inviteInput,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: hasError ? '#ef4444' : isValid ? '#4ade80' : colors.glassBorder,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 12,
+                    }
+                  ]}>
+                    <Phone size={18} color={hasError ? '#ef4444' : isValid ? '#4ade80' : colors.muted} />
+                    <TextInput
+                      value={inviteContact}
+                      onChangeText={handleInviteContactChange}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      placeholder="Email or phone number"
+                      placeholderTextColor={colors.muted}
+                      style={{ flex: 1, color: colors.foreground, marginLeft: 8 }}
+                    />
+                    {isValid && <CheckCircle2 size={18} color="#4ade80" style={{ marginRight: 4 }} />}
+                    {hasError && <AlertCircle size={18} color="#ef4444" style={{ marginRight: 4 }} />}
+                  </View>
+                );
+              })()}
+              {invitePhoneError ? (
+                <CustomText style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                  {invitePhoneError}
+                </CustomText>
+              ) : null}
+            </View>
 
             <View style={styles.inviteActions}>
               <TouchableOpacity
