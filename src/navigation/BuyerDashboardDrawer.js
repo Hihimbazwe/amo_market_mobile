@@ -9,18 +9,19 @@ import { Sun, Moon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { 
-  Home, 
-  ShoppingBag, 
-  CircleUser as UserIcon, 
-  Heart, 
-  Wallet, 
-  Settings, 
-  AlertCircle, 
+import {
+  Home,
+  ShoppingBag,
+  CircleUser as UserIcon,
+  Heart,
+  Wallet,
+  Settings,
+  AlertCircle,
   RefreshCcw,
   LogOut,
   X,
   MessageCircle,
+  Rss,
 } from 'lucide-react-native';
 
 import BuyerOverviewScreen from '../screens/buyer/BuyerOverviewScreen';
@@ -32,9 +33,11 @@ import BuyerDisputesScreen from '../screens/buyer/BuyerDisputesScreen';
 import BuyerReplacementsScreen from '../screens/buyer/BuyerReplacementsScreen';
 import BuyerSettingsScreen from '../screens/buyer/BuyerSettingsScreen';
 import BuyerOrderTrackingScreen from '../screens/buyer/BuyerOrderTrackingScreen';
+import BuyerFeedScreen from '../screens/buyer/BuyerFeedScreen';
 import ChatListScreen from '../screens/shared/ChatListScreen';
 import ChatDetailScreen from '../screens/shared/ChatDetailScreen';
 import StatusViewerScreen from '../screens/shared/StatusViewerScreen';
+import GlobalSearchScreen from '../screens/GlobalSearchScreen';
 
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import SellerStoreScreen from '../screens/buyer/SellerStoreScreen';
@@ -71,10 +74,11 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
 
   const routes = [
     { name: 'Dashboard', label: t('dashboard'), icon: Home },
+    { name: 'Feed', label: t('feed') || 'Feed', icon: Rss },
     { name: 'Orders', label: t('orders'), icon: ShoppingBag },
     { name: 'Wishlist', label: t('wishlist'), icon: Heart },
-    { name: 'Wallet', label: t('wallet'), icon: Wallet },
-    { name: 'Disputes', label: t('disputes'), icon: AlertCircle },
+    // { name: 'Wallet', label: t('wallet'), icon: Wallet },
+    // { name: 'Disputes', label: t('disputes'), icon: AlertCircle },
     { name: 'Settings', label: t('settings'), icon: Settings },
   ].filter((r) => {
     if (!canChat && r.name === 'Chat') return false;
@@ -87,13 +91,13 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
         <TouchableWithoutFeedback onPress={onClose}>
           <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]} />
         </TouchableWithoutFeedback>
-        
+
         <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }], backgroundColor: colors.background, borderRightColor: colors.glassBorder }]}>
           <View style={[styles.drawerHeader, { borderBottomColor: colors.glassBorder }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <Image 
-                source={require('../../assets/logo.png')} 
-                style={{ width: 34, height: 34, resizeMode: 'contain', marginRight: 10 }} 
+              <Image
+                source={require('../../assets/logo.png')}
+                style={{ width: 34, height: 34, resizeMode: 'contain', marginRight: 10 }}
               />
               <Svg height="28" width="110">
                 <Defs>
@@ -115,12 +119,12 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
 
             {/* User Info - Avatar and Name */}
             <View style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ 
-                width: 36, 
-                height: 36, 
-                borderRadius: 18, 
-                backgroundColor: 'rgba(255,255,255,0.05)', 
-                alignItems: 'center', 
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 10,
                 borderWidth: 1,
@@ -164,21 +168,21 @@ const CustomDrawer = ({ visible, onClose, navigation }) => {
             })}
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => {
               Alert.alert(t('logoutConfirmTitle'), t('logoutConfirmDesc'), [
                 { text: t('cancel'), style: 'cancel' },
-                { 
-                  text: t('logoutConfirmTitle'), 
-                  style: 'destructive', 
+                {
+                  text: t('logoutConfirmTitle'),
+                  style: 'destructive',
                   onPress: () => {
                     onClose();
                     logout();
                     navigation.navigate('Home');
-                  } 
+                  }
                 }
               ]);
-            }} 
+            }}
             style={[styles.logoutButton, { borderColor: '#ff4444' }]}
           >
             <LogOut color="#ff4444" size={20} />
@@ -199,6 +203,7 @@ export default function BuyerDashboard({ navigation }) {
     <View style={{ flex: 1 }}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Dashboard" component={BuyerOverviewScreen} />
+        <Stack.Screen name="Feed" component={BuyerFeedScreen} />
         <Stack.Screen name="Orders" component={BuyerOrdersScreen} />
         <Stack.Screen name="Profile" component={BuyerProfileScreen} />
         <Stack.Screen name="Wishlist" component={BuyerWishlistScreen} />
@@ -207,6 +212,7 @@ export default function BuyerDashboard({ navigation }) {
         <Stack.Screen name="Replacements" component={BuyerReplacementsScreen} />
         <Stack.Screen name="Settings" component={BuyerSettingsScreen} />
         <Stack.Screen name="OrderTracking" component={BuyerOrderTrackingScreen} />
+        <Stack.Screen name="GlobalSearch" component={GlobalSearchScreen} />
         <Stack.Screen name="StatusViewer" component={StatusViewerScreen} />
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <Stack.Screen name="SellerStore" component={SellerStoreScreen} />
@@ -214,12 +220,12 @@ export default function BuyerDashboard({ navigation }) {
         <Stack.Screen name="Checkout" component={CheckoutScreen} />
         <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
       </Stack.Navigator>
-      
-      <CustomDrawer 
-        visible={visible} 
-        onClose={() => setVisible(false)} 
+
+      <CustomDrawer
+        visible={visible}
+        onClose={() => setVisible(false)}
         // Custom navigation object to handle routes inside the Stack overlay
-        navigation={navigation.navigate ? navigation : { navigate: () => {} }}
+        navigation={navigation.navigate ? navigation : { navigate: () => { } }}
       />
     </View>
   );

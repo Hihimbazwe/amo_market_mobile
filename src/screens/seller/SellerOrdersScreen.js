@@ -200,8 +200,8 @@ const SellerOrdersScreen = () => {
         onPress: async () => {
           try {
             await sellerService.shipOrder(user.id, orderId);
+            await fetchOrdersAndReplacements();
             Alert.alert(t('success'), t('orderMarkedShipped'));
-            fetchOrdersAndReplacements();
           } catch (err) {
             Alert.alert(t('error'), err.message || t('failedToShipOrder'));
           }
@@ -234,8 +234,8 @@ const SellerOrdersScreen = () => {
             setPreparingOrderId(order.id);
             try {
               await sellerService.markPrepared(user.id, order.id);
+              await fetchOrdersAndReplacements();
               Alert.alert(t('success'), t('orderMarkedPrepared'));
-              fetchOrdersAndReplacements();
             } catch (err) {
               Alert.alert(t('error'), err.message || t('failedToMarkPrepared'));
             } finally {
@@ -353,8 +353,8 @@ const SellerOrdersScreen = () => {
     try {
       await sellerService.verifyPickupCode(user.id, targetOrderId, pickupCodeInput.trim().toUpperCase());
       setShowVerifyVerifyPickupModalInternal(false);
+      await fetchOrdersAndReplacements();
       Alert.alert(t('success'), t('pickupVerified'));
-      fetchOrdersAndReplacements();
     } catch (err) {
       Alert.alert(t('error'), err.message || t('failedToVerifyPickup'));
     } finally {
@@ -468,8 +468,8 @@ const SellerOrdersScreen = () => {
     try {
       await sellerService.verifyReturnCode(user.id, targetOrderId, returnCodeInput.trim().toUpperCase());
       setShowVerifyVerifyReturnModalInternal(false);
+      await fetchOrdersAndReplacements();
       Alert.alert(t('success'), "Return verified successfully!");
-      fetchOrdersAndReplacements();
     } catch (err) {
       Alert.alert(t('error'), err.message || "Failed to verify return code");
     } finally {

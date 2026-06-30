@@ -8,6 +8,7 @@ const commonHeaders = {
 };
 
 export const productService = {
+  BASE_URL: BASE_URL,
   getProducts: async (filters = {}) => {
     try {
       const { category, province, district, sellerId } = filters;

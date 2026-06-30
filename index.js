@@ -1,6 +1,7 @@
 import { registerRootComponent } from 'expo';
 import * as Notifications from 'expo-notifications';
 import { notifyIncomingCallFromPush } from './src/utils/callNotificationBridge';
+import { formatNotificationBody } from './src/utils/formatNotificationBody';
 
 import App from './App';
 
@@ -12,6 +13,11 @@ import App from './App';
 // subscribes to once it mounts.
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
+    const body = notification.request.content.body || '';
+    const formattedBody = formatNotificationBody(body);
+    if (formattedBody !== body) {
+      notification.request.content.body = formattedBody;
+    }
     const data = notification.request.content.data || {};
 
     // Give high-priority / full-screen treatment to incoming call pushes

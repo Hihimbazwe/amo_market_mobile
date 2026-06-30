@@ -109,14 +109,14 @@ const BuyerOverviewScreen = () => {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={true}>
 
         {/* Futuristic Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: colors.glass }]}>
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('GlobalSearch')}
+          style={[styles.searchContainer, { backgroundColor: colors.glass }]}
+        >
           <Search color={colors.primary} size={20} style={styles.searchIcon} />
-          <TextInput
-            placeholder={t('searchPlaceholder')}
-            placeholderTextColor={colors.muted}
-            style={[styles.searchInput, { color: colors.foreground }]}
-          />
-        </View>
+          <CustomText style={{ color: colors.muted, flex: 1, marginLeft: 8 }}>{t('searchPlaceholder')}</CustomText>
+        </TouchableOpacity>
 
         {/* Pickup Reminder Banner */}
         {upcomingPickupOrder && (
@@ -218,7 +218,7 @@ const BuyerOverviewScreen = () => {
         </View>
 
         {/* Promo Cards */}
-        <View style={[styles.promoCard, { backgroundColor: colors.secondary }]}>
+        {/* <View style={[styles.promoCard, { backgroundColor: colors.secondary }]}>
           <CustomText style={styles.promoSub}>{t('premiumAccount')}</CustomText>
           <CustomText style={[styles.promoTitle, { color: colors.white }]}>{t('unlockCashback')}</CustomText>
           <CustomText style={styles.promoDesc}>{t('upgradeAmoPlus')}</CustomText>
@@ -230,7 +230,7 @@ const BuyerOverviewScreen = () => {
             <CustomText style={[styles.promoTitle, { color: colors.foreground }]}>{t('buyerProtection')}</CustomText>
           </View>
           <CustomText style={[styles.promoDesc, { color: colors.muted }]}>{t('protectionDesc')}</CustomText>
-        </View>
+        </View> */}
 
       </ScrollView>
     </SafeAreaView>
@@ -248,7 +248,8 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32 },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 12, paddingHorizontal: 16, marginBottom: 24,
+    borderRadius: 16, paddingHorizontal: 20, marginBottom: 24,
+    height: 60,
   },
   searchIcon: { marginRight: 12 },
   searchInput: { flex: 1, height: 50, fontSize: 16 },

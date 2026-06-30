@@ -127,11 +127,12 @@ export const orderService = {
     }
   },
 
-  cancelOrder: async (userId, orderId) => {
+  cancelOrder: async (userId, orderId, sellerIds) => {
     try {
       const response = await fetch(`${BASE_URL}/api/orders/${orderId}/cancel`, {
         method: 'PATCH',
         headers: buildHeaders(userId),
+        body: sellerIds?.length ? JSON.stringify({ sellerIds }) : undefined,
       });
       return await handleResponse(response, 'Failed to cancel order');
     } catch (error) {

@@ -135,9 +135,8 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Delivery Method
   const [pickupType, setPickupType] = useState('PICKUP');
-  const [pickupLocationId, setPickupLocationId] = useState('');
+  const pickupLocationId = 'default';
   const [sellerPickupSlots, setSellerPickupSlots] = useState({}); // { [sellerId]: slot_string }
-  const [pickupLocations, setPickupLocations] = useState([]);
   const [landmark, setLandmark] = useState('');
 
   // Location details
@@ -179,12 +178,8 @@ const CheckoutScreen = ({ route, navigation }) => {
   useEffect(() => {
     const init = async () => {
       setLocLoading(true);
-      const [p, pl] = await Promise.all([
-        locationService.fetchProvinces(),
-        checkoutService.fetchPickupLocations()
-      ]);
+      const p = await locationService.fetchProvinces();
       setProvinces(p);
-      setPickupLocations(pl);
       setLocLoading(false);
     };
     init();
@@ -294,12 +289,14 @@ const CheckoutScreen = ({ route, navigation }) => {
           if (!sellerGroups[sellerId]) {
             sellerGroups[sellerId] = {
               sellerId,
-              locationId: 'default', // Added to satisfy backend schema
+              sellerName: seller?.user?.name || 'Store',
+              locationId: pickupLocationId,
               address: seller?.locationAddress ||
                 (item.product?.district && item.product?.province
                   ? `${item.product.district}, ${item.product.province}`
                   : 'Location not set'),
-              slot: sellerPickupSlots[sellerId] || ''
+              slot: sellerPickupSlots[sellerId] || '',
+              pickupSlot: sellerPickupSlots[sellerId] || ''
             };
           }
         });
@@ -307,22 +304,28 @@ const CheckoutScreen = ({ route, navigation }) => {
       }
 
       const orderData = {
-        recipientName,
-        phoneNumber,
-        giftMessage,
+        recipientName: recipientName || '',
+        phoneNumber: phoneNumber || '',
+        giftMessage: giftMessage || '',
         pickupType,
-        address: pickupType === 'DELIVERY' ? address : '',
         agentId: selectedAgentId || undefined,
-        pickupLocationId: (pickupType === 'PICKUP' && pickupLocationId) ? pickupLocationId : undefined,
-        pickupSlot: pickupType === 'PICKUP' ? Object.values(sellerPickupSlots)[0] : undefined, // Fallback for single slot
-        sellerPickups: pickupType === 'PICKUP' ? sellerPickups : undefined,
-        shippingCost: deliveryFee,
+        shippingCost: deliveryFee ?? 0,
         items: checkoutItems.map(item => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-          price: item.product.price
+          productId: item.product?.id || '',
+          quantity: item.quantity ?? 0,
+          price: item.product?.price ?? 0,
+          sellerId: item.product?.seller?.id || item.product?.sellerId || 'unknown'
         }))
       };
+
+      if (pickupType === 'PICKUP') {
+        orderData.address = '';
+        orderData.pickupLocationId = pickupLocationId || '';
+        orderData.pickupSlot = Object.entries(sellerPickupSlots).map(([sid, slot]) => `${sid}:${slot}`).join(' | ') || '';
+        orderData.sellerPickups = sellerPickups;
+      } else {
+        orderData.address = address || '';
+      }
 
       const order = await checkoutService.placeOrder(user.id, orderData);
 
@@ -664,7 +667,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                 <CustomText variant="h3" style={{ color: colors.foreground, marginLeft: 12 }}>Pickup Locations</CustomText>
               </View>
 
-              <View style={styles.toggleRow}>
+              {/* <View style={styles.toggleRow}>
                 <TouchableOpacity
                   onPress={() => {
                     setPickupType('PICKUP');
@@ -679,7 +682,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                   <Building2 size={20} color={pickupType === 'PICKUP' ? colors.primary : colors.muted} />
                   <CustomText style={[styles.toggleText, { color: pickupType === 'PICKUP' ? colors.primary : colors.muted }]}>Pickup</CustomText>
                 </TouchableOpacity>
-              </View>
+              </View> */}
 
               {pickupType === 'DELIVERY' ? (
                 null
@@ -1137,6 +1140,7 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+
     </SafeAreaView>
 
   );

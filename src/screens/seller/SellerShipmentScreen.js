@@ -104,8 +104,8 @@ const SellerShipmentScreen = () => {
     setShippingId(orderId);
     try {
       await sellerService.shipOrder(user.id, orderId);
+      await loadData();
       Alert.alert(t('success'), t('orderMarkedShipped'));
-      loadData();
     } catch (err) {
       Alert.alert(t('error'), err.message || t('failedToMarkShipped'));
     } finally {

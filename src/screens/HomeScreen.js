@@ -154,10 +154,10 @@ const HomeScreen = ({ navigation }) => {
   const filteredProducts = useMemo(() => {
     let list = liveProducts;
     if (selectedCategory !== 'All') {
-      list = list.filter(p => p.category === selectedCategory);
+      list = list.filter(p => p.category && p.category.toLowerCase() === selectedCategory.toLowerCase());
     }
     if (searchQuery) {
-      list = list.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+      list = list.filter(p => p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase()));
     }
     return list;
   }, [liveProducts, selectedCategory, searchQuery]);

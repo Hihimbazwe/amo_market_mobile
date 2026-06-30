@@ -81,14 +81,14 @@ const SellerOverviewScreen = () => {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Futuristic Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: colors.glass }]}>
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('GlobalSearch')}
+          style={[styles.searchContainer, { backgroundColor: colors.glass }]}
+        >
           <Search color={colors.primary} size={20} style={styles.searchIcon} />
-          <TextInput
-            placeholder={t('searchSellerPlaceholder')}
-            placeholderTextColor={colors.muted}
-            style={[styles.searchInput, { color: colors.foreground }]}
-          />
-        </View>
+          <CustomText style={{ color: colors.muted, flex: 1, marginLeft: 8 }}>{t('searchSellerPlaceholder')}</CustomText>
+        </TouchableOpacity>
 
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>

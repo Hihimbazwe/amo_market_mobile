@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Linking, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, Linking, ActivityIndicator, Alert, TextInput, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  Loader2, 
-  Menu, 
-  Package, 
-  ChevronRight, 
+import {
+  Loader2,
+  Menu,
+  Package,
+  ChevronRight,
   Navigation as TrackIcon,
-  AlertTriangle, 
-  MoreVertical, 
+  AlertTriangle,
+  MoreVertical,
   QrCode,
   Star,
   Edit2,
@@ -52,7 +52,7 @@ const getStatusColor = (status) => {
   }
 };
 
-const filterTabs = ['All', 'PENDING', 'PAID', 'PREPARED', 
+const filterTabs = ['All', 'PENDING', 'PAID', 'PREPARED',
   // 'SHIPPED', 'DELIVERED', 
   'CANCELLED'];
 
@@ -75,6 +75,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
   const [deliveryCodeLoading, setDeliveryCodeLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelSellerIds, setCancelSellerIds] = useState([]);
 
   const [editPickupVisible, setEditPickupVisible] = useState(false);
   const [editPickupSlot, setEditPickupSlot] = useState('');
@@ -120,19 +121,25 @@ const BuyerOrdersScreen = ({ navigation }) => {
     fetchLocations();
   }, [user?.id]);
 
+  const stripSellerPrefix = (str) => {
+    if (!str) return '';
+    const idx = str.indexOf(':');
+    if (idx > 0) {
+      const before = str.slice(0, idx);
+      if (!before.includes(' ') && !/^\d+$/.test(before)) {
+        return str.slice(idx + 1);
+      }
+    }
+    return str;
+  };
+
   const parsePickupSlot = (slotStr) => {
     if (!slotStr) return null;
     try {
       // Handle multiple slots by taking the first one
       let firstSlot = slotStr.includes(' | ') ? slotStr.split(' | ')[0] : slotStr;
-      
-      // Strip sellerId: prefix if present
-      if (firstSlot.includes(':') && firstSlot.indexOf(':') < 30) {
-        const parts = firstSlot.split(':');
-        if (parts.length > 1 && (parts[0].startsWith('c') || parts[0].length >= 10)) {
-          firstSlot = parts.slice(1).join(':');
-        }
-      }
+
+      firstSlot = stripSellerPrefix(firstSlot);
 
       if (firstSlot.includes(' at ')) {
         const parts = firstSlot.split(' at ');
@@ -142,7 +149,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
         const d = new Date(dateStr);
         return isNaN(d.getTime()) ? null : d;
       }
-      
+
       const d = new Date(firstSlot);
       return isNaN(d.getTime()) ? null : d;
     } catch (e) {
@@ -179,12 +186,12 @@ const BuyerOrdersScreen = ({ navigation }) => {
 
   const filteredOrders = orders.filter(order => {
     const matchesTab = activeTab === 'All' || order.status?.toUpperCase() === activeTab.toUpperCase();
-    
+
     const query = searchQuery.toLowerCase();
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       order.id.toLowerCase().includes(query) ||
       order.items?.some(item => item.product?.title?.toLowerCase().includes(query));
-      
+
     return matchesTab && matchesSearch;
   });
 
@@ -210,7 +217,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
     setDeliveryCodeVisible(true);
     setDeliveryCodeData(null);
     setDeliveryCodeLoading(true);
-    
+
     try {
       const data = await orderService.getDeliveryCode(user.id, order.id);
       setDeliveryCodeData(data);
@@ -223,9 +230,13 @@ const BuyerOrdersScreen = ({ navigation }) => {
 
   const handleCancelOrder = async () => {
     if (!user?.id || !selectedOrder) return;
+    if (cancelSellerIds.length === 0) {
+      Alert.alert(t('cancelOrder'), 'Please select at least one seller to cancel.');
+      return;
+    }
     setCancelling(true);
     try {
-      await orderService.cancelOrder(user.id, selectedOrder.id);
+      await orderService.cancelOrder(user.id, selectedOrder.id, cancelSellerIds);
       setShowCancelModal(false);
       setOptionsVisible(false);
       await fetchOrders();
@@ -310,25 +321,25 @@ const BuyerOrdersScreen = ({ navigation }) => {
           )}
         </View>
       </View>
-      
+
       <View style={styles.topFilterSection}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.pillsScrollContent}
           style={styles.pillsRow}
         >
           {filterTabs.map((tab) => (
-            <TouchableOpacity 
-              key={tab} 
+            <TouchableOpacity
+              key={tab}
               style={[
-                styles.filterPill, 
+                styles.filterPill,
                 activeTab === tab && { backgroundColor: colors.primary }
               ]}
               onPress={() => setActiveTab(tab)}
             >
               <CustomText style={[
-                styles.pillText, 
+                styles.pillText,
                 { color: activeTab === tab ? '#fff' : colors.muted }
               ]}>
                 {tab === 'All' ? t('all') : t(tab.toLowerCase()) || tab}
@@ -344,7 +355,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
           <View style={{ flex: 1, marginLeft: 12 }}>
             <CustomText style={{ color: '#f97316', fontWeight: 'bold', fontSize: 13, marginBottom: 2 }}>Upcoming Pickup Reminder</CustomText>
             <CustomText style={{ color: colors.foreground, fontSize: 12, lineHeight: 18 }}>
-              Your order #{upcomingPickupOrder.id.slice(-8).toUpperCase()} is scheduled for pickup in roughly {Math.ceil(hoursRemaining)} hour{Math.ceil(hoursRemaining) !== 1 ? 's' : ''} ({upcomingPickupOrder.pickupSlot}).
+              Your order #{upcomingPickupOrder.id.slice(-8).toUpperCase()} is scheduled for pickup in roughly {Math.ceil(hoursRemaining)} hour{Math.ceil(hoursRemaining) !== 1 ? 's' : ''} ({stripSellerPrefix(upcomingPickupOrder.pickupSlot)}).
             </CustomText>
           </View>
         </View>
@@ -353,8 +364,8 @@ const BuyerOrdersScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? (
           <View style={styles.emptyState}>
-             <Loader2 color={colors.primary} size={32} />
-             <CustomText style={{ marginTop: 12 }}>{t('loadingOrders')}</CustomText>
+            <Loader2 color={colors.primary} size={32} />
+            <CustomText style={{ marginTop: 12 }}>{t('loadingOrders')}</CustomText>
           </View>
         ) : filteredOrders.length === 0 ? (
           <View style={styles.emptyState}>
@@ -363,10 +374,10 @@ const BuyerOrdersScreen = ({ navigation }) => {
               {t('noOrdersFound')}
             </CustomText>
             <CustomText style={{ fontSize: 10, color: colors.muted, marginTop: 8, opacity: 0.5 }}>
-              Logged in as: {user?.email} ({user?.id?.slice(0,8)}...)
+              Logged in as: {user?.email} ({user?.id?.slice(0, 8)}...)
             </CustomText>
             <TouchableOpacity onPress={fetchOrders} style={{ marginTop: 20, padding: 10 }}>
-               <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>{t('retry')}</CustomText>
+              <CustomText style={{ color: colors.primary, fontWeight: 'bold' }}>{t('retry')}</CustomText>
             </TouchableOpacity>
           </View>
         ) : (
@@ -379,7 +390,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
             if (isPickup && order.items?.length > 0) {
               const slots = order.pickupSlot?.split(' | ') || [];
               const locations = order.address?.split(' | ') || [];
-              
+
               const uniqueSellerIds = [];
               order.items.forEach(item => {
                 const sId = item.product?.seller?.id || item.product?.sellerId || 'unknown';
@@ -389,15 +400,9 @@ const BuyerOrdersScreen = ({ navigation }) => {
               order.items.forEach(item => {
                 const sellerId = item.product?.seller?.id || item.product?.sellerId || 'unknown';
                 const sellerIndex = uniqueSellerIds.indexOf(sellerId);
-                
+
                 let pTime = (slots[sellerIndex] || order.pickupSlot || 'Time not set').trim();
-                // Strip sellerId: prefix if present
-                if (pTime.includes(':') && pTime.indexOf(':') < 30) {
-                  const parts = pTime.split(':');
-                  if (parts.length > 1 && (parts[0].startsWith('c') || parts[0].length >= 10)) {
-                    pTime = parts.slice(1).join(':');
-                  }
-                }
+                pTime = stripSellerPrefix(pTime);
 
                 if (!sellerGroups[sellerId]) {
                   sellerGroups[sellerId] = {
@@ -412,8 +417,8 @@ const BuyerOrdersScreen = ({ navigation }) => {
             }
 
             return (
-              <TouchableOpacity 
-                key={order.id} 
+              <TouchableOpacity
+                key={order.id}
                 style={[styles.orderCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}
                 onPress={() => handleOpenOptions(order)}
               >
@@ -480,87 +485,90 @@ const BuyerOrdersScreen = ({ navigation }) => {
         animationType="slide"
         onRequestClose={() => setOptionsVisible(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setOptionsVisible(false)}
         >
           <View style={[styles.optionsContainer, { backgroundColor: colors.card, borderColor: colors.glassBorder }]}>
-             <View style={styles.modalHeader}>
-                <View style={styles.modalHandle} />
-                <CustomText variant="h3" style={{ textAlign: 'center', marginBottom: 20 }}>{t('orderOptions')}</CustomText>
-             </View>
-            
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHandle} />
+              <CustomText variant="h3" style={{ textAlign: 'center', marginBottom: 20 }}>{t('orderOptions')}</CustomText>
+            </View>
+
             <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Track Order */}
-                <TouchableOpacity 
+              {/* Track Order */}
+              <TouchableOpacity
                 style={styles.optionItem}
                 onPress={() => {
-                    setOptionsVisible(false);
-                    navigation.navigate('OrderTracking', { orderId: selectedOrder.id });
+                  setOptionsVisible(false);
+                  navigation.navigate('OrderTracking', { orderId: selectedOrder.id });
                 }}
-                >
+              >
                 <TrackIcon size={20} color={colors.primary} />
                 <CustomText style={styles.optionLabel}>{t('trackOrder')}</CustomText>
-                </TouchableOpacity>
+              </TouchableOpacity>
 
-                {/* Rate Agent */}
-                {(selectedOrder?.status === "DELIVERED" || selectedOrder?.status === "COMPLETED") && selectedOrder?.agentId && (
-                    <TouchableOpacity 
-                    style={styles.optionItem}
-                    onPress={() => {
-                        setOptionsVisible(false);
-                        navigation.navigate('OrderTracking', { orderId: selectedOrder.id });
-                    }}
-                    >
-                    <Star size={20} color="#fbbf24" />
-                    <CustomText style={styles.optionLabel}>{t('rateAgent')}</CustomText>
-                    </TouchableOpacity>
-                )}
-
-                {/* View Pickup QR */}
-                {selectedOrder?.pickupType === "PICKUP" && selectedOrder?.pickupCode && (
-                    <TouchableOpacity 
-                    style={styles.optionItem}
-                    onPress={() => {
-                        setOptionsVisible(false);
-                        navigation.navigate('OrderTracking', { orderId: selectedOrder.id });
-                    }}
-                    >
-                    <QrCode size={20} color={colors.primary} />
-                    <CustomText style={styles.optionLabel}>{t('view QR Code')}</CustomText>
-                    </TouchableOpacity>
-                )}
-
-                {/* Delivery Code (QR) */}
-                {["PAID","SHIPPED","DELIVERED","COMPLETED"].includes(selectedOrder?.status) && (
-                <TouchableOpacity 
-                    style={styles.optionItem}
-                    onPress={() => handleOpenDeliveryCode(selectedOrder)}
+              {/* Rate Agent */}
+              {(selectedOrder?.status === "DELIVERED" || selectedOrder?.status === "COMPLETED") && selectedOrder?.agentId && (
+                <TouchableOpacity
+                  style={styles.optionItem}
+                  onPress={() => {
+                    setOptionsVisible(false);
+                    navigation.navigate('OrderTracking', { orderId: selectedOrder.id });
+                  }}
                 >
-                    <PackageCheck size={20} color={colors.primary} />
-                    <CustomText style={[styles.optionLabel, { color: colors.primary }]}>{t('deliveryCode')}</CustomText>
+                  <Star size={20} color="#fbbf24" />
+                  <CustomText style={styles.optionLabel}>{t('rateAgent')}</CustomText>
                 </TouchableOpacity>
-                )}
+              )}
 
-                {/* Edit Pickup */}
-                {selectedOrder?.pickupType === "PICKUP" && !(["SHIPPED", "COMPLETED", "CANCELLED"].includes(selectedOrder?.status)) && (
-                    <TouchableOpacity 
-                    style={styles.optionItem}
-                    onPress={() => {
-                        setOptionsVisible(false);
-                        setEditPickupSlot(selectedOrder.pickupSlot || '');
-                        setEditLocationId(selectedOrder.pickupLocationId || '');
-                        setEditPickupVisible(true);
-                    }}
-                    >
-                    <Edit2 size={20} color={colors.primary} />
-                    <CustomText style={styles.optionLabel}>{t('edit pickup') || "Edit Pickup"}</CustomText>
-                    </TouchableOpacity>
-                )}
 
-                {/* After-Sales Request (Commented out as requested) */}
-                {/*
+              {/* View Pickup QR */}
+              {selectedOrder?.pickupType === "PICKUP" &&
+                (selectedOrder?.pickupCode || selectedOrder?.sellerOrders?.some(so => so.pickupCode)) && (
+                <TouchableOpacity
+                  style={styles.optionItem}
+                  onPress={() => {
+                    setOptionsVisible(false);
+                    navigation.navigate('OrderTracking', { orderId: selectedOrder.id });
+                  }}
+                >
+                  <QrCode size={20} color={colors.primary} />
+                  <CustomText style={styles.optionLabel}>{t('view QR Code')}</CustomText>
+                </TouchableOpacity>
+              )}
+
+
+              {/* Delivery Code (QR) */}
+              {["PAID", "SHIPPED", "DELIVERED", "COMPLETED"].includes(selectedOrder?.status) && (
+                <TouchableOpacity
+                  style={styles.optionItem}
+                  onPress={() => handleOpenDeliveryCode(selectedOrder)}
+                >
+                  <PackageCheck size={20} color={colors.primary} />
+                  <CustomText style={[styles.optionLabel, { color: colors.primary }]}>{t('deliveryCode')}</CustomText>
+                </TouchableOpacity>
+              )}
+
+              {/* Edit Pickup */}
+              {selectedOrder?.pickupType === "PICKUP" && !(["SHIPPED", "COMPLETED", "CANCELLED"].includes(selectedOrder?.status)) && (
+                <TouchableOpacity
+                  style={styles.optionItem}
+                  onPress={() => {
+                    setOptionsVisible(false);
+                    setEditPickupSlot(selectedOrder.pickupSlot || '');
+                    setEditLocationId(selectedOrder.pickupLocationId || '');
+                    setEditPickupVisible(true);
+                  }}
+                >
+                  <Edit2 size={20} color={colors.primary} />
+                  <CustomText style={styles.optionLabel}>{t('edit pickup') || "Edit Pickup"}</CustomText>
+                </TouchableOpacity>
+              )}
+
+              {/* After-Sales Request (Commented out as requested) */}
+              {/*
                 {(selectedOrder?.status === 'DELIVERED' || selectedOrder?.status === 'COMPLETED') && (
                     <TouchableOpacity 
                     style={styles.optionItem}
@@ -575,33 +583,33 @@ const BuyerOrdersScreen = ({ navigation }) => {
                 )}
                 */}
 
-                {/* Request Return Option */}
-                {(() => {
-                  if (!selectedOrder) return null;
-                  const isCompletedOrDelivered = ['COMPLETED', 'PICKED_UP', 'DELIVERED'].includes(selectedOrder.status?.toUpperCase());
-                  const isReturn = ['RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'RETURN_COMPLETED', 'RETURNED_TO_SELLER', 'REFUNDED'].includes(selectedOrder.status?.toUpperCase());
+              {/* Request Return Option */}
+              {(() => {
+                if (!selectedOrder) return null;
+                const isCompletedOrDelivered = ['COMPLETED', 'PICKED_UP', 'DELIVERED'].includes(selectedOrder.status?.toUpperCase());
+                const isReturn = ['RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'RETURN_COMPLETED', 'RETURNED_TO_SELLER', 'REFUNDED'].includes(selectedOrder.status?.toUpperCase());
 
-                  if (isCompletedOrDelivered && !isReturn) {
-                    return (
-                      <TouchableOpacity 
-                        style={styles.optionItem}
-                        onPress={() => {
-                          setOptionsVisible(false);
-                          setReturnReason('');
-                          setReturnError('');
-                          setReturnModalVisible(true);
-                        }}
-                      >
-                        <RotateCcw size={20} color="#F97316" />
-                        <CustomText style={[styles.optionLabel, { color: '#F97316' }]}>Request Return</CustomText>
-                      </TouchableOpacity>
-                    );
-                  }
-                  return null;
-                })()}
+                if (isCompletedOrDelivered && !isReturn) {
+                  return (
+                    <TouchableOpacity
+                      style={styles.optionItem}
+                      onPress={() => {
+                        setOptionsVisible(false);
+                        setReturnReason('');
+                        setReturnError('');
+                        setReturnModalVisible(true);
+                      }}
+                    >
+                      <RotateCcw size={20} color="#F97316" />
+                      <CustomText style={[styles.optionLabel, { color: '#F97316' }]}>Request Return</CustomText>
+                    </TouchableOpacity>
+                  );
+                }
+                return null;
+              })()}
 
-                {/* Report Issue */}
-                <TouchableOpacity 
+              {/* Report Issue */}
+              {/* <TouchableOpacity 
                 style={styles.optionItem}
                 onPress={() => {
                     setOptionsVisible(false);
@@ -610,41 +618,52 @@ const BuyerOrdersScreen = ({ navigation }) => {
                 >
                 <AlertTriangle size={20} color={colors.error || '#EF4444'} />
                 <CustomText style={[styles.optionLabel, { color: colors.error || '#EF4444' }]}>{t('reportIssue')}</CustomText>
+                </TouchableOpacity> */}
+
+              {/* Cancel Order */}
+              {canCancel(selectedOrder) && (
+                <TouchableOpacity
+                  style={styles.optionItem}
+                  onPress={() => {
+                    setOptionsVisible(false);
+                    // Initialize cancelSellerIds with all seller IDs
+                    if (selectedOrder?.items) {
+                      const ids = [];
+                      selectedOrder.items.forEach(item => {
+                        const sId = item.product?.seller?.id || item.product?.sellerId;
+                        if (sId && !ids.includes(sId)) ids.push(sId);
+                      });
+                      setCancelSellerIds(ids);
+                    } else {
+                      setCancelSellerIds([]);
+                    }
+                    setShowCancelModal(true);
+                  }}
+                >
+                  <AlertTriangle size={20} color="#ef4444" />
+                  <CustomText style={[styles.optionLabel, { color: '#ef4444' }]}>{t('cancelOrder')}</CustomText>
                 </TouchableOpacity>
+              )}
 
-                {/* Cancel Order */}
-                {canCancel(selectedOrder) && (
-                  <TouchableOpacity 
-                    style={styles.optionItem}
-                    onPress={() => {
-                      setOptionsVisible(false);
-                      setShowCancelModal(true);
-                    }}
-                  >
-                    <AlertTriangle size={20} color="#ef4444" />
-                    <CustomText style={[styles.optionLabel, { color: '#ef4444' }]}>{t('cancelOrder')}</CustomText>
-                  </TouchableOpacity>
-                )}
+              {/* Download Invoice */}
+              {selectedOrder?.status !== "PENDING" && selectedOrder?.status !== "CANCELLED" && (
+                <TouchableOpacity
+                  style={styles.optionItem}
+                  onPress={handleDownloadInvoice}
+                >
+                  <FileText size={20} color="#3b82f6" />
+                  <CustomText style={[styles.optionLabel, { color: '#3b82f6' }]}>{t('download Invoice')}</CustomText>
+                </TouchableOpacity>
+              )}
 
-                {/* Download Invoice */}
-                {selectedOrder?.status !== "PENDING" && selectedOrder?.status !== "CANCELLED" && (
-                    <TouchableOpacity 
-                        style={styles.optionItem}
-                        onPress={handleDownloadInvoice}
-                    >
-                        <FileText size={20} color="#3b82f6" />
-                        <CustomText style={[styles.optionLabel, { color: '#3b82f6' }]}>{t('download Invoice')}</CustomText>
-                    </TouchableOpacity>
-                )}
+              <View style={{ height: 1, backgroundColor: colors.glassBorder, marginVertical: 12 }} />
 
-                <View style={{ height: 1, backgroundColor: colors.glassBorder, marginVertical: 12 }} />
-                
-                <CustomButton 
-                title={t('close')} 
-                variant="outline" 
-                onPress={() => setOptionsVisible(false)} 
+              <CustomButton
+                title={t('close')}
+                variant="outline"
+                onPress={() => setOptionsVisible(false)}
                 style={{ marginBottom: 20 }}
-                />
+              />
             </ScrollView>
           </View>
         </TouchableOpacity>
@@ -657,9 +676,9 @@ const BuyerOrdersScreen = ({ navigation }) => {
         animationType="fade"
         onRequestClose={() => setDeliveryCodeVisible(false)}
       >
-        <TouchableOpacity 
-          style={styles.qrModalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.qrModalOverlay}
+          activeOpacity={1}
           onPress={() => setDeliveryCodeVisible(false)}
         >
           <View style={[styles.qrModalContent, { backgroundColor: colors.card, borderColor: colors.primary + '30' }]} onStartShouldSetResponder={() => true}>
@@ -703,9 +722,9 @@ const BuyerOrdersScreen = ({ navigation }) => {
               Share this 6-digit code with the delivery agent when receiving your package.
             </CustomText>
 
-            <CustomButton 
-              title={t('close')} 
-              onPress={() => setDeliveryCodeVisible(false)} 
+            <CustomButton
+              title={t('close')}
+              onPress={() => setDeliveryCodeVisible(false)}
               style={{ width: '100%' }}
             />
           </View>
@@ -730,37 +749,98 @@ const BuyerOrdersScreen = ({ navigation }) => {
                 <CustomText style={{ fontSize: 11, color: colors.muted }}>#{selectedOrder?.id?.slice(-8).toUpperCase()}</CustomText>
               </View>
             </View>
-            
-            <CustomText style={{ color: colors.muted, marginVertical: 16 }}>
-              {t('cancelOrderConfirmDesc')}
-            </CustomText>
 
-            {selectedOrder?.totalAmount > 0 && (
-              <View style={[styles.refundBox, { backgroundColor: 'rgba(34, 197, 94, 0.1)', borderColor: 'rgba(34, 197, 94, 0.2)' }]}>
-                <CheckCircle2 size={16} color="#22c55e" />
-                <CustomText style={{ color: '#22c55e', fontWeight: 'bold', fontSize: 12, marginLeft: 8 }}>
-                  Rwf {selectedOrder.totalAmount.toLocaleString()} {t('refundToWallet')}
-                </CustomText>
-              </View>
-            )}
+            {(() => {
+              if (!selectedOrder?.items) return null;
+              const sellerMap = {};
+              selectedOrder.items.forEach(item => {
+                const sId = item.product?.seller?.id || item.product?.sellerId || 'unknown';
+                if (!sellerMap[sId]) {
+                  sellerMap[sId] = { id: sId, name: item.product?.seller?.user?.name || item.product?.sellerName || 'Store', itemCount: 0 };
+                }
+                sellerMap[sId].itemCount++;
+              });
+              const sellerList = Object.values(sellerMap);
+              const isMultiSeller = sellerList.length > 1;
 
-            <View style={styles.cancelModalActions}>
-              <TouchableOpacity 
-                style={[styles.cancelModalBtn, { backgroundColor: colors.glass }]} 
-                onPress={() => setShowCancelModal(false)}
-              >
-                <CustomText style={{ fontWeight: 'bold' }}>{t('keepOrder')}</CustomText>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.cancelModalBtn, { backgroundColor: '#ef4444' }]} 
-                onPress={handleCancelOrder}
-                disabled={cancelling}
-              >
-                {cancelling ? <ActivityIndicator size="small" color="#fff" /> : (
-                  <CustomText style={{ color: '#fff', fontWeight: 'bold' }}>{t('yesCancel')}</CustomText>
-                )}
-              </TouchableOpacity>
-            </View>
+              return (
+                <>
+                  {isMultiSeller && (
+                    <>
+                      <CustomText style={{ color: colors.muted, fontSize: 12, fontWeight: '800', letterSpacing: 1, marginTop: 8, marginBottom: 8 }}>
+                        SELECT SELLERS TO CANCEL
+                      </CustomText>
+                      {sellerList.map(s => {
+                        const checked = cancelSellerIds.includes(s.id);
+                        return (
+                          <TouchableOpacity
+                            key={s.id}
+                            onPress={() => {
+                              setCancelSellerIds(prev =>
+                                checked ? prev.filter(id => id !== s.id) : [...prev, s.id]
+                              );
+                            }}
+                            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 }}
+                          >
+                            <View style={{
+                              width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+                              borderColor: checked ? '#ef4444' : colors.border,
+                              backgroundColor: checked ? '#ef4444' : 'transparent',
+                              alignItems: 'center', justifyContent: 'center', marginRight: 12
+                            }}>
+                              {checked && <CustomText style={{ color: '#fff', fontSize: 12, fontWeight: '900' }}>✓</CustomText>}
+                            </View>
+                            <Store size={16} color={colors.muted} style={{ marginRight: 8 }} />
+                            <View style={{ flex: 1 }}>
+                              <CustomText style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>{s.name}</CustomText>
+                              <CustomText style={{ color: colors.muted, fontSize: 11 }}>{s.itemCount} item(s)</CustomText>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                      <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
+                    </>
+                  )}
+
+                  <CustomText style={{ color: colors.muted, marginVertical: 8 }}>
+                    {isMultiSeller
+                      ? (cancelSellerIds.length > 0
+                        ? `Cancel order items from ${cancelSellerIds.length} selected seller(s)? Items from other sellers will remain active.`
+                        : t('cancelOrderConfirmDesc'))
+                      : t('cancelOrderConfirmDesc')}
+                  </CustomText>
+
+                  {selectedOrder?.totalAmount > 0 && (
+                    <View style={[styles.refundBox, { backgroundColor: 'rgba(34, 197, 94, 0.1)', borderColor: 'rgba(34, 197, 94, 0.2)' }]}>
+                      <CheckCircle2 size={16} color="#22c55e" />
+                      <CustomText style={{ color: '#22c55e', fontWeight: 'bold', fontSize: 12, marginLeft: 8 }}>
+                        Rwf {selectedOrder.totalAmount.toLocaleString()} {t('refundToWallet')}
+                      </CustomText>
+                    </View>
+                  )}
+
+                  <View style={styles.cancelModalActions}>
+                    <TouchableOpacity
+                      style={[styles.cancelModalBtn, { backgroundColor: colors.glass }]}
+                      onPress={() => setShowCancelModal(false)}
+                    >
+                      <CustomText style={{ fontWeight: 'bold' }}>{t('keepOrder')}</CustomText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.cancelModalBtn, { backgroundColor: '#ef4444', opacity: cancelSellerIds.length === 0 ? 0.5 : 1 }]}
+                      onPress={handleCancelOrder}
+                      disabled={cancelling || cancelSellerIds.length === 0}
+                    >
+                      {cancelling ? <ActivityIndicator size="small" color="#fff" /> : (
+                        <CustomText style={{ color: '#fff', fontWeight: 'bold' }}>
+                          {isMultiSeller ? `Cancel ${cancelSellerIds.length} Seller(s)` : t('yesCancel')}
+                        </CustomText>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })()}
           </View>
         </View>
       </Modal>
@@ -785,16 +865,16 @@ const BuyerOrdersScreen = ({ navigation }) => {
             </View>
 
             <TextInput
-              style={{ 
-                backgroundColor: colors.inputBg, 
-                borderColor: colors.glassBorder, 
-                borderWidth: 1, 
-                color: colors.foreground, 
-                borderRadius: 12, 
-                padding: 12, 
-                minHeight: 80, 
+              style={{
+                backgroundColor: colors.inputBg,
+                borderColor: colors.glassBorder,
+                borderWidth: 1,
+                color: colors.foreground,
+                borderRadius: 12,
+                padding: 12,
+                minHeight: 80,
                 textAlignVertical: 'top',
-                marginVertical: 16 
+                marginVertical: 16
               }}
               placeholder="Describe the reason for return (e.g. wrong item, damaged, etc.)..."
               placeholderTextColor={colors.muted}
@@ -809,14 +889,14 @@ const BuyerOrdersScreen = ({ navigation }) => {
             ) : null}
 
             <View style={styles.cancelModalActions}>
-              <TouchableOpacity 
-                style={[styles.cancelModalBtn, { backgroundColor: colors.glass }]} 
+              <TouchableOpacity
+                style={[styles.cancelModalBtn, { backgroundColor: colors.glass }]}
                 onPress={() => setReturnModalVisible(false)}
               >
                 <CustomText style={{ fontWeight: 'bold' }}>Cancel</CustomText>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.cancelModalBtn, { backgroundColor: colors.primary }]} 
+              <TouchableOpacity
+                style={[styles.cancelModalBtn, { backgroundColor: colors.primary }]}
                 onPress={handleReturnRequest}
                 disabled={submittingReturn || !returnReason.trim()}
               >
@@ -831,8 +911,9 @@ const BuyerOrdersScreen = ({ navigation }) => {
 
       {/* Edit Pickup Modal */}
       <Modal visible={editPickupVisible} transparent animationType="fade" onRequestClose={() => setEditPickupVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 24, width: '100%', borderWidth: 1, borderColor: colors.glassBorder }}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View onStartShouldSetResponder={() => true} style={{ backgroundColor: colors.card, borderRadius: 24, padding: 24, width: '100%', borderWidth: 1, borderColor: colors.glassBorder }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Edit2 size={20} color={colors.primary} style={{ marginRight: 12 }} />
@@ -849,12 +930,12 @@ const BuyerOrdersScreen = ({ navigation }) => {
 
             {/* Location Picker */}
             <CustomText style={{ fontSize: 11, fontWeight: 'bold', color: colors.muted, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1 }}>Pickup Location</CustomText>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={{ backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 12, padding: 14, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
               onPress={() => setLocationPickerVisible(!locationPickerVisible)}
             >
               <CustomText style={{ color: editLocationId ? colors.foreground : colors.muted, fontSize: 14 }}>
-                {editLocationId 
+                {editLocationId
                   ? allLocations.find(l => l.id === editLocationId)?.name || "Select location..."
                   : "Select location..."}
               </CustomText>
@@ -865,8 +946,8 @@ const BuyerOrdersScreen = ({ navigation }) => {
               <View style={{ backgroundColor: colors.inputBg, borderRadius: 12, borderWidth: 1, borderColor: colors.glassBorder, marginBottom: 16, maxHeight: 150 }}>
                 <ScrollView nestedScrollEnabled>
                   {allLocations.map((loc) => (
-                    <TouchableOpacity 
-                      key={loc.id} 
+                    <TouchableOpacity
+                      key={loc.id}
                       style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: colors.glassBorder }}
                       onPress={() => {
                         setEditLocationId(loc.id);
@@ -902,6 +983,7 @@ const BuyerOrdersScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
+      </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );

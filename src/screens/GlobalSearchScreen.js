@@ -53,7 +53,7 @@ const GlobalSearchScreen = ({ navigation }) => {
         return;
       }
       try {
-        const response = await fetch(`${productService.API_BASE_URL}/api/search?q=${encodeURIComponent(q)}`);
+        const response = await fetch(`${productService.BASE_URL || 'https://unrevived-unpolemically-ossie.ngrok-free.dev'}/api/search?q=${encodeURIComponent(q)}`);
         const data = await response.json();
         setResults(data);
       } catch (error) {

@@ -429,6 +429,8 @@ const RootNavigator = () => {
                     <Stack.Screen name="MainApp" component={AppTabs} />
                     <Stack.Screen name="Checkout" component={CheckoutScreen} />
                     <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
+                    <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                    <Stack.Screen name="GlobalSearch" component={GlobalSearchScreen} />
                     {!user && (
                       <Stack.Screen name="Auth" component={AuthStack} />
                     )}

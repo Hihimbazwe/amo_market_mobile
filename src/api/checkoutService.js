@@ -26,11 +26,15 @@ export const checkoutService = {
       try {
         data = JSON.parse(text);
       } catch (e) {
-        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+        // Backend returned plain text (common for validation errors like "Invalid phone number")
+        if (!response.ok) {
+          throw new Error(text.slice(0, 300) || `Server error (${response.status})`);
+        }
+        throw new Error(`Unexpected response from server: ${text.slice(0, 100)}`);
       }
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to place order (${response.status})`);
+        throw new Error(data.error || data.message || `Failed to place order (${response.status})`);
       }
 
       return data;
@@ -53,11 +57,15 @@ export const checkoutService = {
       try {
         data = JSON.parse(text);
       } catch (e) {
-        throw new Error(`Invalid JSON from server: ${text.slice(0, 100)}`);
+        // Backend returned plain text
+        if (!response.ok) {
+          throw new Error(text.slice(0, 300) || `Payment error (${response.status})`);
+        }
+        throw new Error(`Unexpected response from server: ${text.slice(0, 100)}`);
       }
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to process payment (${response.status})`);
+        throw new Error(data.error || data.message || `Failed to process payment (${response.status})`);
       }
 
       return data;

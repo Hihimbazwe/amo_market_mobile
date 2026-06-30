@@ -6,6 +6,7 @@ import Constants from 'expo-constants';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { formatNotificationBody } from '../utils/formatNotificationBody';
 
 export const NotificationContext = createContext();
 
@@ -154,10 +155,11 @@ export const NotificationProvider = ({ children }) => {
       notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
         try {
           setNotification(notification);
+          const body = formatNotificationBody(notification.request.content.body || '');
           const newItem = {
             id: notification.request.identifier || String(Date.now()),
             title: notification.request.content.title || 'Notification',
-            message: notification.request.content.body || '',
+            message: body,
             data: notification.request.content.data || {},
             createdAt: new Date().toISOString(),
             read: false,
@@ -183,10 +185,11 @@ export const NotificationProvider = ({ children }) => {
       responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
         try {
           const notif = response.notification;
+          const body = formatNotificationBody(notif.request.content.body || '');
           const newItem = {
             id: notif.request.identifier || String(Date.now()),
             title: notif.request.content.title || 'Notification',
-            message: notif.request.content.body || '',
+            message: body,
             data: notif.request.content.data || {},
             createdAt: new Date().toISOString(),
             read: false,

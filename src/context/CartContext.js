@@ -35,6 +35,11 @@ export const CartProvider = ({ children }) => {
       Alert.alert('Authentication Required', 'Please log in to add items to your cart.');
       return;
     }
+    const existingItem = cartItems.find(item => item.productId === productId);
+    if (existingItem) {
+      await updateQuantity(productId, existingItem.quantity + quantity);
+      return true;
+    }
     setLoading(true);
     try {
       await cartService.addToCart(user.id, productId, quantity, selectedVariants);

@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity,
   RefreshControl, ActivityIndicator, Linking, Dimensions, Image,
-  Alert, Platform, StatusBar, Modal, TextInput
+  Alert, Platform, StatusBar, Modal, TextInput, Keyboard,
+  TouchableWithoutFeedback
 } from 'react-native';
 import {
   ArrowLeft, CheckCircle2, Truck, MapPin, Package, Store,
@@ -67,6 +68,18 @@ const formatCoverageArea = (coverageArea) => {
   return coverageArea;
 };
 
+const stripSellerPrefix = (str) => {
+  if (!str) return '';
+  const idx = str.indexOf(':');
+  if (idx > 0) {
+    const before = str.slice(0, idx);
+    if (!before.includes(' ') && !/^\d+$/.test(before)) {
+      return str.slice(idx + 1);
+    }
+  }
+  return str;
+};
+
 // ─── Sub-components ───────────────────────────────────────────────
 const StatusBadge = ({ status, pickupType }) => {
   let color = '#f97316';
@@ -81,6 +94,84 @@ const StatusBadge = ({ status, pickupType }) => {
     </View>
   );
 };
+
+const AgentMap = React.memo(({ buyerLocation, agentLat, agentLng, mapZoom }) => {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 350);
+    return () => clearTimeout(t);
+  }, []);
+
+  const mapSource = useMemo(() => {
+    const url = buyerLocation 
+      ? `https://maps.google.com/maps?saddr=${buyerLocation.lat},${buyerLocation.lng}&daddr=${agentLat},${agentLng}&z=${mapZoom}&output=embed`
+      : `https://maps.google.com/maps?q=${agentLat},${agentLng}&z=${mapZoom}&output=embed`;
+    return {
+      html: `<html><body style="margin:0;padding:0;"><iframe width="100%" height="100%" frameborder="0" style="border:0" src="${url}" allowfullscreen></iframe></body></html>`
+    };
+  }, [buyerLocation?.lat, buyerLocation?.lng, agentLat, agentLng, mapZoom]);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+        <ActivityIndicator size="small" color="#f97316" />
+      </View>
+    );
+  }
+
+  return (
+    <WebView 
+      source={mapSource} 
+      style={{ flex: 1 }} 
+      scrollEnabled={false}
+      renderLoading={() => (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="small" color="#f97316" />
+        </View>
+      )}
+      startInLoadingState
+    />
+  );
+});
+
+const SellerMap = React.memo(({ buyerLocation, sellerLat, sellerLng }) => {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 350);
+    return () => clearTimeout(t);
+  }, []);
+
+  const mapSource = useMemo(() => {
+    const url = buyerLocation 
+      ? `https://maps.google.com/maps?saddr=${buyerLocation.lat},${buyerLocation.lng}&daddr=${sellerLat},${sellerLng}&z=14&output=embed`
+      : `https://maps.google.com/maps?q=${sellerLat},${sellerLng}&z=14&output=embed`;
+    return {
+      html: `<html><body style="margin:0;padding:0;"><iframe width="100%" height="100%" frameborder="0" style="border:0" src="${url}" allowfullscreen></iframe></body></html>`
+    };
+  }, [buyerLocation?.lat, buyerLocation?.lng, sellerLat, sellerLng]);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+        <ActivityIndicator size="small" color="#f97316" />
+      </View>
+    );
+  }
+
+  return (
+    <WebView 
+      source={mapSource} 
+      style={{ flex: 1 }} 
+      scrollEnabled={false}
+      renderLoading={() => (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="small" color="#f97316" />
+        </View>
+      )}
+      startInLoadingState
+    />
+  );
+});
 
 // ─── Main Screen ──────────────────────────────────────────────────
 const BuyerOrderTrackingScreen = ({ route, navigation }) => {
@@ -97,7 +188,8 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const [mapZoom, setMapZoom] = useState(15);
   
   const [deliveryCodeVisible, setDeliveryCodeVisible] = useState(false);
-  const [pickupCodeVisible, setPickupCodeVisible] = useState(false);
+  
+  const [sellerCodeVisible, setSellerCodeVisible] = useState({});
   
   const [returnCodeData, setReturnCodeData] = useState(null);
   const [returnCodeVisible, setReturnCodeVisible] = useState(false);
@@ -111,6 +203,7 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelSellerIds, setCancelSellerIds] = useState([]);
   const [buyerLocation, setBuyerLocation] = useState(null);
 
   const [editingPickup, setEditingPickup] = useState(null);
@@ -119,20 +212,69 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const [allLocations, setAllLocations] = useState([]);
   const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [savingPickup, setSavingPickup] = useState(false);
+  const returnCodeAttemptedRef = useRef(false);
+  const locationAttemptedRef = useRef(false);
 
   useEffect(() => {
-    let locationSubscription = null;
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      locationSubscription = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.Balanced, timeInterval: 10000, distanceInterval: 50 },
-        (loc) => setBuyerLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude })
-      );
-    })();
+    if (locationAttemptedRef.current) return;
+    locationAttemptedRef.current = true;
+    let active = true;
+
+    const fetchLocation = async () => {
+      try {
+        // Check existing permission first — never show a dialog if already granted
+        const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
+        let granted = existingStatus === 'granted';
+
+        // Only request if not yet granted (avoids the flashing Expo Go dialog)
+        if (!granted) {
+          const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+          granted = newStatus === 'granted';
+        }
+
+        if (!granted || !active) return;
+
+        // 1) Try last-known position first — instant, never blocks JS thread
+        try {
+          const last = await Location.getLastKnownPositionAsync({ maxAge: 300000 });
+          if (last && active) {
+            setBuyerLocation({ lat: last.coords.latitude, lng: last.coords.longitude });
+            return; // Good enough — skip the slow GPS call
+          }
+        } catch (_) {}
+
+        // 2) Race getCurrentPositionAsync against a 6-second Promise timeout
+        //    (Expo ignores the `timeout` field on Android, so we race manually)
+        const locationPromise = Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+        });
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('location_timeout')), 6000)
+        );
+
+        try {
+          const loc = await Promise.race([locationPromise, timeoutPromise]);
+          if (active) {
+            setBuyerLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+          }
+        } catch (e) {
+          // Timeout or GPS error — fall back to Kigali default so maps still render
+          if (active) {
+            setBuyerLocation({ lat: -1.9441, lng: 30.0619 });
+          }
+        }
+      } catch (e) {
+        // Swallow — location is optional, map still works without it
+        if (active) {
+          setBuyerLocation({ lat: -1.9441, lng: 30.0619 });
+        }
+      }
+    };
+
+    fetchLocation();
 
     return () => {
-      if (locationSubscription) locationSubscription.remove();
+      active = false;
     };
   }, []);
 
@@ -165,7 +307,8 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   }, [user?.id, orderId]);
 
   useEffect(() => {
-    if (order && RETURN_STATUSES.includes(order.status) && !returnCodeData && !fetchingReturnCode) {
+    if (order && RETURN_STATUSES.includes(order.status) && !returnCodeData && !fetchingReturnCode && !returnCodeAttemptedRef.current) {
+      returnCodeAttemptedRef.current = true;
       fetchReturnCode();
     }
   }, [order?.status, returnCodeData, fetchingReturnCode, fetchReturnCode]);
@@ -196,16 +339,28 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   const currentStep = stepIndex(activeSteps, resolvedStep);
   const isActive = ["PAID", "SHIPPED", "DELIVERED"].includes(order?.status);
 
-  // QR Payload
+  // Build a sellerId -> pickupCode map from sellerOrders for easy lookup
+  const sellerPickupCodeMap = useMemo(() => {
+    const m = {};
+    if (Array.isArray(order?.sellerOrders)) {
+      order.sellerOrders.forEach(so => {
+        if (so.sellerId && so.pickupCode) m[so.sellerId] = so.pickupCode;
+      });
+    }
+    return m;
+  }, [order?.sellerOrders]);
+
+  // QR Payload (order-level fallback)
   const qrPayload = order ? [
-    `Code: ${order.pickupCode}`,
+    `Code: ${order.pickupCode || ''}`,
     `Order: #${order.id?.slice(-8).toUpperCase()}`,
     `Buyer: ${order.buyer?.name || order.recipientName}`,
     `Phone: ${order.phoneNumber}`
   ].filter(Boolean).join('\n') : '';
 
-  const isReadyForCollection = isPickup && !!order?.pickupCode && order?.status !== "PENDING";
-  const isPickupCodeInvalid = order?.status === "PICKED_UP" || order?.status === "COMPLETED" || order?.status === "CANCELLED";
+  // Ready for collection if it's a pickup order that is not PENDING and has at least one seller pickup code
+  const isReadyForCollection = isPickup && order?.status !== "PENDING" &&
+    (!!order?.pickupCode || Object.keys(sellerPickupCodeMap).length > 0);
   
   const canCancelPickup = isPickup && !["PICKED_UP", "COMPLETED", "CANCELLED", "PREPARED"].includes(order?.status);
   const canCancelDelivery = !isPickup && !["PICKED_UP", "COMPLETED", "CANCELLED", "PREPARED", "DELIVERED", "IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(order?.status);
@@ -264,13 +419,13 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
         }
 
         let pTime = slots[sIdx] || order.pickupSlot || '';
-        // Strip sellerId: prefix if present
-        if (pTime.includes(':') && pTime.indexOf(':') < 30) {
-          const parts = pTime.split(':');
-          if (parts.length > 1 && (parts[0].startsWith('c') || parts[0].length >= 10)) {
-            pTime = parts.slice(1).join(':');
-          }
-        }
+        pTime = stripSellerPrefix(pTime);
+
+        // Priority: 1) sellerOrders per-seller code, 2) order-level pickupCode as fallback
+        const sellerOrderRec = Array.isArray(order?.sellerOrders)
+          ? order.sellerOrders.find(so => so.sellerId === sId)
+          : null;
+        let cCode = sellerOrderRec?.pickupCode || order.pickupCodes?.[sId] || order.pickupCode || '';
 
         map[sId] = {
           id: sId,
@@ -280,6 +435,7 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
           lng: seller.locationLng,
           locationName: finalLocation,
           pickupTime: pTime,
+          pickupCode: cCode,
         };
       }
     });
@@ -297,10 +453,14 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
   };
 
   const handleCancelOrder = async () => {
+    if (cancelSellerIds.length === 0) {
+      Alert.alert("Cancel Order", "Please select at least one seller to cancel.");
+      return;
+    }
     setCancelling(true);
     setShowCancelModal(false);
     try {
-      await orderService.cancelOrder(user.id, order.id);
+      await orderService.cancelOrder(user.id, order.id, cancelSellerIds);
       fetchOrder();
     } catch (e) { Alert.alert("Error", e.message || "Failed to cancel order"); }
     finally { setCancelling(false); }
@@ -310,7 +470,21 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
     if (!editingPickup) return;
     setSavingPickup(true);
     try {
-      await orderService.updatePickupTime(user.id, order.id, editLocationId || null, editSlot);
+      let slotToSend = editSlot;
+      // Rebuild multi-seller pickupSlot string with only the edited seller's time changed
+      if (order.pickupSlot?.includes(' | ')) {
+        const parts = order.pickupSlot.split(' | ');
+        const updated = parts.map(s => {
+          const ci = s.indexOf(':');
+          if (ci > 0) {
+            const sid = s.slice(0, ci);
+            if (sid === editingPickup.id) return `${sid}:${editSlot}`;
+          }
+          return s;
+        });
+        slotToSend = updated.join(' | ');
+      }
+      await orderService.updatePickupTime(user.id, order.id, editLocationId || null, slotToSend);
       setEditingPickup(null);
       fetchOrder();
     } catch (e) {
@@ -364,34 +538,99 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
                 <CustomText style={{ fontSize: 12, color: '#9ca3af' }}>#{order.id.slice(-8).toUpperCase()}</CustomText>
               </View>
             </View>
-            <CustomText style={{ color: '#9ca3af', fontSize: 14, lineHeight: 22, marginBottom: 20 }}>
-              Are you sure you want to cancel this order? This action cannot be undone.
-            </CustomText>
-            {order.totalAmount > 0 && (
-              <View style={{ backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)', padding: 12, borderRadius: 12, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
-                <CheckCircle2 size={16} color="#4ade80" />
-                <CustomText style={{ color: '#4ade80', fontSize: 12, fontWeight: '800', marginLeft: 8 }}>
-                  Rwf {order.totalAmount.toLocaleString()} will be refunded
-                </CustomText>
-              </View>
-            )}
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => setShowCancelModal(false)} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: '#374151', alignItems: 'center' }}>
-                <CustomText style={{ color: '#d1d5db', fontWeight: '800' }}>Keep Order</CustomText>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleCancelOrder} disabled={cancelling} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#ef4444', alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}>
-                {cancelling ? <ActivityIndicator size="small" color="#fff" /> : <AlertTriangle size={16} color="#fff" />}
-                <CustomText style={{ color: '#fff', fontWeight: '800', marginLeft: 8 }}>Yes, Cancel</CustomText>
-              </TouchableOpacity>
-            </View>
+
+            {(() => {
+              if (!order?.items) return null;
+              const sellerMap = {};
+              order.items.forEach(item => {
+                const sId = item.product?.seller?.id || item.product?.sellerId || 'unknown';
+                if (!sellerMap[sId]) {
+                  sellerMap[sId] = { id: sId, name: item.product?.seller?.user?.name || item.product?.sellerName || 'Store', itemCount: 0 };
+                }
+                sellerMap[sId].itemCount++;
+              });
+              const sellerList = Object.values(sellerMap);
+              const isMultiSeller = sellerList.length > 1;
+
+              return (
+                <>
+                  {isMultiSeller && (
+                    <>
+                      <CustomText style={{ color: '#9ca3af', fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 8 }}>
+                        SELECT SELLERS TO CANCEL
+                      </CustomText>
+                      {sellerList.map(s => {
+                        const checked = cancelSellerIds.includes(s.id);
+                        return (
+                          <TouchableOpacity
+                            key={s.id}
+                            onPress={() => {
+                              setCancelSellerIds(prev =>
+                                checked ? prev.filter(id => id !== s.id) : [...prev, s.id]
+                              );
+                            }}
+                            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 }}
+                          >
+                            <View style={{
+                              width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+                              borderColor: checked ? '#ef4444' : '#374151',
+                              backgroundColor: checked ? '#ef4444' : 'transparent',
+                              alignItems: 'center', justifyContent: 'center', marginRight: 12
+                            }}>
+                              {checked && <CustomText style={{ color: '#fff', fontSize: 12, fontWeight: '900' }}>✓</CustomText>}
+                            </View>
+                            <Store size={16} color="#9ca3af" style={{ marginRight: 8 }} />
+                            <View style={{ flex: 1 }}>
+                              <CustomText style={{ color: '#f3f4f6', fontSize: 14, fontWeight: '600' }}>{s.name}</CustomText>
+                              <CustomText style={{ color: '#9ca3af', fontSize: 11 }}>{s.itemCount} item(s)</CustomText>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                      <View style={{ height: 1, backgroundColor: '#1f2937', marginVertical: 8 }} />
+                    </>
+                  )}
+
+                  <CustomText style={{ color: '#9ca3af', fontSize: 14, lineHeight: 22, marginBottom: 20 }}>
+                    {isMultiSeller
+                      ? (cancelSellerIds.length > 0
+                        ? `Cancel items from ${cancelSellerIds.length} selected seller(s)? Items from other sellers will remain active.`
+                        : 'Select at least one seller to cancel.')
+                      : 'Are you sure you want to cancel this order? This action cannot be undone.'}
+                  </CustomText>
+
+                  {order.totalAmount > 0 && (
+                    <View style={{ backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)', padding: 12, borderRadius: 12, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
+                      <CheckCircle2 size={16} color="#4ade80" />
+                      <CustomText style={{ color: '#4ade80', fontSize: 12, fontWeight: '800', marginLeft: 8 }}>
+                        Rwf {order.totalAmount.toLocaleString()} will be refunded
+                      </CustomText>
+                    </View>
+                  )}
+
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity onPress={() => setShowCancelModal(false)} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: '#374151', alignItems: 'center' }}>
+                      <CustomText style={{ color: '#d1d5db', fontWeight: '800' }}>Keep Order</CustomText>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleCancelOrder} disabled={cancelling || cancelSellerIds.length === 0} style={{ flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#ef4444', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', opacity: cancelSellerIds.length === 0 ? 0.5 : 1 }}>
+                      {cancelling ? <ActivityIndicator size="small" color="#fff" /> : <AlertTriangle size={16} color="#fff" />}
+                      <CustomText style={{ color: '#fff', fontWeight: '800', marginLeft: 8 }}>
+                        {isMultiSeller ? `Cancel ${cancelSellerIds.length} Seller(s)` : 'Yes, Cancel'}
+                      </CustomText>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })()}
           </View>
         </View>
       </Modal>
 
       {/* Edit Pickup Modal */}
       <Modal visible={!!editingPickup} transparent animationType="fade" onRequestClose={() => setEditingPickup(null)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#111827', borderRadius: 24, padding: 24, width: '100%', borderWidth: 1, borderColor: '#1f2937' }}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View onStartShouldSetResponder={() => true} style={{ backgroundColor: '#111827', borderRadius: 24, padding: 24, width: '100%', borderWidth: 1, borderColor: '#1f2937' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Edit2 size={20} color="#fb923c" style={{ marginRight: 12 }} />
@@ -461,6 +700,7 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
             </View>
           </View>
         </View>
+      </TouchableWithoutFeedback>
       </Modal>
 
       {/* Header */}
@@ -697,51 +937,6 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Ready for Collection Pickup Code Card */}
-        {isReadyForCollection && (
-          <View style={[styles.glassCard, isPickupCodeInvalid ? { borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' } : { borderColor: 'rgba(249,115,22,0.3)', backgroundColor: 'rgba(249,115,22,0.05)' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-              <View style={[styles.iconBox, isPickupCodeInvalid ? { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' } : { backgroundColor: 'rgba(249,115,22,0.2)', borderColor: 'rgba(249,115,22,0.3)' }]}>
-                <QrCode size={20} color={isPickupCodeInvalid ? "#9ca3af" : "#fb923c"} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <CustomText style={{ fontSize: 15, fontWeight: '800', color: isPickupCodeInvalid ? '#9ca3af' : '#fb923c' }}>
-                  {isPickupCodeInvalid ? "Pickup Code Used/Invalid" : "Your Pickup Code"}
-                </CustomText>
-                <CustomText style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                  {isPickupCodeInvalid ? "This pickup code is no longer valid." : "Show this code to the seller when collecting your order"}
-                </CustomText>
-              </View>
-            </View>
-
-            {isPickupCodeInvalid ? (
-              <View style={{ borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.05)', padding: 16, alignItems: 'center' }}>
-                 <CustomText style={{ fontSize: 24, fontWeight: '900', letterSpacing: 8, color: '#9ca3af', opacity: 0.5, textDecorationLine: 'line-through' }}>EXPIRED</CustomText>
-              </View>
-            ) : (
-              <View style={{ alignItems: 'center' }}>
-                {!pickupCodeVisible ? (
-                  <TouchableOpacity onPress={() => setPickupCodeVisible(true)} style={{ backgroundColor: '#f97316', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16, shadowColor: '#f97316', shadowOpacity: 0.3, shadowRadius: 10 }}>
-                    <CustomText style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>Show Pickup Code</CustomText>
-                  </TouchableOpacity>
-                ) : (
-                  <>
-                    <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 24, marginBottom: 16 }}>
-                      <QRCode value={qrPayload} size={160} color="#000" backgroundColor="#fff" />
-                    </View>
-                    <CustomText style={{ fontSize: 10, color: '#9ca3af', letterSpacing: 1.5, fontWeight: '800', marginBottom: 4 }}>YOUR PICKUP CODE</CustomText>
-                    <CustomText style={{ fontSize: 36, fontWeight: '900', letterSpacing: 12, color: '#fb923c' }}>{order.pickupCode}</CustomText>
-                    
-                    <TouchableOpacity onPress={() => setPickupCodeVisible(false)} style={{ marginTop: 16, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(249,115,22,0.2)' }}>
-                      <CustomText style={{ fontSize: 12, fontWeight: '800', color: '#fb923c' }}>Hide Code</CustomText>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            )}
-          </View>
-        )}
-
         {/* Agent GPS Card */}
         {order.agent && isActive && (
           <View style={[styles.glassCard, agentLoc?.lat ? { borderColor: 'rgba(34,197,94,0.2)', backgroundColor: 'rgba(34,197,94,0.05)' } : {}]}>
@@ -794,10 +989,11 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
                     <CustomText style={{ color: '#9ca3af', fontSize: 11 }}>Lng: <CustomText style={{ color: '#f3f4f6', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>{agentLoc.lng.toFixed(5)}</CustomText></CustomText>
                   </View>
                   <View style={{ height: 200, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                    <WebView 
-                      source={{ html: `<html><body style="margin:0;padding:0;"><iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://maps.google.com/maps?q=${agentLoc.lat},${agentLoc.lng}&z=${mapZoom}&output=embed" allowfullscreen></iframe></body></html>` }} 
-                      style={{ flex: 1 }} 
-                      scrollEnabled={false}
+                    <AgentMap 
+                      buyerLocation={buyerLocation}
+                      agentLat={agentLoc.lat}
+                      agentLng={agentLoc.lng}
+                      mapZoom={mapZoom}
                     />
                   </View>
                 </View>
@@ -858,26 +1054,58 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
                 )}
               </View>
 
+              {/* Per-seller Pickup Code */}
+              {isReadyForCollection && s.pickupCode && (
+                <View style={{ marginTop: 12, padding: 12, backgroundColor: 'rgba(249,115,22,0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(249,115,22,0.15)' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1 }}>
+                      <CustomText style={{ fontSize: 10, color: '#fb923c', fontWeight: '800', letterSpacing: 1, marginBottom: 4 }}>PICKUP CODE</CustomText>
+                      <CustomText style={{ fontSize: 18, fontWeight: '900', letterSpacing: 4, color: sellerCodeVisible[s.id] ? '#fb923c' : 'rgba(251,146,60,0.3)' }}>
+                        {sellerCodeVisible[s.id] ? s.pickupCode : '••••••'}
+                      </CustomText>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => setSellerCodeVisible(prev => ({ ...prev, [s.id]: !prev[s.id] }))}
+                        style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 10 }}
+                      >
+                        <CustomText style={{ fontSize: 11, fontWeight: '800', color: '#fb923c' }}>{sellerCodeVisible[s.id] ? 'Hide' : 'Reveal'}</CustomText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  {sellerCodeVisible[s.id] && (
+                    <View style={{ alignItems: 'center', marginTop: 12 }}>
+                      <View style={{ backgroundColor: '#fff', padding: 12, borderRadius: 16 }}>
+                        <QRCode
+                          value={[
+                            `Code: ${s.pickupCode}`,
+                            `Order: #${order.id?.slice(-8).toUpperCase()}`,
+                            `Seller: ${s.name}`,
+                            `Buyer: ${order.buyer?.name || order.recipientName}`,
+                            `Phone: ${order.phoneNumber}`
+                          ].filter(Boolean).join('\n')}
+                          size={120}
+                          color="#000"
+                          backgroundColor="#fff"
+                        />
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+
               {s.lat && s.lng ? (
                 <View style={{ marginTop: 16 }}>
                   <View style={{ height: 220, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-                    <WebView 
-                      source={{ 
-                        html: `<html><body style="margin:0;padding:0;"><iframe width="100%" height="100%" frameborder="0" style="border:0" src="https://maps.google.com/maps?${buyerLocation ? `saddr=${buyerLocation.lat},${buyerLocation.lng}&daddr=${s.lat},${s.lng}` : `q=${s.lat},${s.lng}`}&z=14&output=embed" allowfullscreen></iframe></body></html>` 
-                      }} 
-                      style={{ flex: 1 }} 
-                      scrollEnabled={false}
+                    <SellerMap
+                      buyerLocation={buyerLocation}
+                      sellerLat={s.lat}
+                      sellerLng={s.lng}
                     />
-                    {!buyerLocation && (
-                      <View style={{ position: 'absolute', bottom: 12, left: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.8)', padding: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center' }}>
-                        <ActivityIndicator size="small" color="#fb923c" />
-                        <CustomText style={{ color: '#9ca3af', fontSize: 10, marginLeft: 8 }}>Waiting for your location to calculate route...</CustomText>
-                      </View>
-                    )}
                   </View>
                   
                   <TouchableOpacity 
-                    onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`)}
+                    onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}${buyerLocation ? `&origin=${buyerLocation.lat},${buyerLocation.lng}` : ''}`)}
                     style={[styles.mapActionBtn, { backgroundColor: '#f97316' }]}
                   >
                     <ExternalLink size={16} color="#fff" />
@@ -988,7 +1216,20 @@ const BuyerOrderTrackingScreen = ({ route, navigation }) => {
         {/* Actions */}
         <View style={{ flexDirection: 'row', gap: 12 }}>
           {canCancel && (
-            <TouchableOpacity onPress={() => setShowCancelModal(true)} disabled={cancelling} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239,68,68,0.05)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', paddingVertical: 16, borderRadius: 16 }}>
+            <TouchableOpacity onPress={() => {
+              // Initialize cancelSellerIds with all seller IDs
+              if (order?.items) {
+                const ids = [];
+                order.items.forEach(item => {
+                  const sId = item.product?.seller?.id || item.product?.sellerId;
+                  if (sId && !ids.includes(sId)) ids.push(sId);
+                });
+                setCancelSellerIds(ids);
+              } else {
+                setCancelSellerIds([]);
+              }
+              setShowCancelModal(true);
+            }} disabled={cancelling} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239,68,68,0.05)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', paddingVertical: 16, borderRadius: 16 }}>
               {cancelling ? <ActivityIndicator size="small" color="#f87171" /> : <AlertTriangle size={16} color="#f87171" />}
               <CustomText style={{ color: '#f87171', fontWeight: '800', fontSize: 13, marginLeft: 8 }}>Cancel Order</CustomText>
             </TouchableOpacity>

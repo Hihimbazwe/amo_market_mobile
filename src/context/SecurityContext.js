@@ -132,16 +132,11 @@ export const SecurityProvider = ({ children }) => {
   const [deviceLocked, setDeviceLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const appStateRef = useRef(AppState.currentState);
-  const lockTimeoutRef = useRef(null);
-  const inactivityTimerRef = useRef(null);
   const deviceLockUserIdRef = useRef(null);
   const skipLockAfterLoginRef = useRef(false);
   const isDeviceLockSessionRef = useRef(false);
   const suppressUnlockToastRef = useRef(false);
   const loadSecuritySettingsRef = useRef(null);
-
-  // Configurable inactivity period in milliseconds (default: 30 seconds)
-  const INACTIVITY_LOCK_PERIOD = 30000;
 
   // Storage key for local credential hash (never sent over the wire after setup)
   const localCredKey = user?.id ? `@security_cred_${user.id}` : null;
@@ -171,13 +166,8 @@ export const SecurityProvider = ({ children }) => {
           configuredMethods: mergeConfiguredMethods(parsed.configuredMethods, localConfiguredMethods),
         };
         setSecuritySettings(safe);
-        if (!skipLock && safe.enabled && safe.method && hasConfiguredMethod(safe.method, safe.configuredMethods)) {
-          setAppLocked(true);
-        } else if (!skipLock && safe.enabled) {
-          setAppLocked(false);
-        } else if (skipLock) {
-          setAppLocked(false);
-        }
+        // Start from home screen, never lock on startup/cold start
+        setAppLocked(false);
       }
 
       // Then sync from remote - but prioritize local method if it exists
@@ -221,12 +211,11 @@ export const SecurityProvider = ({ children }) => {
         const activeToken = token || authToken || await getAuthToken();
         const activeUser = userData || user;
         await persistSecuritySettings(user.id, safeSettings, deviceSecurityKey, activeToken, activeUser);
-        setAppLocked(skipLock ? false : !!safeSettings.enabled);
+        // Start from home screen, never lock on startup/cold start
+        setAppLocked(false);
       } catch (remoteErr) {
         console.warn('[SecurityContext] Remote settings fetch failed, using local cache:', remoteErr?.message);
-        if (skipLock) {
-          setAppLocked(false);
-        }
+        setAppLocked(false);
       }
     } catch (err) {
       console.warn('[SecurityContext] Error loading settings:', err);
@@ -234,7 +223,6 @@ export const SecurityProvider = ({ children }) => {
       setLoading(false);
     }
   }, [user?.id, deviceSecurityKey, authToken]);
-
 
   loadSecuritySettingsRef.current = loadSecuritySettings;
 
@@ -274,34 +262,8 @@ export const SecurityProvider = ({ children }) => {
 
   const handleAppStateChange = useCallback((nextAppState) => {
     if (skipLockAfterLoginRef.current) return;
-
-    if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
-      // App returning from background/inactive
-      if (inactivityTimerRef.current) {
-        // Clear the inactivity timer
-        clearTimeout(inactivityTimerRef.current);
-        inactivityTimerRef.current = null;
-        // If timer was still running, user returned quickly - don't lock
-        return;
-      }
-      // Timer expired, lock the app
-      if (securitySettings.enabled && isAuthenticated) {
-        setAppLocked(true);
-        setDeviceLocked(false);
-      }
-    } else if (nextAppState.match(/inactive|background/)) {
-      // App going to background/inactive
-      if (securitySettings.enabled && isAuthenticated) {
-        // Start inactivity timer instead of locking immediately
-        inactivityTimerRef.current = setTimeout(() => {
-          setAppLocked(true);
-          setDeviceLocked(true);
-          inactivityTimerRef.current = null;
-        }, INACTIVITY_LOCK_PERIOD);
-      }
-    }
     appStateRef.current = nextAppState;
-  }, [securitySettings.enabled, isAuthenticated]);
+  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
